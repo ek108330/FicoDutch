@@ -1,0 +1,924 @@
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #102f29;
+  color: #ffffff;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.home-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 35%, #23634e 0%, transparent 55%),
+    #102f29;
+}
+
+.top-bar {
+  height: 76px;
+  padding: 0 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 23px;
+  font-weight: 800;
+  color: #f5d46b;
+}
+
+.version {
+  font-size: 12px;
+  color: #b9d1c6;
+}
+
+.hero {
+  width: 100%;
+  max-width: 520px;
+  margin: auto;
+  padding: 55px 24px;
+  text-align: center;
+}
+
+.hero-icon {
+  font-size: 58px;
+  margin-bottom: 5px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(42px, 9vw, 64px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  color: #f5d46b;
+}
+
+.subtitle {
+  margin: 14px auto 32px;
+  max-width: 380px;
+  color: #d0e0d8;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.home-panel {
+  padding: 28px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.97);
+  color: #17372d;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  text-align: left;
+}
+
+.home-panel label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-panel input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d6e0da;
+  border-radius: 9px;
+  outline: none;
+  color: #17372d;
+  background: #ffffff;
+}
+
+.home-panel input:focus {
+  border-color: #26956e;
+  box-shadow: 0 0 0 3px rgba(38,149,110,0.12);
+}
+
+.primary-button {
+  width: 100%;
+  height: 50px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #e9bd43;
+  color: #26351e;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.primary-button:hover {
+  background: #f5d46b;
+  transform: translateY(-2px);
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 27px 0 20px;
+  color: #82958a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.separator::before,
+.separator::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: #e0e8e2;
+}
+
+.hub-list {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px dashed #cbd8cf;
+  border-radius: 10px;
+  color: #73877b;
+}
+
+.hub-list p {
+  font-size: 13px;
+}
+
+
+.rules-button {
+  margin: 22px auto 0;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #b42318;
+  border-radius: 30px;
+  background: #b42318;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.rules-button:hover {
+  background: #8f1d14;
+}
+
+
+footer {
+  padding: 20px;
+  text-align: center;
+  font-size: 11px;
+  color: #9bb9aa;
+}
+
+@media (max-width: 480px) {
+  .top-bar {
+    height: 62px;
+  }
+
+  .home-panel {
+    padding: 22px;
+  }
+
+  .hero {
+    padding: 35px 18px;
+  }
+}
+
+
+.rules-page {
+  min-height: 100vh;
+  padding: 25px 20px 60px;
+  background: #102f29;
+  color: #ffffff;
+}
+
+.rules-header {
+  max-width: 850px;
+  margin: 0 auto 35px;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 25px;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+}
+
+.rules-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 30px;
+  color: #f5d46b;
+  font-size: 30px;
+}
+
+.rules-content {
+  max-width: 850px;
+  margin: auto;
+  display: grid;
+  gap: 18px;
+}
+
+.rules-content section {
+  padding: 24px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.97);
+  color: #17372d;
+}
+
+.rules-content h2 {
+  margin-top: 0;
+  color: #247451;
+  font-size: 19px;
+}
+
+.rules-content p,
+.rules-content li {
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.rules-content ul {
+  padding-left: 22px;
+}
+
+@media (max-width: 600px) {
+  .rules-header h1 {
+    font-size: 24px;
+  }
+
+  .rules-content section {
+    padding: 19px;
+  }
+}
+
+.hub-settings {
+  margin-top: 28px;
+  text-align: left;
+}
+
+.hub-settings h3,
+.hub-settings h4 {
+  margin-bottom: 14px;
+}
+
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.variant-button {
+  min-height: 90px;
+  padding: 16px;
+  border: 1px solid #d5d9d7;
+  border-radius: 14px;
+  background: #f1f3f2;
+  color: #26332d;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.variant-button.active {
+  background: #176b45;
+  border-color: #176b45;
+  color: white;
+}
+
+.variant-button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.variant-button:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+
+.threshold-setting {
+  margin-top: 28px;
+  text-align: left;
+}
+
+.threshold-setting h4 {
+  margin-bottom: 18px;
+}
+
+.threshold-setting input[type="range"] {
+  width: 100%;
+  margin: 10px 0;
+  accent-color: #176b45;
+  cursor: pointer;
+}
+
+.threshold-setting input[type="range"]:disabled {
+  cursor: default;
+}
+
+.threshold-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+  color: #64716a;
+}
+
+.threshold-labels span {
+  text-align: center;
+  flex: 1;
+}
+
+.threshold-labels span:last-child {
+  text-align: right;
+}
+
+.start-game-button {
+  display: block;
+  width: 100%;
+  margin-top: 24px;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 14px;
+  background: #176b45;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.start-game-button:not(:disabled):hover {
+  background: #115535;
+  transform: translateY(-2px);
+}
+
+.start-game-button:disabled {
+  background: #a8b4ad;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Cartes FicoDutch */
+
+.playing-card {
+  width: 90px;
+  height: 130px;
+  border-radius: 10px;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.playing-card.face-down {
+  background: #145c3b;
+}
+
+.card-back-pattern {
+  width: 76%;
+  height: 82%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-linear-gradient(
+    45deg,
+    #145c3b,
+    #145c3b 6px,
+    #1b704a 6px,
+    #1b704a 12px
+  );
+}
+
+.card-back-pattern span {
+  font-size: 42px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: Georgia, serif;
+}
+
+@media (max-width: 600px) {
+  .playing-card {
+    width: 65px;
+    height: 95px;
+    border-width: 2px;
+  }
+
+  .card-back-pattern span {
+    font-size: 30px;
+  }
+}
+
+/* Tapis de jeu FicoDutch */
+
+.game-table {
+  width: 100%;
+  min-height: 500px;
+  padding: 30px;
+  border-radius: 24px;
+  background: radial-gradient(
+    ellipse at center,
+    #23764d 0%,
+    #145c3b 65%,
+    #0b3d27 100%
+  );
+  border: 8px solid #65452d;
+  box-shadow:
+    inset 0 0 35px rgba(0, 0, 0, 0.25),
+    0 10px 30px rgba(0, 0, 0, 0.15);
+  color: #ffffff;
+}
+
+.table-center {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin: 30px 0 45px;
+}
+
+.deck-placeholder,
+.discard-placeholder {
+  width: 90px;
+  height: 130px;
+  border: 2px dashed rgba(255, 255, 255, 0.65);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.table-players {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 35px;
+}
+
+.table-player {
+  text-align: center;
+}
+
+.player-name {
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.player-cards {
+  display: grid;
+  justify-content: center;
+  gap: 8px;
+}
+
+.player-cards.cards-four {
+  grid-template-columns: repeat(2, max-content);
+}
+
+.player-cards.cards-six {
+  grid-template-columns: repeat(3, max-content);
+}
+
+@media (max-width: 600px) {
+  .game-table {
+    padding: 15px;
+    border-width: 5px;
+  }
+
+  .table-center {
+    gap: 15px;
+    margin: 20px 0 30px;
+  }
+
+  .deck-placeholder,
+  .discard-placeholder {
+    width: 65px;
+    height: 95px;
+  }
+
+  .table-players {
+    gap: 25px;
+  }
+
+  .player-cards {
+    gap: 4px;
+  }
+}
+
+/* Placement des joueurs autour de la table */
+
+.game-table {
+  position: relative;
+  min-height: 780px;
+  perspective: 1200px;
+}
+
+.table-player {
+  position: absolute;
+  z-index: 2;
+  text-align: center;
+}
+
+.position-bottom {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.position-top {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.75);
+  transform-origin: top center;
+}
+
+.position-left {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.7);
+  transform-origin: left center;
+}
+
+.position-right {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.7);
+  transform-origin: right center;
+}
+
+.position-left-top {
+  left: 20px;
+  top: 15%;
+  transform: scale(0.6);
+  transform-origin: left top;
+}
+
+.position-left-bottom {
+  left: 20px;
+  bottom: 15%;
+  transform: scale(0.6);
+  transform-origin: left bottom;
+}
+
+.position-right-top {
+  right: 20px;
+  top: 15%;
+  transform: scale(0.6);
+  transform-origin: right top;
+}
+
+.position-right-bottom {
+  right: 20px;
+  bottom: 15%;
+  transform: scale(0.6);
+  transform-origin: right bottom;
+}
+
+.table-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+/* Effet de profondeur du tapis */
+
+.game-table {
+  background:
+    radial-gradient(
+      ellipse at 50% 65%,
+      #287f54 0%,
+      #176542 55%,
+      #0b3926 100%
+    );
+
+  border: 12px solid #65452d;
+
+  box-shadow:
+    inset 0 0 0 3px #a47b4b,
+    inset 0 15px 35px rgba(0, 0, 0, 0.3),
+    inset 0 -8px 20px rgba(255, 255, 255, 0.06),
+    0 12px 0 #3d281b,
+    0 20px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Écran de jeu indépendant du Hub */
+
+.game-screen {
+  width: 100%;
+  min-height: 100dvh;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #14251c;
+  box-sizing: border-box;
+}
+
+.game-screen .game-table {
+  width: 100%;
+  max-width: 1400px;
+  min-height: min(780px, calc(100dvh - 48px));
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .game-screen {
+    padding: 8px;
+  }
+
+  .game-screen .game-table {
+    min-height: calc(100dvh - 16px);
+  }
+}
+
+/* Adaptation de la table à l'orientation */
+
+@media (orientation: landscape) {
+  .game-screen .game-table {
+    width: 100%;
+    max-width: 1400px;
+    min-height: 0;
+    height: calc(100dvh - 48px);
+  }
+}
+
+@media (orientation: portrait) {
+  .game-screen .game-table {
+    width: 100%;
+    max-width: 650px;
+    min-height: calc(100dvh - 16px);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .game-screen {
+    padding: 6px;
+  }
+
+  .game-screen .game-table {
+    height: calc(100dvh - 12px);
+    border-width: 6px;
+  }
+}
+
+/* Taille des cartes selon leur position */
+
+.position-bottom .playing-card {
+  width: clamp(55px, 7vw, 100px);
+  height: clamp(80px, 10vw, 145px);
+}
+
+.position-top .playing-card,
+.position-left .playing-card,
+.position-right .playing-card,
+.position-left-top .playing-card,
+.position-left-bottom .playing-card,
+.position-right-top .playing-card,
+.position-right-bottom .playing-card {
+  width: 75px;
+  height: 108px;
+}
+
+/* Ajustements pour les téléphones */
+
+@media (max-width: 600px) {
+  .position-bottom .playing-card {
+    width: clamp(48px, 12vw, 70px);
+    height: clamp(70px, 17vw, 100px);
+  }
+
+  .position-top .playing-card,
+  .position-left .playing-card,
+  .position-right .playing-card,
+  .position-left-top .playing-card,
+  .position-left-bottom .playing-card,
+  .position-right-top .playing-card,
+  .position-right-bottom .playing-card {
+    width: 55px;
+    height: 80px;
+  }
+}
+
+/* Répartition des joueurs sur les côtés */
+
+.position-left-top,
+.position-right-top {
+  top: 8%;
+  bottom: auto;
+}
+
+.position-left-bottom,
+.position-right-bottom {
+  top: auto;
+  bottom: 8%;
+}
+
+/* Éviter que les joueurs latéraux débordent du tapis */
+
+.position-left,
+.position-left-top,
+.position-left-bottom {
+  left: 3%;
+}
+
+.position-right,
+.position-right-top,
+.position-right-bottom {
+  right: 3%;
+}
+
+/* Ajustements sur les écrans en paysage */
+
+@media (orientation: landscape) {
+  .position-left-top,
+  .position-right-top {
+    top: 3%;
+  }
+
+  .position-left-bottom,
+  .position-right-bottom {
+    bottom: 3%;
+  }
+}
+
+/* Recentrage des joueurs latéraux à 5 et 6 joueurs */
+
+.position-left-top,
+.position-right-top {
+  top: 22%;
+  bottom: auto;
+}
+
+.position-left-bottom,
+.position-right-bottom {
+  top: auto;
+  bottom: 22%;
+}
+
+@media (orientation: landscape) {
+  .position-left-top,
+  .position-right-top {
+    top: 17%;
+  }
+
+  .position-left-bottom,
+  .position-right-bottom {
+    bottom: 17%;
+  }
+}
+
+/* Orientation des cartes des joueurs latéraux */
+
+.position-left .player-cards,
+.position-left-top .player-cards,
+.position-left-bottom .player-cards {
+  transform: rotate(90deg);
+}
+
+.position-right .player-cards,
+.position-right-top .player-cards,
+.position-right-bottom .player-cards {
+  transform: rotate(-90deg);
+}
+
+/* Décalage des cartes latérales vers le centre */
+
+.position-left .player-cards,
+.position-left-top .player-cards,
+.position-left-bottom .player-cards {
+  position: relative;
+  left: 35px;
+}
+
+.position-right .player-cards,
+.position-right-top .player-cards,
+.position-right-bottom .player-cards {
+  position: relative;
+  right: 35px;
+}
+
+/* Réserver de l'espace entre le centre et le joueur local */
+
+.game-screen .game-table {
+  min-height: 650px;
+}
+
+.position-bottom {
+  bottom: 15px;
+}
+
+.table-center {
+  top: 38%;
+}
+
+.game-screen .game-table .position-top .player-cards {
+  transform: rotate(180deg);
+}
+
+/* Pseudo du joueur en face, côté extérieur de la table */
+
+.position-top {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+}
+
+.position-top .player-name {
+  margin-bottom: 0;
+  margin-top: 12px;
+}
+
+/* Espacement du joueur en face */
+
+.position-top {
+  top: 12px;
+}
+
+.position-top .player-cards {
+  margin-bottom: 8px;
+}
+
+.position-top .player-name {
+  margin-top: 8px;
+}
+
+/* Correction du joueur situé en face */
+
+.game-screen .game-table .position-top {
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.game-screen .game-table .position-top .player-name {
+  order: 0;
+  margin: 0 0 8px;
+}
+
+.game-screen .game-table .position-top .player-cards {
+  order: 1;
+  margin: 0;
+  transform: rotate(180deg);
+}
+
+/* Espacement vertical des trois zones principales */
+
+.game-screen .game-table {
+  min-height: 780px;
+}
+
+.game-screen .game-table .position-top {
+  top: 12px;
+}
+
+.game-screen .game-table .table-center {
+  top: 50%;
+}
+
+.game-screen .game-table .position-bottom {
+  bottom: 12px;
+}
