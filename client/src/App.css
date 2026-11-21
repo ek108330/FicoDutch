@@ -2355,6 +2355,16 @@ button.pile-slot:not(:disabled) .pile-card,
   }
 }
 
+@media (orientation: landscape) and (max-height: 370px) {
+  .game-screen .game-table:not(.is-large-table) .table-center:has(.turn-layout) {
+    top: 44.5%;
+  }
+
+  .game-table:not(.is-large-table) .position-bottom .playing-card {
+    height: clamp(34px, 12dvh, 44px);
+  }
+}
+
 @media (orientation: portrait) and (max-width: 600px) {
   .game-screen .game-table[data-player-count="2"] .position-top {
     top: 52px;

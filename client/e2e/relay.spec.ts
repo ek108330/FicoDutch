@@ -50,6 +50,11 @@ test("la partie démarre avec le relais quand la liaison directe ne répond pas"
     await discard(host).click();
     await expect(drawnCard(host)).toHaveCount(0);
     await expect(drawDeck(host)).toBeEnabled();
+    await host.setViewportSize({ width: 740, height: 360 });
+    const pile = (await host.locator(".discard-slot").boundingBox())!;
+    const name = (await host.locator(".position-bottom .player-name").boundingBox())!;
+    expect(pile.y + pile.height + 7).toBeLessThan(name.y);
+    await host.screenshot({ path: testInfo.outputPath("04-tour-paysage-compact.png") });
     expect(received.some((frame) => frame.includes('"ciphertext"'))).toBe(true);
     expect(received.every((frame) => !frame.includes('"drawnCard"') && !frame.includes('"round-view"'))).toBe(true);
   } finally {
