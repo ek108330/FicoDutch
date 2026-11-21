@@ -1,29 +1,20 @@
-
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
-
 const {
-  getAllHubs,
-  createHub,
-  joinHub,
-  updateHubSettings,
-  startHubGame,
-  removePlayer,
+  getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
+  disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame,
+  removeHubGuest, interruptHub, relayLobbyMessage,
 } = require("./hubManager");
 
 const app = express();
 const httpServer = http.createServer(app);
-
 app.use(cors());
 app.use(express.json());
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
+  cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
 app.get("/", (req, res) => {
@@ -35,119 +26,158 @@ app.get("/", (req, res) => {
 });
 
 function broadcastHubs() {
-  io.emit("hubs:update", getAllHubs());
+  io.emit("hubs:update", getAllHubs(), Date.now());
+}
+
+function scheduleHostExpiry(hubId, pauseUntil) {
+  setTimeout(() => {
+    if (expireHostPause(hubId, pauseUntil)) broadcastHubs();
+  }, Math.max(0, pauseUntil - Date.now()) + 1).unref();
+}
+
+function readPseudo(data) {
+  const pseudo = typeof data?.pseudo === "string" ? data.pseudo.trim() : "";
+  return /^[A-Za-z0-9]{2,20}$/.test(pseudo) ? pseudo : null;
 }
 
 io.on("connection", (socket) => {
   console.log("Connexion établie :", socket.id);
+  socket.emit("hubs:update", getAllHubs(), Date.now());
 
-  socket.emit("hubs:update", getAllHubs());
+  socket.on("hub:peer-signal", (request) => {
+    const relay = resolvePeerRelay(socket.id, request);
+    if (relay) io.to(relay.socketId).emit("hub:peer-signal", relay.signal);
+  });
 
-  // Créer un Hub
+  socket.on("hub:lobby-chat", (request, acknowledge) => {
+    const result = relayLobbyMessage(socket.id, request);
+    if (result.status === "ok") io.to(result.socketIds).emit("hub:lobby-chat", result.message);
+    if (typeof acknowledge === "function") acknowledge(result.status);
+  });
+
   socket.on("hub:create", (data) => {
-    const pseudo = data?.pseudo?.trim();
-
-    if (!pseudo || pseudo.length < 2 || pseudo.length > 20) {
+    const pseudo = readPseudo(data);
+    if (!pseudo) {
       socket.emit("hub:error", "Pseudo invalide.");
       return;
     }
-
-    const hub = createHub(socket.id, pseudo);
-
-if (!hub) {
-  socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
-  return;
-}
-
-socket.emit("hub:created", hub);
-broadcastHubs();
-
-console.log("Hub créé :", hub.name);
+    const membership = createHub(socket.id, pseudo);
+    if (!membership) {
+      socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
+      return;
+    }
+    socket.emit("hub:created", membership, Date.now());
+    broadcastHubs();
+    console.log("Hub créé :", membership.hub.name);
   });
 
-  // Rejoindre un Hub
   socket.on("hub:join", (data) => {
-    const pseudo = data?.pseudo?.trim();
+    const pseudo = readPseudo(data);
     const hubId = data?.hubId;
-
-    if (!pseudo || pseudo.length < 2 || pseudo.length > 20 || !hubId) {
+    if (!pseudo || typeof hubId !== "string" || !hubId) {
       socket.emit("hub:error", "Informations invalides.");
       return;
     }
-
-    const hub = joinHub(hubId, socket.id, pseudo);
-
-    if (!hub) {
-  socket.emit(
-    "hub:error",
-    "Impossible de rejoindre ce Hub. Vérifie qu'il est disponible et que tu n'appartiens pas déjà à un autre Hub."
-  );
-  return;
-}
-
-    socket.emit("hub:joined", hub);
+    const membership = joinHub(hubId, socket.id, pseudo);
+    if (!membership) {
+      socket.emit("hub:error", "Impossible de rejoindre ce Hub. Vérifie qu'il est disponible et que tu n'appartiens pas déjà à un autre Hub.");
+      return;
+    }
+    socket.emit("hub:joined", membership, Date.now());
     broadcastHubs();
-
-    console.log(pseudo, "a rejoint", hub.name);
+    console.log(pseudo, "a rejoint", membership.hub.name);
   });
 
-  // Modifier les paramètres du Hub
-socket.on("hub:update-settings", (settings) => {
-  const hub = updateHubSettings(socket.id, settings);
+  socket.on("hub:resume", (request, acknowledge) => {
+    if (typeof acknowledge !== "function") return;
+    const resumed = resumeHub(socket.id, request);
+    if (!resumed) {
+      acknowledge(null, Date.now());
+      return;
+    }
+    const { previousSocketId, ...membership } = resumed;
+    if (previousSocketId) io.sockets.sockets.get(previousSocketId)?.disconnect(true);
+    if (previousSocketId && membership.session.isHost && membership.hub.hostPause) {
+      scheduleHostExpiry(membership.hub.id, membership.hub.hostPause.until);
+    }
+    acknowledge(membership, Date.now());
+    broadcastHubs();
+  });
 
-  if (!hub) {
-    socket.emit(
-      "hub:error",
-      "Seul le créateur peut modifier les paramètres du Hub."
-    );
-    return;
-  }
+  socket.on("hub:host-ready", () => {
+    if (completeHostResume(socket.id)) broadcastHubs();
+  });
 
-  broadcastHubs();
+  socket.on("hub:finish", () => {
+    if (finishHubGame(socket.id)) broadcastHubs();
+  });
 
-  console.log("Paramètres du Hub modifiés :", hub.name);
-});
+  socket.on("hub:remove-guest", (request) => {
+    const { hubId, playerId } = request ?? {};
+    const result = removeHubGuest(socket.id, hubId, playerId);
+    if (!result) {
+      socket.emit("hub:error", "Ce joueur ne peut pas être retiré de la table.");
+      return;
+    }
+    if (result.socketId) io.to(result.socketId).emit("hub:ended", { hubId, reason: "removed" });
+    broadcastHubs();
+  });
 
-// Lancer une partie
-socket.on("hub:start", () => {
-  const result = startHubGame(socket.id);
+  socket.on("hub:interrupt", (request) => {
+    const { hubId } = request ?? {};
+    const socketIds = interruptHub(socket.id, hubId);
+    if (!socketIds) {
+      socket.emit("hub:error", "Cette partie ne peut plus être interrompue.");
+      return;
+    }
+    io.to(socketIds).emit("hub:ended", { hubId, reason: "interrupted" });
+    broadcastHubs();
+  });
 
-  if (result.error) {
-    socket.emit("hub:error", result.error);
-    return;
-  }
+  socket.on("hub:update-settings", (settings) => {
+    const hub = updateHubSettings(socket.id, settings);
+    if (!hub) {
+      socket.emit("hub:error", "Seul le créateur peut modifier les paramètres du Hub.");
+      return;
+    }
+    broadcastHubs();
+    console.log("Paramètres du Hub modifiés :", hub.name);
+  });
 
-  broadcastHubs();
+  socket.on("hub:start", (request, acknowledge) => {
+    const result = startHubGame(socket.id, request);
+    if (result.error) {
+      if (typeof acknowledge === "function") acknowledge(false);
+      socket.emit("hub:error", result.error);
+      return;
+    }
+    broadcastHubs();
+    if (typeof acknowledge === "function") acknowledge(true);
+    console.log("Partie lancée :", result.hub.name);
+  });
 
-  console.log("Partie lancée :", result.hub.name);
-});
-
-  // Quitter volontairement un Hub
   socket.on("hub:leave", () => {
     const result = removePlayer(socket.id);
-
     if (result) {
       socket.emit("hub:left");
       broadcastHubs();
-
       console.log("Joueur sorti de son Hub :", socket.id);
     }
   });
 
-  // Déconnexion
   socket.on("disconnect", () => {
     console.log("Déconnexion :", socket.id);
+    const result = disconnectPlayer(socket.id);
+    if (!result) return;
+    broadcastHubs();
 
-    const result = removePlayer(socket.id);
-
-    if (result) {
-      broadcastHubs();
-    }
+    const { hubId, pauseUntil } = result;
+    if (pauseUntil !== undefined) scheduleHostExpiry(hubId, pauseUntil);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-
-httpServer.listen(PORT, "0.0.0.0", () => {
+const HOST = process.env.HOST || "0.0.0.0";
+httpServer.listen(PORT, HOST, () => {
   console.log(`FicoDutch Server démarré sur le port ${PORT}`);
 });

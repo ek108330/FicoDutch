@@ -2,6 +2,8 @@ import type { Card } from "./cards";
 import type { GameVariants } from "./variants";
 
 export type GamePhase =
+  | "transition"
+  | "dealing"
   | "memorization"
   | "playing"
   | "results";
@@ -10,18 +12,50 @@ export type GamePlayer = {
   id: string;
   pseudo: string;
   cards: Card[];
+  handVersion: number;
   roundScore: number;
   totalScore: number;
+  scoreHistory: number[];
   hasLeft: boolean;
+};
+
+export type CardTarget = { playerId: string; position: number };
+export type PowerKind = "look-own" | "look-other" | "blind-swap" | "look-and-swap" | "give-card";
+export type SelectedCard = { playerId: string; cardId: string };
+export type Power = { kind: PowerKind; selected: SelectedCard[] };
+export type ReactionNotice = { playerId: string; outcome: "played" | "penalty" | "empty-pile" };
+export type ReactionState = { reference: number; lastPlayerId: string | null; notice: ReactionNotice | null };
+export type Dutch = { announcerId: string; remainingPlayerIds: string[] };
+export type RoundResult = {
+  emptyHandPlayerId: string | null;
+  dutchAnnouncerId: string | null;
+  dutchPenalty: boolean;
+  winnerIds: string[];
+  gameWinnerIds: string[];
+  nextVariants: GameVariants;
+};
+
+export type Turn = {
+  number: number;
+  deadline: number;
+  drawnCard: Card | null;
+  power: Power | null;
+  dutchArmed: boolean;
 };
 
 export type GameState = {
   roundNumber: number;
   phase: GamePhase;
+  phaseDeadline: number | null;
+  openingPlayerId: string | null;
   players: GamePlayer[];
   drawPile: Card[];
   discardPile: Card[];
   currentPlayerId: string | null;
+  turn: Turn | null;
+  reaction: ReactionState;
+  dutch: Dutch | null;
+  result: RoundResult | null;
   variants: GameVariants;
   endThreshold: number | null;
 };

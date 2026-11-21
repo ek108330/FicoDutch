@@ -17,6 +17,14 @@ export const GAME_CONFIG = {
 
   scoring: {
     defaultEndThreshold: 100,
+    historyLength: 8,
+  },
+
+  round: {
+    resultsMs: 60_000,
+    transitionMs: 5_000,
+    dealingMs: 600,
+    memorizationMs: 15_000,
   },
 
   player: {

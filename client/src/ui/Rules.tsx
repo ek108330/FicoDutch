@@ -82,11 +82,12 @@ function Rules({ onBack }: RulesProps) {
         <section>
           <h2>4. Déroulement d'un tour</h2>
           <p>
-            À son tour, un joueur dispose de 60 secondes pour piocher
+            Le premier joueur de la première manche est tiré au sort.
+            Chaque joueur dispose ensuite de 60 secondes pour prendre
             une carte et terminer son action.
           </p>
           <ol>
-            <li>Il pioche une carte dans la pioche.</li>
+            <li>Il prend la carte du dessus de la pioche ou de la défausse.</li>
             <li>Il peut l'échanger avec une de ses cartes. La carte remplacée est alors révélée sur la défausse.</li>
             <li>Ou il peut défausser directement la carte piochée, sans la conserver.</li>
           </ol>
@@ -145,7 +146,7 @@ function Rules({ onBack }: RulesProps) {
           </p>
           <ul>
             <li>La première réaction valide reçue par l'hôte est prioritaire.</li>
-            <li>Les autres tentatives ne sont pas validées et les cartes restent dans les mains de leurs propriétaires.</li>
+            <li>Une tentative reçue après le changement de la défausse laisse la main intacte.</li>
             <li>Une réaction invalide entraîne la récupération de la carte tentée et l'ajout d'une carte de pénalité aléatoire face cachée.</li>
             <li>La chaîne de réactions continue à partir de la dernière défausse valide.</li>
             <li>Les réactions ne disposent pas de minuterie.</li>
@@ -153,6 +154,11 @@ function Rules({ onBack }: RulesProps) {
           <p>
             La variante Pose infinie permet de poursuivre les réactions
             sans limite, y compris pour un même joueur.
+          </p>
+          <p>
+            Une réaction peut passer avant la sélection des deux cibles du 10
+            ou du Valet. Une fois les deux cibles du Valet validées,
+            elles restent réservées jusqu'à la décision du joueur.
           </p>
           <p>
             La variante +1 / -1 autorise également une réaction avec
@@ -170,7 +176,7 @@ function Rules({ onBack }: RulesProps) {
               <strong>Pioche épuisée :</strong> la défausse est mélangée pour reformer une pioche, en conservant visible sa carte supérieure.
             </li>
             <li>
-              <strong>Fin de tour :</strong> si le délai de 60 secondes expire, le tour est automatiquement passé.
+              <strong>Fin de tour :</strong> à l'expiration des 60 secondes, toute carte tirée encore en attente rejoint la défausse et le tour passe automatiquement.
             </li>
             <li>
               <strong>Déconnexion :</strong> un joueur déconnecté conserve ses cartes et son score. Son tour est passé si nécessaire.
@@ -196,10 +202,12 @@ function Rules({ onBack }: RulesProps) {
             À la fin de son tour, un joueur qui pense avoir le score
             le plus faible peut annoncer Dutch.
           </p>
+          <p>Le bouton Dutch prépare l’annonce. Elle prend effet quand le tour se termine.</p>
           <ul>
             <li>Les autres joueurs disposent d'un dernier tour.</li>
             <li>Le joueur ayant annoncé Dutch ne rejoue pas.</li>
             <li>Il est protégé contre les échanges forcés de ses cartes.</li>
+            <li>Le Valet peut toujours consulter ses cartes. L’échange est alors indisponible.</li>
             <li>Il peut néanmoins participer aux réactions.</li>
           </ul>
           <p>

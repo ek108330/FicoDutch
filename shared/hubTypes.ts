@@ -1,11 +1,13 @@
+import type hubSocial from "./hubSocial.json";
 
-export type HubStatus = "waiting" | "in-progress" | "full";
+export type HubStatus = "waiting" | "in-progress" | "full" | "finished";
 
 export type HubPlayer = {
   id: string;
   pseudo: string;
   isHost: boolean;
   connected: boolean;
+  connectionVersion: number;
 };
 
 
@@ -18,6 +20,11 @@ export type Hub = {
   maxPlayers: 6;
   status: HubStatus;
   gameStarted: boolean;
+  gameFinished: boolean;
+  hostPause: { startedAt: number; until: number } | null;
+  clockVersion: number;
+  initialCardCounts?: Record<string, number>;
+  memorizationEndsAt?: number;
   createdAt: number;
   variants: {
     sixCards: boolean;
@@ -33,7 +40,34 @@ export type CreateHubRequest = {
   pseudo: string;
 };
 
+export type HubSession = { hubId: string; playerId: string; token: string; isHost: boolean };
+export type HubMembership = { hub: Hub; session: HubSession };
+export type HubEnd = { hubId: string; reason: "removed" | "interrupted" };
+export type HubEmoji = keyof typeof hubSocial.emojis;
+export type LobbyChatContent = { kind: "text"; text: string } | { kind: "emoji"; emoji: HubEmoji };
+export type LobbyChatMessage = LobbyChatContent & { id: string; hubId: string; playerId: string; pseudo: string };
+export type LobbyChatStatus = "ok" | "unavailable" | "invalid" | "slow";
+
 export type JoinHubRequest = {
   hubId: string;
   pseudo: string;
+};
+
+export type StartHubRequest = Pick<Hub, "variants" | "endThreshold"> & {
+  hubId: string;
+  cardCounts: Record<string, number>;
+};
+
+export type PeerDescription = {
+  type: "offer" | "answer";
+  sdp: string;
+};
+
+export type PeerSignal = {
+  hubId: string;
+  senderId: string;
+  senderVersion: number;
+  recipientVersion: number;
+  negotiationId: string;
+  description: PeerDescription;
 };

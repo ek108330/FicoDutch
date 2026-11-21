@@ -23,6 +23,12 @@ export type Card = {
   suit?: Suit;
 };
 
+export type CardFace = Pick<Card, "rank" | "suit">;
+
+export function getCardFace({ rank, suit }: Card): CardFace {
+  return { rank, suit };
+}
+
 export const CARD_VALUES: Record<CardRank, number> = {
   A: 1,
   "2": 2,

@@ -1,65 +1,230 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { GAME_CONFIG } from "./config/gameConfig";
 import { Users, BookOpen, Plus, Spade } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
-import type { Hub } from "../../shared/hubTypes";
+import { useHubPeers } from "./network/useHubPeers";
+import { readHubSession, saveHubSession } from "./network/hubSession";
+import type { Hub, HubEnd, HubMembership, HubSession, StartHubRequest } from "../../shared/hubTypes";
+import { createRound } from "./game/createRound";
+import { resumeGameClock } from "./game/gameClock";
+import type { GameState } from "./game/gameTypes";
+import { applyDepartures } from "./game/turn";
+import type { UpdateHostRound } from "./game/useRoundTurn";
 import Rules from "./ui/Rules";
-import GameTable from "./ui/GameTable";
+import HubManagement from "./ui/HubManagement";
+import LobbyChat from "./ui/LobbyChat";
+import RoundScreen from "./ui/RoundScreen";
+
+type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
+type HostRound = { hubId: string; state: GameState };
 
 function App() {
-  const [pseudo, setPseudo] = useState(
-    localStorage.getItem("ficodutch-pseudo") || ""
-  );
-
+  const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
   const [showRules, setShowRules] = useState(false);
   const [hubs, setHubs] = useState<Hub[]>([]);
-  const [currentHub, setCurrentHub] = useState<Hub | null>(null);
+  const [currentHub, setCurrentHub] = useState<CurrentHub | null>(null);
+  const [session, setSession] = useState(readHubSession);
+  const [networkReady, setNetworkReady] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const [hostRound, setHostRound] = useState<HostRound | null>(null);
+  const hubRef = useRef<CurrentHub | null>(null);
+  const sessionRef = useRef(session);
+  const readyRef = useRef(false);
+  const hostRoundRef = useRef<HostRound | null>(null);
+  const pausedAt = useRef<number | null>(null);
+  const playerId = session?.playerId;
+  const peers = useHubPeers(currentHub, playerId, networkReady);
+
+  const storeHostRound = useCallback((round: HostRound | null) => {
+    hostRoundRef.current = round;
+    setHostRound(round);
+  }, []);
+
+  const storeHub = useCallback((hub: CurrentHub | null) => {
+    hubRef.current = hub;
+    setCurrentHub(hub);
+  }, []);
+
+  const storeSession = useCallback((value: HubSession | null) => {
+    sessionRef.current = value;
+    setSession(value);
+    saveHubSession(value);
+  }, []);
+
+  const storeReady = useCallback((ready: boolean) => {
+    readyRef.current = ready;
+    setNetworkReady(ready);
+  }, []);
+
+  const clearTable = useCallback(() => {
+    storeHub(null);
+    storeSession(null);
+    storeHostRound(null);
+    pausedAt.current = null;
+  }, [storeHub, storeHostRound, storeSession]);
+
+  const updateHostRound = useCallback<UpdateHostRound>((hubId, update) => {
+    const current = hostRoundRef.current;
+    const hub = hubRef.current;
+    if (current?.hubId !== hubId || hub?.id !== hubId || !readyRef.current ||
+        pausedAt.current !== null || !socket.connected) return;
+    const state = update(current.state, hub.players);
+    if (state !== current.state) storeHostRound({ hubId, state });
+  }, [storeHostRound]);
 
   useEffect(() => {
-    connectToServer();
+    let resumeRetry: number | undefined;
 
-    socket.on("connect", () => {
+    function applyHub(update: Hub, serverTime: number) {
+      const receivedAt = performance.now();
+      const previous = hubRef.current?.id === update.id ? hubRef.current : null;
+      let memorizationDeadline = previous?.memorizationDeadline;
+      if (memorizationDeadline === undefined && update.memorizationEndsAt !== undefined) {
+        memorizationDeadline = receivedAt + Math.max(0, update.memorizationEndsAt - serverTime);
+      }
+      const pauseDeadline = update.hostPause
+        ? previous?.hostPause?.until === update.hostPause.until && previous.pauseDeadline !== undefined
+          ? previous.pauseDeadline
+          : receivedAt + Math.max(0, update.hostPause.until - serverTime)
+        : undefined;
+
+      const round = hostRoundRef.current;
+      if (round?.hubId === update.id && update.gameStarted) {
+        let state = round.state;
+        if (state.roundNumber === 1 && state.phase === "memorization" &&
+            state.phaseDeadline === null && memorizationDeadline !== undefined) {
+          state = { ...state, phaseDeadline: memorizationDeadline };
+        }
+        if (update.hostPause) {
+          pausedAt.current ??= receivedAt;
+        } else if (pausedAt.current !== null && readyRef.current) {
+          state = resumeGameClock(state, receivedAt - pausedAt.current);
+          pausedAt.current = null;
+        }
+
+        const presentIds = new Set(update.players.map(({ id }) => id));
+        state = applyDepartures(state, presentIds, pausedAt.current ?? receivedAt);
+        if (state !== round.state) storeHostRound({ ...round, state });
+      }
+      storeHub({ ...update, memorizationDeadline, pauseDeadline });
+    }
+
+    function acceptMembership({ hub, session }: HubMembership, serverTime: number) {
+      storeSession(session);
+      storeReady(true);
+      setSessionNotice(null);
+      applyHub(hub, serverTime);
+    }
+
+    function onConnect() {
       console.log("FicoDutch connecté au serveur :", socket.id);
-    });
+      const saved = sessionRef.current;
+      if (!saved) {
+        storeReady(true);
+        return;
+      }
+      const connectionId = socket.id;
+      const tryResume = () => {
+        if (!socket.connected || socket.id !== connectionId || sessionRef.current?.token !== saved.token) return;
+        socket.timeout(5_000).emit("hub:resume", {
+          hubId: saved.hubId,
+          token: saved.token,
+          hasHostState: hostRoundRef.current?.hubId === saved.hubId,
+        }, (error: Error | null, membership: HubMembership | null, serverTime: number) => {
+          if (!socket.connected || socket.id !== connectionId || sessionRef.current?.token !== saved.token) return;
+          if (error) {
+            resumeRetry = window.setTimeout(tryResume, 1_000);
+          } else if (membership) {
+            acceptMembership(membership, serverTime);
+          } else {
+            const hostWithoutRound = saved.isHost && !hostRoundRef.current;
+            clearTable();
+            storeReady(true);
+            setSessionNotice(hostWithoutRound
+              ? "Pour reprendre une partie en tant qu’hôte, garde son onglet d’origine ouvert."
+              : "La reprise de ce Hub n’est plus disponible.");
+          }
+        });
+      };
+      tryResume();
+    }
 
-    socket.on("hubs:update", (updatedHubs: Hub[]) => {
+    function onHubs(updatedHubs: Hub[], serverTime: number) {
       setHubs(updatedHubs);
+      const current = hubRef.current;
+      if (!current) return;
+      const update = updatedHubs.find(({ id }) => id === current.id);
+      if (!update?.players.some(({ id }) => id === sessionRef.current?.playerId)) {
+        clearTable();
+        if (socket.connected) storeReady(true);
+        if (current.gameStarted) setSessionNotice(current.hostPause
+          ? "La partie est terminée. L’hôte n’est pas revenu à temps."
+          : "Le Hub de la partie a été fermé.");
+        return;
+      }
+      applyHub(update, serverTime);
+    }
 
-      setCurrentHub((current) => {
-        if (!current) return null;
-
-        return updatedHubs.find((hub) => hub.id === current.id) || null;
-      });
-    });
-
-    socket.on("hub:created", (hub: Hub) => {
-      setCurrentHub(hub);
-    });
-
-    socket.on("hub:joined", (hub: Hub) => {
-      setCurrentHub(hub);
-    });
-
-    socket.on("disconnect", () => {
+    function onDisconnect() {
+      if (hubRef.current?.gameStarted && hostRoundRef.current) pausedAt.current ??= performance.now();
+      storeReady(false);
+      window.clearTimeout(resumeRetry);
       console.log("FicoDutch déconnecté du serveur");
-    });
+    }
 
-    socket.on("hub:error", (message: string) => {
+    function onHubError(message: string) {
       alert(message);
-    });
+    }
+
+    function onHubEnded({ hubId, reason }: HubEnd) {
+      if (sessionRef.current?.hubId !== hubId) return;
+      clearTable();
+      setSessionNotice(reason === "removed"
+        ? "L’hôte t’a retiré de la table."
+        : "L’hôte a interrompu la partie.");
+    }
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("hubs:update", onHubs);
+    socket.on("hub:error", onHubError);
+    socket.on("hub:ended", onHubEnded);
+    socket.on("hub:created", acceptMembership);
+    socket.on("hub:joined", acceptMembership);
+    window.addEventListener("online", connectToServer);
+    window.addEventListener("offline", disconnectFromServer);
+    if (socket.connected) onConnect();
+    else connectToServer();
 
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("hubs:update");
-      socket.off("hub:error");
-      socket.off("hub:created");
-      socket.off("hub:joined");
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("hubs:update", onHubs);
+      socket.off("hub:error", onHubError);
+      socket.off("hub:ended", onHubEnded);
+      socket.off("hub:created", acceptMembership);
+      socket.off("hub:joined", acceptMembership);
+      window.removeEventListener("online", connectToServer);
+      window.removeEventListener("offline", disconnectFromServer);
+      window.clearTimeout(resumeRetry);
       disconnectFromServer();
     };
-  }, []);
+  }, [clearTable, storeHostRound, storeHub, storeReady, storeSession]);
+
+  useEffect(() => {
+    if (!networkReady || !currentHub?.hostPause || currentHub.hostId !== playerId ||
+        hostRoundRef.current?.hubId !== currentHub.id) return;
+    const activeIds = new Set(hostRoundRef.current.state.players.filter(({ hasLeft }) => !hasLeft).map(({ id }) => id));
+    const others = currentHub.players.filter(({ id, connected }) => connected && id !== playerId && activeIds.has(id));
+    if (others.every(({ id }) => peers.connectedPeers.includes(id))) socket.emit("hub:host-ready");
+  }, [currentHub, networkReady, peers.connectedPeers, playerId]);
+
+  useEffect(() => {
+    if (networkReady && currentHub && !currentHub.gameFinished && hostRound?.hubId === currentHub.id &&
+        hostRound.state.result?.gameWinnerIds.length) socket.emit("hub:finish");
+  }, [currentHub, hostRound, networkReady]);
 
   function savePseudo(value: string) {
     setPseudo(value);
@@ -79,7 +244,7 @@ function App() {
       return;
     }
 
-    if (!socket.connected) {
+    if (!networkReady) {
       alert("Connexion au serveur en cours. Réessaie dans un instant.");
       return;
     }
@@ -106,26 +271,94 @@ function App() {
     });
   }
 
+  function startGame(hub: Hub) {
+    if (!networkReady || hostRoundRef.current?.hubId === hub.id) return;
+
+    const state = createRound(
+      hub.players.map(({ id, pseudo }) => ({ id, pseudo, totalScore: 0 })),
+      hub.variants,
+      hub.endThreshold
+    );
+    const preparedRound = { hubId: hub.id, state };
+    const request: StartHubRequest = {
+      hubId: hub.id,
+      variants: state.variants,
+      endThreshold: state.endThreshold,
+      cardCounts: Object.fromEntries(
+        state.players.map(({ id, cards }) => [id, cards.length])
+      ),
+    };
+
+    storeHostRound(preparedRound);
+    socket.emit("hub:start", request, (accepted: boolean) => {
+      if (!accepted && hostRoundRef.current === preparedRound) storeHostRound(null);
+    });
+  }
+
+  function leaveHub() {
+    if (networkReady) socket.emit("hub:leave");
+    clearTable();
+  }
+
+  const canManage = networkReady && currentHub && currentHub.hostId === playerId && !currentHub.gameFinished &&
+    !hostRound?.state.result?.gameWinnerIds.length;
+
+  function manageHub(hub: Hub, className?: string) {
+    if (!canManage) return null;
+    return (
+      <HubManagement
+        className={className}
+        members={hub.players}
+        onRemove={(playerId) => socket.emit("hub:remove-guest", { hubId: hub.id, playerId })}
+        onInterrupt={hub.gameStarted ? () => socket.emit("hub:interrupt", { hubId: hub.id }) : undefined}
+      />
+    );
+  }
+
   if (showRules) {
   return <Rules onBack={() => setShowRules(false)} />;
   }
 
   if (currentHub?.gameStarted) {
-  return (
-    <main className="game-screen">
-      <GameTable
-        localPlayerId={socket.id ?? ""}
-        players={currentHub.players.map((player) => ({
-          id: player.id,
-          pseudo: player.pseudo,
-          cardCount: currentHub.variants.sixCards ? 6 : 4,
-        }))}
+    const { memorizationDeadline } = currentHub;
+    if (memorizationDeadline === undefined) {
+      return (
+        <main className="game-screen">
+          <p role="status">En attente de la distribution des cartes…</p>
+        </main>
+      );
+    }
+
+    const localRound = hostRound?.hubId === currentHub.id ? hostRound.state : null;
+    return (
+      <RoundScreen
+        key={currentHub.id}
+        hubId={currentHub.id}
+        hostId={currentHub.hostId}
+        playerId={playerId ?? ""}
+        deadline={memorizationDeadline}
+        members={currentHub.players}
+        gameFinished={currentHub.gameFinished}
+        hostRound={localRound}
+        peers={peers}
+        updateHostRound={updateHostRound}
+        onLeave={leaveHub}
+        hostManagement={manageHub(currentHub, "game-leave")}
+        clockVersion={currentHub.clockVersion}
+        pause={currentHub.hostPause
+          ? { reason: "host", deadline: currentHub.pauseDeadline }
+          : !networkReady ? { reason: "local" } : null}
+        canLeave={networkReady}
       />
-    </main>
-  );
-}
+    );
+  }
 
   if (currentHub) {
+    const isHost = currentHub.hostId === playerId;
+    const canStart = currentHub.players.length >= GAME_CONFIG.players.min;
+    const peersReady = currentHub.players.every(({ id }) =>
+      id === playerId || peers.connectedPeers.includes(id)
+    );
     return (
       <main className="home-page">
         <header className="top-bar">
@@ -166,7 +399,7 @@ function App() {
       [50, 100, 200, 500, 1000, null].indexOf(currentHub.endThreshold)
     }
     disabled={
-  currentHub.hostId !== socket.id ||
+  currentHub.hostId !== playerId ||
   currentHub.gameStarted
 }
     onChange={(event) => {
@@ -210,7 +443,7 @@ function App() {
         currentHub.variants[key] ? "active" : ""
       }`}
       disabled={
-  currentHub.hostId !== socket.id ||
+  currentHub.hostId !== playerId ||
   currentHub.gameStarted
 }
       onClick={() => {
@@ -244,44 +477,28 @@ function App() {
               </div>
             ))}
 
-            {!currentHub.gameStarted ? (
-  <>
-    <p>En attente du lancement de la partie...</p>
-
-    {currentHub.hostId === socket.id && (
-      <button
-        type="button"
-        className="start-game-button"
-        disabled={currentHub.players.length < 2}
-        onClick={() => socket.emit("hub:start")}
-      >
-        Lancer la partie
-      </button>
-    )}
-  </>
-) : (
-  <>
-    <p>La partie est lancée !</p>
-
-    <GameTable
-      localPlayerId={socket.id ?? ""}
-      players={currentHub.players.map((player) => ({
-        id: player.id,
-        pseudo: player.pseudo,
-        cardCount: currentHub.variants.sixCards ? 6 : 4,
-      }))}
-    />
-  </>
-)}
+            <p>En attente du lancement de la partie...</p>
+            {isHost && canStart && !peersReady && (
+              <p role="status">Connexion directe aux joueurs en cours…</p>
+            )}
+            {isHost && (
+              <button
+                type="button"
+                className="start-game-button"
+                disabled={!canStart || !peersReady || hostRound?.hubId === currentHub.id}
+                onClick={() => startGame(currentHub)}
+              >
+                Lancer la partie
+              </button>
+            )}
+            {manageHub(currentHub, "rules-button")}
             <button
   className="rules-button"
-  onClick={() => {
-    socket.emit("hub:leave");
-    setCurrentHub(null);
-  }}
+  onClick={leaveHub}
 >
   Quitter le Hub
 </button>
+            <LobbyChat key={currentHub.id} hubId={currentHub.id} connected={networkReady} />
           </div>
         </section>
       </main>
@@ -311,6 +528,7 @@ function App() {
         </p>
 
         <div className="home-panel">
+          {sessionNotice && <p role="status">{sessionNotice}</p>}
           <label htmlFor="pseudo">Choisis ton pseudo</label>
 
           <input
@@ -353,11 +571,12 @@ function App() {
                       {hub.status === "waiting" && "En attente"}
                       {hub.status === "in-progress" && "En cours"}
                       {hub.status === "full" && "Complet"}
+                      {hub.status === "finished" && "Terminée"}
                     </div>
 
                     <button
                       className="join-button"
-                      disabled={hub.status !== "waiting" || !pseudo.trim()}
+                      disabled={!networkReady || !pseudo.trim() || hub.status === "full" || hub.status === "finished"}
                       onClick={() => joinHub(hub.id)}
                     >
                       Rejoindre

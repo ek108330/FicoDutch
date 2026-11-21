@@ -1,4 +1,4 @@
-import { createDeck } from "./deck";
+import { createDeck } from "./deck.ts";
 import type { Card } from "./cards";
 import type { GameVariants } from "./variants";
 

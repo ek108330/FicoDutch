@@ -1,4 +1,4 @@
-import { dealCards } from "./deal";
+import { dealCards } from "./deal.ts";
 import type { GameState, GamePlayer } from "./gameTypes";
 import type { GameVariants } from "./variants";
 
@@ -6,6 +6,7 @@ type RoundPlayer = {
   id: string;
   pseudo: string;
   totalScore: number;
+  scoreHistory?: number[];
 };
 
 export function createRound(
@@ -31,18 +32,26 @@ export function createRound(
     id: player.id,
     pseudo: player.pseudo,
     cards: hands[player.id],
+    handVersion: 0,
     roundScore: 0,
     totalScore: player.totalScore,
+    scoreHistory: player.scoreHistory ?? [],
     hasLeft: false,
   }));
 
   return {
     roundNumber,
     phase: "memorization",
+    phaseDeadline: null,
+    openingPlayerId: null,
     players: gamePlayers,
     drawPile,
     discardPile: [],
     currentPlayerId: null,
+    turn: null,
+    reaction: { reference: 0, lastPlayerId: null, notice: null },
+    dutch: null,
+    result: null,
     variants: { ...variants },
     endThreshold,
   };

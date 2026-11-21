@@ -1,0 +1,10 @@
+{
+  "maxMessageLength": 200,
+  "emojis": {
+    "wave": { "symbol": "👋", "label": "Salut" },
+    "laugh": { "symbol": "😄", "label": "Amusé" },
+    "clap": { "symbol": "👏", "label": "Bravo" },
+    "wow": { "symbol": "😮", "label": "Surpris" },
+    "heart": { "symbol": "❤️", "label": "Cœur" }
+  }
+}
