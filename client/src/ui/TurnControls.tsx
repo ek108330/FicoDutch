@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ArrowDownUp } from "lucide-react";
 import type { PowerKind } from "../game/gameTypes";
 import { powerCardCount, type PowerView } from "../game/powers";
 import { FINAL_REACTION_MS, TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
@@ -6,6 +7,7 @@ import { CardBackMark, CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
 import type { CardFeedback } from "./useCardFeedback";
 import PerimeterClock from "./PerimeterClock";
+import { useTapAction } from "./useTapAction";
 
 type TurnControlsProps = {
   view: TurnView;
@@ -46,9 +48,6 @@ function PowerControls({
         : viewedPair && !canSwap ? <p>La protection Dutch empêche l’échange.</p>
         : !completedSelection && <p>{instruction}</p>}
       <div className="power-actions">
-        {canSwap && (
-          <button type="button" onClick={() => act({ kind: "power-swap" })}>Échanger les cartes</button>
-        )}
         <button type="button" onClick={() => act({ kind: "power-pass" })}>{passLabel}</button>
       </div>
     </>
@@ -62,6 +61,8 @@ export function TurnPanel({
   piles: ReactNode;
 }) {
   const { power } = view;
+  const canSwap = canPlay && power?.selection?.canSwap === true;
+  const swapTap = useTapAction(canSwap ? () => act({ kind: "power-swap" }) : undefined);
   const notice = view.reaction.notice;
   const reactor = notice && view.players.find(({ id }) => id === notice.playerId)?.pseudo;
   const feedback = reactor && notice ? {
@@ -75,7 +76,15 @@ export function TurnPanel({
         {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}`}
           remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : TURN_DURATION_MS}
           label={view.finalReaction ? "Temps pour réagir" : "Temps restant"} />}
-        <strong className="turn-player" role="status">{view.finalReaction ? "Dernières réactions" : `${view.playerName} joue`}</strong>
+        <div className="turn-player-row">
+          <strong className="turn-player" role="status">{view.finalReaction ? "Dernières réactions" : `${view.playerName} joue`}</strong>
+          {canSwap && (
+            <button type="button" className="turn-swap" aria-label="Échanger les cartes"
+              title="Échanger les deux cartes retournées" {...swapTap}>
+              <ArrowDownUp size={18} aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
       {(power || feedback) && (
         <div className="round-panel turn-choices">

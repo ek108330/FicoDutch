@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState } from "react";
 import { Bot, Crown } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
@@ -15,7 +15,6 @@ type Props = {
   onAddBot: () => void;
   onLeave: () => void;
   onUpdate: (variants: Hub["variants"], endThreshold: Hub["endThreshold"]) => void;
-  management: ReactNode;
 };
 
 const thresholds = [50, 100, 200, 500, 1000, null];
@@ -33,7 +32,7 @@ function PlayerConnectionNotice() {
 }
 
 export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, isHost, canStart,
-  onStart, onAddBot, onLeave, onUpdate, management }: Props) {
+  onStart, onAddBot, onLeave, onUpdate }: Props) {
   const thresholdId = useId();
   const points = hub.endThreshold === null ? "Sans limite" : `${hub.endThreshold} points`;
   return (
@@ -92,7 +91,6 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
           {isHost && <button type="button" onClick={onAddBot} disabled={!connected || hub.players.length >= hub.maxPlayers}>
             Ajouter un bot
           </button>}
-          {management}
           <button type="button" className="lobby-leave" onClick={onLeave}>Quitter le Hub</button>
         </div>
       </footer>

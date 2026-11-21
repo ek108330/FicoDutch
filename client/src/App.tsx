@@ -13,7 +13,6 @@ import type { GameState } from "./game/gameTypes";
 import { applyDepartures } from "./game/turn";
 import type { UpdateHostRound } from "./game/useRoundTurn";
 import GameSettings from "./ui/GameSettings";
-import HubManagement from "./ui/HubManagement";
 import HubLobby from "./ui/HubLobby";
 import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
@@ -308,20 +307,12 @@ function App() {
     clearTable();
   }
 
-  const canManage = networkReady && currentHub && currentHub.hostId === playerId && !currentHub.gameFinished &&
-    !hostRound?.state.result?.gameWinnerIds.length;
-
-  function manageHub(hub: Hub, className?: string) {
-    if (!canManage) return null;
-    return (
-      <HubManagement
-        className={className}
-        members={hub.players}
-        onRemove={(playerId) => socket.emit("hub:remove-guest", { hubId: hub.id, playerId })}
-        onInterrupt={hub.gameStarted ? () => socket.emit("hub:interrupt", { hubId: hub.id }) : undefined}
-      />
-    );
-  }
+  const management = currentHub && networkReady && currentHub.hostId === playerId && !currentHub.gameFinished &&
+    !hostRound?.state.result?.gameWinnerIds.length ? {
+    members: currentHub.players,
+    onRemove: (playerId: string) => socket.emit("hub:remove-guest", { hubId: currentHub.id, playerId }),
+    onInterrupt: currentHub.gameStarted ? () => socket.emit("hub:interrupt", { hubId: currentHub.id }) : undefined,
+  } : undefined;
 
   function canJoinHub(hub: Hub) {
     return networkReady && !!pseudo.trim() && (hub.status === "waiting" || hub.status === "in-progress");
@@ -359,7 +350,6 @@ function App() {
           peers={peers}
           updateHostRound={updateHostRound}
           onLeave={leaveHub}
-          hostManagement={manageHub(currentHub, "game-leave")}
           settings={settings}
           playSound={playSound}
           clockVersion={currentHub.clockVersion}
@@ -390,8 +380,7 @@ function App() {
                 hostRound?.hubId !== currentHub.id}
               onStart={() => startGame(currentHub)} onLeave={leaveHub}
               onAddBot={() => socket.emit("hub:add-bot", { hubId: currentHub.id })}
-              onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })}
-              management={manageHub(currentHub)} />
+              onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })} />
           ) : (
             <div className="home-panel home-entry">
               {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
@@ -439,7 +428,7 @@ function App() {
   return (
     <>
       {renderScreen()}
-      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} />
+      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management} />
     </>
   );
 }

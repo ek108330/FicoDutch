@@ -8,7 +8,6 @@ import PerimeterClock from "./PerimeterClock";
 
 type Props = {
   result: RoundResultView;
-  hostManagement: ReactNode;
   settings: ReactNode;
   roundNumber: number;
   remaining: number;
@@ -92,7 +91,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, hostManagement, settings, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
+  result, settings, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
 }: Props) {
   const [panel, setPanel] = useState<"round" | "ranking">("round");
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
@@ -147,7 +146,7 @@ export default function RoundResults({
             <span data-current={panel === "ranking"} aria-hidden="true" />
             <ChevronRight size={15} aria-hidden="true" />
           </button>
-          <div className="result-tools">{hostManagement}{settings}</div>
+          <div className="result-tools">{settings}</div>
         </div>
         {isFinal ? (
           <>

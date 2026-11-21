@@ -9,6 +9,14 @@ export function closeSettings(page: Page) {
   return page.getByRole("button", { name: "Fermer les paramètres" }).click();
 }
 
+export async function openManagement(page: Page) {
+  const settings = await openSettings(page);
+  await settings.getByRole("button", { name: "Gérer la table", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName("Gérer la table");
+  return dialog;
+}
+
 export async function expectScreenFits(page: Page) {
   const overflow = await page.evaluate(() => {
     const root = document.scrollingElement!;

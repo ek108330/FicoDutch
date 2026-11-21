@@ -71,7 +71,8 @@ for (const cardsPerPlayer of [4, 6]) {
       await guestCards.nth(0).click();
       await expect(guestHand.locator(".face-up")).toHaveCount(limit - 1);
       await expect(guestCards.nth(limit)).toBeDisabled();
-      await guest.getByRole("button", { name: "Masquer mes cartes" }).click();
+      await expect(guest.getByRole("button", { name: "Masquer mes cartes" })).toHaveCount(0);
+      for (let i = 1; i < limit; i++) await guestCards.nth(i).click();
       await expect(guestHand.locator(".face-up")).toHaveCount(0);
       for (let i = limit; i < cardsPerPlayer; i++) await expect(guestCards.nth(i)).toBeDisabled();
       for (let i = 0; i < limit; i++) await guestCards.nth(i).click();

@@ -36,7 +36,7 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
   page: host, browser, baseURL,
 }, testInfo) => {
   await fixDeckOrder(host);
-  const guest = await browser.newPage({ baseURL });
+  const guest = await browser.newPage({ baseURL, hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   try {
     await guest.addInitScript(() => {
       const create = AudioContext.prototype.createOscillator;
@@ -47,22 +47,19 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
       };
     });
     await Promise.all([openLobby(host, "AliceApercu"), openLobby(guest, "BobApercu")]);
-    const guestSettings = await openSettings(guest);
-    const sound = guestSettings.getByRole("button", { name: "Sons de jeu" });
-    await expect(sound).toHaveAttribute("aria-pressed", "false");
-    await sound.click();
-    await closeSettings(guest);
+    const sound = guest.getByRole("dialog", { name: "Paramètres du jeu" }).getByRole("button", { name: "Sons de jeu" });
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     await host.getByRole("button", { name: "6 cartes", exact: true }).click();
-    await guest.getByRole("button", { name: "Aperçu du Hub de AliceApercu" }).click();
+    await guest.getByRole("button", { name: "Aperçu du Hub de AliceApercu" }).tap();
     const preview = guest.getByRole("dialog", { name: "Hub de AliceApercu" });
     await expect(preview).toContainText("1/6 joueurs");
     await expect(preview).toContainText("6 cartes");
     await guest.screenshot({ path: testInfo.outputPath("apercu-hub.png") });
-    await preview.getByRole("button", { name: "Rejoindre" }).click();
+    await preview.getByRole("button", { name: "Rejoindre" }).tap();
     await host.getByRole("button", { name: "Lancer la partie" }).click();
 
     await expectLocalTurn(guest, 20_000);
+    await expect(guest.locator("html")).toHaveAttribute("data-test-tones", /^[1-9]\d*$/);
     await guest.setViewportSize({ width: 390, height: 844 });
     const optionsBox = (await guest.locator(".table-options").boundingBox())!;
     const opponentName = (await guest.locator(".position-top .player-name").boundingBox())!;

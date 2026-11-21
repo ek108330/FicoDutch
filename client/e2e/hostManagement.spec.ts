@@ -1,19 +1,15 @@
-import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
-
-async function manageTable(host: Page) {
-  await host.getByRole("button", { name: "Gérer la table" }).click();
-  const dialog = host.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
+import { expect, test } from "@playwright/test";
+import { closeSettings, discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openManagement,
+  openSettings, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 test("l’hôte peut retirer un invité de la salle d’attente", async ({ page: host, browser, baseURL }) => {
   const guest = await browser.newPage({ baseURL });
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceSalon", "BobSalon");
-    await expect(guest.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
-    const dialog = await manageTable(host);
+    await expect(host.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
+    await expect((await openSettings(guest)).getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
+    await closeSettings(guest);
+    const dialog = await openManagement(host);
     await expect(dialog.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "Retirer BobSalon" }).click();
     await dialog.getByRole("button", { name: "Confirmer le retrait" }).click();
@@ -48,7 +44,8 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await expect(drawnCard(removed)).toHaveAccessibleName("Carte tirée, As de pique");
     await expect(guest.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
 
-    let dialog = await manageTable(host);
+    let dialog = await openManagement(host);
+    await host.screenshot({ path: testInfo.outputPath("00-gestion-parametres-hote.png") });
     await dialog.getByRole("button", { name: "Retirer ChloeGestion" }).click();
     await expect(dialog.getByRole("heading", { name: "Retirer ChloeGestion ?" })).toBeVisible();
     await host.screenshot({ path: testInfo.outputPath("01-confirmation-retrait-portrait.png") });
@@ -57,7 +54,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await expectLocalTurn(removed);
     await expect(drawnCard(removed)).toHaveAccessibleName("Carte tirée, As de pique");
 
-    dialog = await manageTable(host);
+    dialog = await openManagement(host);
     await dialog.getByRole("button", { name: "Retirer ChloeGestion" }).click();
     await dialog.getByRole("button", { name: "Confirmer le retrait" }).click();
     await expect(removed.getByText("L’hôte t’a retiré de la table.", { exact: true })).toBeVisible();
@@ -85,7 +82,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await expect(formerHand).toHaveCount(0);
 
     await host.setViewportSize({ width: 844, height: 390 });
-    dialog = await manageTable(host);
+    dialog = await openManagement(host);
     await dialog.getByRole("button", { name: "Interrompre la partie", exact: true }).click();
     await expect(dialog.getByRole("heading", { name: "Interrompre la partie ?" })).toBeVisible();
     await host.screenshot({ path: testInfo.outputPath("04-confirmation-interruption-paysage.png") });

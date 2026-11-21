@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { activeTurn, discard, expectScreenFits, expectLocalTurn, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, discard, expectScreenFits, expectLocalTurn, fixDeckOrder, openLobby, openManagement, openTwoPlayerHub } from "./tableFlow";
 
 test("l’hôte peut gérer cinq bots et jouer seul à une table complète", async ({ page }, testInfo) => {
   test.setTimeout(40_000);
@@ -17,7 +17,7 @@ test("l’hôte peut gérer cinq bots et jouer seul à une table complète", asy
   }
   await expect(add).toBeDisabled();
   await expect(roster.getByRole("img", { name: "Bot", exact: true })).toHaveCount(5);
-  await page.getByRole("button", { name: "Gérer la table", exact: true }).click();
+  await openManagement(page);
   await page.getByRole("button", { name: "Retirer Bot 5", exact: true }).click();
   await page.getByRole("button", { name: "Confirmer le retrait", exact: true }).click();
   await expect(add).toBeEnabled();

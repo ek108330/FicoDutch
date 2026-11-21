@@ -65,7 +65,10 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await host.screenshot({ path: testInfo.outputPath("02-valet-portrait.png") });
     await guest.screenshot({ path: testInfo.outputPath("03-valet-vue-adversaire.png") });
     await guest.setViewportSize({ width: 390, height: 844 });
-    await host.getByRole("button", { name: "Échanger les cartes" }).click();
+    const swapValet = host.locator(".turn-player-row").getByRole("button", { name: "Échanger les cartes" });
+    await expect(swapValet).toBeVisible();
+    await expect(guest.getByRole("button", { name: "Échanger les cartes" })).toHaveCount(0);
+    await swapValet.click();
     await expect(guest.locator('[data-card-animation="swap"]')).toHaveCount(2);
     await expect(guest.locator(".flying-card .card-face")).toHaveCount(0);
     await guest.screenshot({ path: testInfo.outputPath("06-echange-face-cachee.png") });

@@ -641,6 +641,8 @@ input {
   color: #f3de9a;
 }
 
+.settings-management { grid-column: 1 / -1; }
+
 .hub-settings {
   display: grid;
   gap: 4px;
@@ -1489,6 +1491,31 @@ input {
   overflow-wrap: anywhere;
 }
 
+.turn-player-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.turn-panel .turn-swap {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border-color: #ffe39a;
+  background: #ffe39a;
+  color: #303629;
+  touch-action: manipulation;
+}
+
+.turn-swap:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .turn-choices .power-title {
   margin: 0;
   color: #f3de9a;
@@ -2268,6 +2295,45 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .game-screen .game-table {
     min-height: calc(100dvh - 16px);
+    --portrait-card-ratio: 0.71;
+  }
+
+  .game-table .player-cards {
+    --slot-width: min(var(--card-width), calc(var(--card-height) * var(--portrait-card-ratio)),
+      calc((var(--hand-width) - (var(--hand-columns) - 1) * var(--hand-gap)) / var(--hand-columns)));
+    grid-template-rows: repeat(2, calc(var(--slot-width) / var(--portrait-card-ratio)));
+  }
+
+  .game-table .player-cards .playing-card { container-type: inline-size; }
+  .game-table .player-cards .card-back-pattern { box-sizing: border-box; }
+
+  .game-table .player-cards .card-back-pattern span {
+    font-size: clamp(10px, 67cqi, 40px);
+    line-height: 1;
+  }
+
+  .game-table .player-cards .card-face { font-size: clamp(10px, 54cqi, 29px); }
+  .game-table .player-cards .card-face.joker-face { font-size: clamp(7px, 24cqi, 15px); }
+
+  .game-table .table-piles :is(.deck-placeholder, .discard-placeholder, .pile-card) {
+    width: clamp(46px, 7.4dvh, 62px);
+    height: auto;
+    aspect-ratio: var(--portrait-card-ratio);
+  }
+
+  .game-table .table-piles :is(.deck-placeholder, .discard-placeholder) { font-size: clamp(0.57rem, 2.4vw, 0.75rem); }
+
+  .game-table .drawn-card {
+    height: auto;
+    aspect-ratio: var(--portrait-card-ratio);
+  }
+
+  .game-table:is([data-player-count="3"], .is-large-table) :is(.position-left, .position-left-top, .position-left-bottom) {
+    justify-self: start;
+  }
+
+  .game-table:is([data-player-count="3"], .is-large-table) :is(.position-right, .position-right-top, .position-right-bottom) {
+    justify-self: end;
   }
 
   .game-screen .game-table[data-player-count="3"] {
@@ -2474,7 +2540,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .game-screen .game-table.is-large-table {
     min-height: calc(100dvh - 16px);
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto;
+    grid-template-rows: minmax(min-content, 1fr) auto auto auto minmax(min-content, 1fr);
     row-gap: 6px;
     grid-template-areas:
       "top top"
@@ -2491,6 +2557,12 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .game-screen .game-table.is-large-table[data-player-count="5"] {
     grid-template-areas: "left-top right-top" "center center" "left-bottom right-bottom" "own own";
   }
+
+  .game-screen .game-table.is-large-table:is([data-player-count="4"], [data-player-count="5"]) {
+    grid-template-rows: minmax(min-content, 1fr) auto auto minmax(min-content, 1fr);
+  }
+
+  .game-table.is-large-table .position-top { align-self: start; }
 
   .game-table.is-large-table .table-player:not(.position-bottom) .player-cards {
     --hand-width: min(50vw - 36px, 190px);
@@ -2511,11 +2583,15 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   }
 
   .game-table.is-large-table .table-player:not(.position-bottom) .player-cards {
-    --card-height: clamp(26px, 4.9dvh, 38px);
+    --card-height: clamp(34px, 5.7dvh, 48px);
+  }
+
+  .game-table.is-large-table[data-player-count="6"] .table-player:not(.position-bottom) .player-cards {
+    --card-height: clamp(34px, 5.1dvh, 43px);
   }
 
   .game-table.is-large-table .position-bottom .player-cards {
-    --card-height: clamp(34px, 6.7dvh, 51px);
+    --card-height: clamp(39px, 7.4dvh, 57px);
   }
 
   .game-screen .game-table.is-large-table .table-center {
@@ -2531,8 +2607,8 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
     margin: 3px 0;
   }
 
-  .is-large-table .table-piles :is(.pile-card, .deck-placeholder, .discard-placeholder) {
-    height: 42px;
+  .game-table.is-large-table .table-piles :is(.pile-card, .deck-placeholder, .discard-placeholder) {
+    width: clamp(35px, 6.2dvh, 46px);
   }
 }
 

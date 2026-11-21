@@ -1,22 +1,28 @@
 import { useId, useState, type RefObject } from "react";
-import { BookOpen, Volume2, VolumeX, X } from "lucide-react";
+import { BookOpen, Users, Volume2, VolumeX, X } from "lucide-react";
+import HubManagement, { type HubManagementOptions } from "./HubManagement";
 import Rules from "./Rules";
 
 type Props = {
   dialog: RefObject<HTMLDialogElement | null>;
   sound: boolean;
   toggleSound: () => void;
+  management?: HubManagementOptions;
 };
 
-export default function GameSettings({ dialog, sound, toggleSound }: Props) {
+export default function GameSettings({ dialog, sound, toggleSound, management }: Props) {
   const title = useId();
-  const [showRules, setShowRules] = useState(false);
+  const [panel, setPanel] = useState<"settings" | "rules" | "table">("settings");
+  const showRules = panel === "rules";
   const SoundIcon = sound ? Volume2 : VolumeX;
 
   return (
     <dialog className={showRules ? "rules-dialog" : "hub-management game-settings"} ref={dialog}
-      aria-labelledby={title} onClose={() => setShowRules(false)}>
-      {showRules ? <Rules titleId={title} onBack={() => setShowRules(false)} /> : (
+      aria-labelledby={title} onClose={() => setPanel("settings")}>
+      {showRules ? <Rules titleId={title} onBack={() => setPanel("settings")} />
+        : panel === "table" && management ? (
+          <HubManagement {...management} titleId={title} onBack={() => setPanel("settings")} onClose={() => dialog.current?.close()} />
+        ) : (
         <>
           <header className="settings-heading">
             <h2 id={title}>Paramètres du jeu</h2>
@@ -27,9 +33,14 @@ export default function GameSettings({ dialog, sound, toggleSound }: Props) {
             <button type="button" aria-label="Sons de jeu" aria-pressed={sound} onClick={toggleSound}>
               <SoundIcon size={19} aria-hidden="true" /> Son {sound ? "activé" : "coupé"}
             </button>
-            <button type="button" onClick={() => setShowRules(true)}>
+            <button type="button" onClick={() => setPanel("rules")}>
               <BookOpen size={19} aria-hidden="true" /> Règles du jeu
             </button>
+            {management && (
+              <button type="button" className="settings-management" onClick={() => setPanel("table")}>
+                <Users size={19} aria-hidden="true" /> Gérer la table
+              </button>
+            )}
           </div>
         </>
       )}

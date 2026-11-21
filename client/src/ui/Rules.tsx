@@ -113,7 +113,7 @@ function Rules({ onBack, titleId }: RulesProps) {
               <strong>10 — Échange :</strong> échanger deux cartes quelconques, qu'elles appartiennent au même joueur ou à deux joueurs différents.
             </li>
             <li>
-              <strong>Valet — Vision et échange :</strong> regarder une carte, puis éventuellement échanger deux cartes quelconques.
+              <strong>Valet — Vision et échange :</strong> retourne deux cartes, puis touche les flèches près du nom du joueur actif pour les échanger. « Garder en place » termine le tour en les laissant où elles sont.
             </li>
             <li>
               <strong>Joker — Carte supplémentaire :</strong> choisir un autre joueur et lui ajouter une carte aléatoire de la pioche, face cachée. Il ne peut pas la regarder immédiatement.

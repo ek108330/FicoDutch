@@ -24,14 +24,16 @@ const tones: Record<GameSound, readonly [start: number, end: number, seconds: nu
 };
 
 export function useGameAudio() {
-  const [sound, setSound] = useState(() => localStorage.getItem(soundKey) === "on");
+  const [sound, setSound] = useState(() => localStorage.getItem(soundKey) !== "off");
   const audio = useRef<AudioContext | null>(null);
 
-  function unlockSound() {
+  const unlockSound = useCallback(() => {
     if (!window.AudioContext) return;
     audio.current ??= new AudioContext();
-    if (audio.current.state === "suspended") void audio.current.resume().catch(() => {});
-  }
+    if (audio.current.state !== "running" && audio.current.state !== "closed") {
+      void audio.current.resume().catch(() => {});
+    }
+  }, []);
 
   function toggleSound() {
     if (!sound) unlockSound();
@@ -41,13 +43,11 @@ export function useGameAudio() {
 
   useEffect(() => {
     if (!sound) return;
-    window.addEventListener("pointerdown", unlockSound, { once: true });
-    window.addEventListener("keydown", unlockSound, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlockSound);
-      window.removeEventListener("keydown", unlockSound);
-    };
-  }, [sound]);
+    // Les navigateurs mobiles autorisent le son au relâchement du doigt.
+    const activationEvents = ["pointerup", "touchend", "keydown", "click"];
+    for (const event of activationEvents) window.addEventListener(event, unlockSound, true);
+    return () => { for (const event of activationEvents) window.removeEventListener(event, unlockSound, true); };
+  }, [sound, unlockSound]);
 
   useEffect(() => () => {
     if (audio.current) void audio.current.close().catch(() => {});

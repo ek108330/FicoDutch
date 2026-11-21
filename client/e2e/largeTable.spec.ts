@@ -4,6 +4,7 @@ import { discardDrawn, activeTurn, drawDeck, expectScreenFits, fixDeckOrder, ope
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
   { name: "portrait", width: 390, height: 844 },
+  { name: "portrait-android", width: 393, height: 702 },
   { name: "portrait-compact", width: 360, height: 640 },
   { name: "paysage", width: 844, height: 390 },
 ];
@@ -32,11 +33,22 @@ async function checkSeats(page: Page, count: number, cards: number) {
   const hands = await table.locator(".player-cards").evaluateAll((items) => items.map((hand) => {
     const cards = [...hand.querySelectorAll(".playing-card")];
     const rows = new Set(cards.map((card) => (card as HTMLElement).offsetTop)).size;
-    return { rows, minWidth: Math.min(...cards.map((card) => card.getBoundingClientRect().width)) };
+    const rects = cards.map((card) => card.getBoundingClientRect());
+    return { rows, minWidth: Math.min(...rects.map(({ width }) => width)), ratios: rects.map(({ width, height }) => width / height) };
   }));
   for (const hand of hands) {
     expect(hand.rows).toBe(2);
     expect(hand.minWidth).toBeGreaterThanOrEqual(24);
+  }
+  const { width, height } = page.viewportSize()!;
+  if (width < height) {
+    for (const { ratios } of hands) {
+      for (const ratio of ratios) expect(ratio).toBeCloseTo(0.71, 2);
+    }
+    for (const seat of boxes) {
+      if (seat.label.includes("position-left")) expect(seat.left - tableBox.x, seat.label).toBeLessThan(30);
+      if (seat.label.includes("position-right")) expect(tableBox.x + tableBox.width - seat.right, seat.label).toBeLessThan(30);
+    }
   }
 }
 
@@ -71,7 +83,14 @@ for (const count of [4, 5, 6]) {
             await host.screenshot({ path: testInfo.outputPath(`hub-${width}.png`) });
           }
         }
-        await start.click();
+        if (count === 4 && cards === 4) {
+          await host.setViewportSize({ width: 393, height: 702 });
+          await start.click();
+          await expect(host.getByRole("region", { name: "Mémorisation" })).toBeVisible();
+          await expect(host.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
+          await checkSeats(host, count, cards);
+          await host.screenshot({ path: testInfo.outputPath("memorisation-portrait-android.png"), fullPage: true });
+        } else await start.click();
         const last = guests.at(-1)!;
         await expectLocalTurn(last, 21_000);
         for (const { name, width, height } of viewports) {
@@ -123,8 +142,8 @@ for (const count of [4, 5, 6]) {
           expect(rows).toHaveLength(4);
           expect(new Set(rows).size).toBe(1);
           const pager = (await host.getByRole("button", { name: "Afficher le classement cumulé" }).boundingBox())!;
-          const management = (await host.getByRole("button", { name: "Gérer la table" }).boundingBox())!;
-          expect(pager.x + pager.width).toBeLessThan(management.x);
+          const settings = (await host.getByRole("button", { name: "Paramètres du jeu" }).boundingBox())!;
+          expect(pager.x + pager.width).toBeLessThan(settings.x);
           await host.screenshot({ path: testInfo.outputPath(`resultats-six-${width}.png`) });
         }
       } finally {

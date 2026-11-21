@@ -23,7 +23,6 @@ type RoundScreenProps = {
   peers: ReturnType<typeof useHubPeers>;
   updateHostRound: UpdateHostRound;
   onLeave: () => void;
-  hostManagement: ReactNode;
   settings: ReactNode;
   playSound: PlayGameSound;
   canLeave: boolean;
@@ -36,7 +35,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onLeave, hostManagement, settings, playSound, canLeave, clockVersion, pause,
+  peers, updateHostRound, onLeave, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
@@ -125,12 +124,12 @@ export default function RoundScreen({
     );
     return (
       <main className="game-screen">
-        {gameActions(hostManagement)}
+        {gameActions()}
         <section className="round-results" aria-labelledby="pause-title">
           <h1 id="pause-title">{hostPaused ? "Partie en pause" : "Reconnexion à la table"}</h1>
           <p role="status">{hostPaused ? "En attente du retour de l’hôte." : "Ta place est conservée."}</p>
           {hostPaused && seconds !== null && <p>Délai de reprise <span role="timer">{seconds} s</span></p>}
-          {canLeave && !hostManagement && <button type="button" onClick={onLeave}>Quitter la table</button>}
+          {canLeave && playerId !== hostId && <button type="button" onClick={onLeave}>Quitter la table</button>}
         </section>
       </main>
     );
@@ -169,7 +168,6 @@ export default function RoundScreen({
       <RoundResults
         key={roundNumber}
         result={scene.result}
-        hostManagement={hostManagement}
         settings={settings}
         roundNumber={roundNumber}
         remaining={turn.remaining}
@@ -187,7 +185,7 @@ export default function RoundScreen({
   if (scene.phase === "transition") {
     return (
       <main className="game-screen">
-        {gameActions(hostManagement)}
+        {gameActions()}
         <section className="round-results" aria-label="Transition">
           <h1>Manche {roundNumber}</h1>
           <p>Distribution dans <span role="timer">{Math.ceil(turn.remaining / 1_000)} s</span></p>
@@ -220,7 +218,7 @@ export default function RoundScreen({
 
   return (
     <main className="game-screen">
-      {gameActions(hostManagement ?? (canLeave && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>))}
+      {gameActions(canLeave && playerId !== hostId && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>)}
       {emojisEnabled && <div className="table-options">
         <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />
       </div>}
@@ -270,12 +268,6 @@ export default function RoundScreen({
                     <span role="timer" className="round-timer">{Math.ceil(turn.remaining / 1_000)} s</span>
                   </div>
                   <p>{canSelect ? `Consulte jusqu’à ${limit} de tes cartes.` : "Connexion à l’hôte en cours…"}</p>
-                  {canSelect && (
-                    <button type="button" onClick={() => setMemory({ roundNumber, chosen, visible: [] })}
-                      disabled={localMemory.visible.length === 0}>
-                      Masquer mes cartes
-                    </button>
-                  )}
                 </>
               ) : <p role="status">Mémorisation terminée</p>}
             </section>
