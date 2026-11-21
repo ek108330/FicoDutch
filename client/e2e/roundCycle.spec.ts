@@ -2,9 +2,23 @@ import { expect, test, type Page } from "@playwright/test";
 import { activeTurn, closeSettings, drawDeck, fixDeckOrder, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const next = (page: Page) => page.getByRole("button", { name: "Lancer la manche suivante" });
-const showRanking = (page: Page) => page.getByRole("button", { name: "Classement cumulé", exact: true });
+const resultTitle = (page: Page) => page.getByRole("heading", { name: /^Fin de la (manche|partie)$/ });
 const ranking = (page: Page) => page.getByRole("table", { name: "Classement cumulé" });
 const sixCards = (page: Page) => page.getByRole("button", { name: "6 cartes", exact: true });
+
+async function swipeLeftOnResults(page: Page) {
+  const session = await page.context().newCDPSession(page);
+  const box = (await resultTitle(page).boundingBox())!;
+  const y = Math.round(box.y + box.height / 2);
+  const right = Math.round(box.x + box.width * 0.8);
+  try {
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: right, y }] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: right - 120, y }] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } finally {
+    await session.detach();
+  }
+}
 
 async function finishWithDutch(first: Page, last: Page) {
   await expect(activeTurn(first)).toHaveText("À toi de jouer", { timeout: 18_000 });
@@ -21,7 +35,7 @@ async function finishWithDutch(first: Page, last: Page) {
 test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(75_000);
   await fixDeckOrder(host);
-  const guest = await browser.newPage({ baseURL });
+  const guest = await browser.newPage({ baseURL, hasTouch: true });
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceManches", "BobManches");
     const hostSettings = await openSettings(host);
@@ -39,16 +53,19 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
       await expect(next(page)).toHaveCount(0);
     }
     await guest.screenshot({ path: testInfo.outputPath("01-resultats-manche-1.png") });
-    await showRanking(host).click();
+    await resultTitle(host).click();
     await expect(ranking(host)).toBeVisible();
     await expect(guest.getByRole("region", { name: "Résultat de la manche" })).toBeVisible();
     await expect(ranking(guest)).toHaveCount(0);
-    await showRanking(guest).click();
+    await guest.setViewportSize({ width: 390, height: 844 });
+    await swipeLeftOnResults(guest);
+    await expect(ranking(guest)).toBeVisible();
     await expect(next(host)).toBeEnabled();
     await expect(next(guest)).toHaveCount(0);
     await expect(sixCards(guest)).toBeDisabled();
     await sixCards(host).click();
     await expect(sixCards(guest)).toHaveAttribute("aria-pressed", "true");
+    await expect(ranking(host)).toBeVisible();
     await host.screenshot({ path: testInfo.outputPath("02-classement-et-variantes.png") });
 
     await next(host).click();
@@ -73,7 +90,9 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
       await expect(page.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
       await expect(page.getByText("AliceManches remporte la partie.")).toBeVisible();
       await expect(page.getByText("Seuil de 50 points atteint.")).toBeVisible();
-      await showRanking(page).click();
+      await resultTitle(page).click();
+      await expect(page.getByRole("group", { name: "Variantes de la partie" })).toHaveText(/6 cartes/);
+      await expect(sixCards(page)).toHaveCount(0);
       await expect(ranking(page).getByRole("row", { name: /AliceManches/ })).toContainText("27 → 62");
       await expect(ranking(page).getByRole("row", { name: /BobManches/ })).toContainText("46 → 88");
       await expect(next(page)).toHaveCount(0);

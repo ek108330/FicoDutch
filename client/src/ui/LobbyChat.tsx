@@ -4,10 +4,10 @@ import type { LobbyChatContent, LobbyChatMessage, LobbyChatStatus } from "../../
 import { socket } from "../network/socket";
 import EmojiButtons from "./EmojiButtons";
 
-type Props = { hubId: string; connected: boolean; active: boolean };
+type Props = { hubId: string; connected: boolean };
 const MAX_VISIBLE_MESSAGES = 32;
 
-export default function LobbyChat({ hubId, connected, active }: Props) {
+export default function LobbyChat({ hubId, connected }: Props) {
   const [messages, setMessages] = useState<LobbyChatMessage[]>([]);
   const [text, setText] = useState("");
   const [notice, setNotice] = useState("");
@@ -23,8 +23,8 @@ export default function LobbyChat({ hubId, connected, active }: Props) {
   }, [hubId]);
 
   useEffect(() => {
-    if (active && log.current) log.current.scrollTop = log.current.scrollHeight;
-  }, [active, messages]);
+    if (log.current) log.current.scrollTop = log.current.scrollHeight;
+  }, [messages]);
 
   function send(content: LobbyChatContent) {
     if (!connected || !socket.connected) return;
@@ -43,7 +43,7 @@ export default function LobbyChat({ hubId, connected, active }: Props) {
   }
 
   return (
-    <section className="lobby-chat" aria-label="Chat du Hub" hidden={!active}>
+    <section className="lobby-chat" aria-label="Chat du Hub">
       <div className="chat-log" ref={log} role="log" aria-label="Messages du Hub" tabIndex={0}>
         {messages.length ? (
           <ol>

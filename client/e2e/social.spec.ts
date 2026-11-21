@@ -2,7 +2,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { activeTurn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
 
 const chat = (page: Page) => page.getByRole("region", { name: "Chat du Hub" });
-const openChat = (page: Page) => page.getByRole("button", { name: "Chat", exact: true }).click();
 const messages = (page: Page) => page.getByRole("log", { name: "Messages du Hub" });
 const emoji = (page: Page, label: string) => page.getByRole("button", { name: `Envoyer l’emoji ${label}` });
 const bubble = (page: Page, label: string) => page.getByRole("status", { name: label });
@@ -19,7 +18,6 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     const start = await openTwoPlayerHub(host, guest, "AliceChat", "BobChat");
     await openLobby(newcomer, "ChloeChat");
     await newcomer.getByRole("button", { name: "Créer un Hub" }).click();
-    await Promise.all([host, guest, newcomer].map(openChat));
     await expect(chat(newcomer)).toBeVisible();
 
     const input = chat(guest).getByRole("textbox", { name: "Message du Hub" });
@@ -39,10 +37,8 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await newcomer.getByRole("button", { name: "Quitter le Hub" }).click();
     await newcomer.locator(".hub-item").filter({ hasText: "Hub de AliceChat" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
-    await openChat(newcomer);
     await expect(messages(newcomer)).toHaveText("Aucun message pour le moment.");
     await expect(messages(host)).toContainText(content);
-    await host.getByRole("button", { name: "Joueurs", exact: true }).click();
     await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
 
     await start.click();

@@ -67,8 +67,9 @@ for (const count of [4, 5, 6]) {
           for (const [width, height] of [[360, 640], [740, 360]]) {
             await host.setViewportSize({ width, height });
             await expectScreenFits(host);
-            await expect(host.getByRole("list", { name: "Joueurs présents" }).getByText("Invite5", { exact: true })).toBeInViewport();
-            await expect(start).toBeInViewport();
+            await expect(host.getByRole("list", { name: "Joueurs présents" }).getByText("Invite5", { exact: true })).toBeInViewport({ ratio: 1 });
+            await expect(host.getByRole("textbox", { name: "Message du Hub" })).toBeInViewport({ ratio: 1 });
+            await expect(start).toBeInViewport({ ratio: 1 });
             await host.screenshot({ path: testInfo.outputPath(`hub-${width}.png`) });
           }
         }

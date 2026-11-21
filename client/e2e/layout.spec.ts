@@ -39,11 +39,15 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await settings.screenshot({ path: testInfo.outputPath("parametres-hub.png") });
     await closeSettings(page);
 
-    await page.getByRole("button", { name: "Chat", exact: true }).click();
     for (const [width, height] of [[360, 640], [740, 360]]) {
       await page.setViewportSize({ width, height });
       await expectScreenFits(page);
-      await expect(page.getByRole("textbox", { name: "Message du Hub" })).toBeInViewport();
+      const players = page.getByRole("list", { name: "Joueurs présents" });
+      const chat = page.getByRole("region", { name: "Chat du Hub" });
+      await expect(chat.getByRole("textbox", { name: "Message du Hub" })).toBeInViewport({ ratio: 1 });
+      const playerBox = (await players.boundingBox())!;
+      const chatBox = (await chat.boundingBox())!;
+      expect(playerBox.y + playerBox.height).toBeLessThanOrEqual(chatBox.y);
       await expect(start).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath(`chat-${width}.png`) });
     }

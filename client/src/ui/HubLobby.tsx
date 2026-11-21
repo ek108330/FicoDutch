@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { MessageCircle, Users } from "lucide-react";
+import { Crown } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import LobbyChat from "./LobbyChat";
 
@@ -28,39 +28,30 @@ function PlayerConnectionNotice() {
 
 export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, isHost, canStart,
   onStart, onLeave, management }: Props) {
-  const [panel, setPanel] = useState<"players" | "chat">("players");
-  const showChat = panel === "chat";
-
   return (
     <section className="home-panel lobby-panel" aria-labelledby="lobby-title">
       <header className="lobby-heading">
         <h1 id="lobby-title">{hub.name}</h1>
-        <p>Salle d'attente</p>
+        <div className="lobby-meta">
+          <p>Salle d'attente</p>
+          <p>{hub.players.length}/{hub.maxPlayers} joueurs</p>
+        </div>
       </header>
       <div className="lobby-body">
-        <div className="lobby-nav" role="group" aria-label="Affichage de la salle d’attente">
-          <button type="button" aria-pressed={!showChat} onClick={() => setPanel("players")}>
-            <Users size={17} aria-hidden="true" /> Joueurs
-          </button>
-          <button type="button" aria-pressed={showChat} onClick={() => setPanel("chat")}>
-            <MessageCircle size={17} aria-hidden="true" /> Chat
-          </button>
-        </div>
-        <div className="lobby-players" hidden={showChat}>
-          <p className="player-count">{hub.players.length}/{hub.maxPlayers} joueurs</p>
-          <ul aria-label="Joueurs présents">
-            {hub.players.map((player) => (
+        <ul className="lobby-players" aria-label="Joueurs présents">
+          {hub.players.map((player) => {
+            const status = player.connected ? "Connecté" : "Déconnecté";
+            return (
               <li key={player.id}>
+                <span className="player-connection" data-connected={player.connected} role="img"
+                  aria-label={status} title={status} />
                 <strong>{player.pseudo}</strong>
-                {player.isHost && <span className="player-host">Hôte</span>}
-                <span className="player-connection" data-connected={player.connected}>
-                  {player.connected ? "Connecté" : "Déconnecté"}
-                </span>
+                {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
               </li>
-            ))}
-          </ul>
-        </div>
-        <LobbyChat hubId={hub.id} connected={connected} active={showChat} />
+            );
+          })}
+        </ul>
+        <LobbyChat hubId={hub.id} connected={connected} />
       </div>
       <footer className="lobby-footer">
         {awaitingPeers && <PlayerConnectionNotice />}
