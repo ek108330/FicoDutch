@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type PointerEvent, type RefObject } from "react";
 import { flyCard, reducedMotion } from "./cardAnimations";
+import type { PlayGameSound } from "./useCardFeedback";
 
 type Point = { x: number; y: number };
 type Drag = { pointerId: number; origin: Point; target: Point; distance: number; moved: boolean };
@@ -8,6 +9,7 @@ export type CardReaction = {
   scope: string;
   center: RefObject<HTMLDivElement | null>;
   play: () => void;
+  playSound: PlayGameSound;
 };
 
 const tapWindow = 280;
@@ -50,6 +52,7 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
     if (!reaction) return;
     const target = reaction.center.current?.querySelector(".discard-slot");
     if (target) flyCard(element.getBoundingClientRect(), target.getBoundingClientRect(), "reaction");
+    reaction.playSound("reaction");
     reaction.play();
   }
 
@@ -73,7 +76,10 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
     if (!current || event.pointerId !== current.pointerId) return;
     const offset = { x: event.clientX - current.origin.x, y: event.clientY - current.origin.y };
     if (!current.moved && Math.hypot(offset.x, offset.y) < dragThreshold) return;
-    if (!current.moved) resetTaps();
+    if (!current.moved) {
+      resetTaps();
+      reaction?.playSound("slide");
+    }
     current.moved = true;
     event.currentTarget.classList.add("is-dragging");
     event.currentTarget.style.translate = translate(offset);
@@ -105,6 +111,7 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
       playReaction(element);
       return;
     }
+    reaction.playSound("tap");
     if (!reducedMotion()) {
       tapFeedback.current = element.animate([
         { scale: 1 }, { scale: count === 1 ? 1.045 : 1.08, boxShadow: "0 0 0 2px #f3de9a" }, { scale: 1 },

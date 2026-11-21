@@ -51,6 +51,7 @@ test("le 10 échange deux positions de la même main sans révéler de carte", (
   const first = choose(initial, own);
   assert.deepEqual(getTurnView(first, "alice", 1_100)?.power?.selection?.revealed, []);
   assert.equal(getTurnView(first, "bob", 1_100)?.power?.selection, null);
+  assert.deepEqual(getTurnView(first, "bob", 1_100)?.power?.exchangeTargets, [own]);
   assert.equal(choose(first, own), first);
   const result = choose(first, { ...own, position: 1 });
   assert.equal(result.players[0].cards[0], initial.players[0].cards[1]);
@@ -75,6 +76,7 @@ test("le Valet révèle ses deux cibles puis permet de garder les cartes ou de l
     { target: other, face: getCardFace(initial.players[1].cards[1]) },
   ]);
   assert.equal(getTurnView(preview, "bob", 1_200)?.power?.selection, null);
+  assert.deepEqual(getTurnView(preview, "bob", 1_200)?.power?.exchangeTargets, [own, other]);
 
   const kept = playTurn(preview, "alice", 1, { kind: "power-pass" }, 1_200);
   assert.equal(kept.players, initial.players);
@@ -118,7 +120,9 @@ test("le Joker+ donne une carte cachée à un adversaire dont la main est encore
   assert.equal(result.discardPile.at(-1)?.rank, "JOKER");
   assert.equal(result.currentPlayerId, "charlie");
   const view = getTurnView(result, "bob", 1_200);
-  assert.deepEqual(view?.players[1], { id: "bob", pseudo: "bob", cardCount: 5, handVersion: 1 });
+  assert.deepEqual(view?.players[1], {
+    id: "bob", pseudo: "bob", cardCount: 5, handVersion: 1, handLayout: { columns: 3, slots: [0, 2, 1, 3, 4] },
+  });
   assert.equal(view?.drawnCard, null);
   assert.equal(view?.power, null);
   assert.deepEqual(view?.cardMotion?.move, { kind: "gift", target: { playerId: "bob", position: 4 } });

@@ -3,17 +3,20 @@ import { emojis } from "../../../shared/hubSocial.json";
 import type { HubEmoji } from "../../../shared/hubTypes";
 import type { CardFace } from "../game/cards";
 import type { CardTarget, PowerKind } from "../game/gameTypes";
+import { getHandLayout, type HandLayout } from "../game/handLayout";
 import type { MemorizedCard } from "../game/memorization";
 import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
 import type { TurnView } from "../game/turn";
 import PlayingCard from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
 import { animatePublicMove, flyCard } from "./cardAnimations";
+import type { PlayGameSound } from "./useCardFeedback";
 
 export type TablePlayer = {
   id: string;
   pseudo: string;
   cardCount: number;
+  handLayout?: HandLayout;
 };
 
 type GameTableProps = {
@@ -29,6 +32,8 @@ type GameTableProps = {
   reaction?: { scope: string; play: (position: number) => void };
   drawnCard?: CardFace;
   cardMotion?: TurnView["cardMotion"];
+  exchangeTargets?: CardTarget[];
+  playSound: PlayGameSound;
   power?: {
     kind: PowerKind;
     selection: NonNullable<PowerView["selection"]>;
@@ -64,6 +69,8 @@ export default function GameTable({
   reaction,
   drawnCard,
   cardMotion,
+  exchangeTargets,
+  playSound,
   memorization,
   power,
 }: GameTableProps) {
@@ -74,7 +81,8 @@ export default function GameTable({
     if (!cardMotion || !table.current || cardMotion.id <= lastMotion.current) return;
     lastMotion.current = cardMotion.id;
     animatePublicMove(table.current, cardMotion.move);
-  }, [cardMotion]);
+    playSound(cardMotion.move.kind);
+  }, [cardMotion, playSound]);
 
   function replaceCard(position: number) {
     const target = center.current?.querySelector(".discard-slot");
@@ -114,7 +122,8 @@ export default function GameTable({
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
         const name = player.pseudo + (position === "bottom" ? " (Moi)" : "");
         const emoji = tableEmojis?.get(player.id);
-        const handStyle = { "--hand-columns": Math.max(1, Math.ceil(player.cardCount / 2)) } as CSSProperties;
+        const layout = getHandLayout(player.cardCount, player.handLayout);
+        const handStyle = { "--hand-columns": layout.columns } as CSSProperties;
         return (
           <div className={`table-player position-${position}${active}`} key={player.id} data-hand-player={player.id}>
             {emoji && <span className="table-emoji" role="status"
@@ -131,6 +140,7 @@ export default function GameTable({
                 {Array.from({ length: player.cardCount }, (_, index) => {
                   const target = { playerId: player.id, position: index };
                   const selected = power?.selection.targets.some((card) => sameTarget(card, target));
+                  const exchangeSelected = exchangeTargets?.some((card) => sameTarget(card, target));
                   const canChoose = canChooseFromHand && !selected;
                   const powerFace = power?.selection.revealed.find(({ target: card }) => sameTarget(card, target))?.face;
                   const revealed = powerFace ?? ownSelection?.revealed.find(({ position }) => position === index)?.face;
@@ -141,15 +151,17 @@ export default function GameTable({
                     : replace ? `Remplacer la carte ${index + 1}` : undefined;
                   return (
                     <PlayingCard
-                      key={index}
+                      key={layout.slots[index]}
                       index={index}
+                      slot={layout.slots[index]}
                       dealOrder={dealing ? index : undefined}
                       face={revealed}
                       powerReveal={!!powerFace}
                       onToggle={cardAction}
-                      reaction={react && { scope: react.scope, center, play: () => react.play(index) }}
+                      reaction={react && { scope: react.scope, center, play: () => react.play(index), playSound }}
                       actionLabel={actionLabel}
                       selected={selected}
+                      exchangeSelected={exchangeSelected}
                       disabled={ownSelection && ownSelection.selected.length >= ownSelection.limit
                         && !ownSelection.selected.includes(index)}
                     />

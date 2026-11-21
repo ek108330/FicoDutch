@@ -1,9 +1,27 @@
 import { GAME_CONFIG } from "../config/gameConfig.ts";
 import { getCardFace, getCardValue, type Card } from "./cards.ts";
-import type { GamePlayer, GameState } from "./gameTypes";
+import type { GamePlayer, GameState, PublicCardMove } from "./gameTypes";
+import { addHandSlot, getHandLayout } from "./handLayout.ts";
 
 export function changeHand(player: GamePlayer, cards: Card[]): GamePlayer {
   return { ...player, cards, handVersion: player.handVersion + 1 };
+}
+
+export function appendCard(player: GamePlayer, card: Card): GamePlayer {
+  const layout = getHandLayout(player.cards.length, player.handLayout);
+  return { ...changeHand(player, [...player.cards, card]), handLayout: addHandSlot(layout) };
+}
+
+export function removeCard(player: GamePlayer, position: number): GamePlayer {
+  const layout = getHandLayout(player.cards.length, player.handLayout);
+  return {
+    ...changeHand(player, player.cards.filter((_, index) => index !== position)),
+    handLayout: { ...layout, slots: layout.slots.filter((_, index) => index !== position) },
+  };
+}
+
+export function recordCardMove(state: GameState, move: PublicCardMove, now: number): NonNullable<GameState["cardMotion"]> {
+  return { id: (state.cardMotion?.id ?? 0) + 1, at: now, move };
 }
 
 export function finishRound(state: GameState, now: number, emptyHandPlayerId: string | null = null): GameState {
@@ -68,8 +86,8 @@ export function getRoundResultView(state: GameState) {
   return {
     ...state.result,
     endThreshold: state.endThreshold,
-    players: state.players.map(({ id, pseudo, roundScore, totalScore, scoreHistory, cards }) => ({
-      id, pseudo, roundScore, totalScore, scoreHistory, cards: cards.map(getCardFace),
+    players: state.players.map(({ id, pseudo, roundScore, totalScore, scoreHistory, cards, handLayout }) => ({
+      id, pseudo, roundScore, totalScore, scoreHistory, cards: cards.map(getCardFace), ...(handLayout && { handLayout }),
     })),
   };
 }

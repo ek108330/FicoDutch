@@ -1,12 +1,13 @@
 import { getCardFace, type Card, type CardFace } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
+import type { HandLayout } from "./handLayout";
 import type { GameState, GamePlayer, PublicCardMove, ReactionNotice, Turn } from "./gameTypes";
 import { changeHand, finishRound } from "./hands.ts";
 import { applyPowerAction, getPowerView, POWER_DURATION_MS, startPower, type PowerAction, type PowerView } from "./powers.ts";
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
 
 export const TURN_DURATION_MS = 60_000;
-const CARD_MOTION_WINDOW_MS = 950;
+const CARD_MOTION_WINDOW_MS = 1_350;
 
 export type TurnAction =
   | { kind: "draw"; source: "deck" }
@@ -28,7 +29,7 @@ export type TurnView = {
   topDiscard: CardFace | null;
   power: PowerView | null;
   cardMotion: CardMotionView | null;
-  players: Array<{ id: string; pseudo: string; cardCount: number; handVersion: number }>;
+  players: Array<{ id: string; pseudo: string; cardCount: number; handVersion: number; handLayout?: HandLayout }>;
   reaction: { reference: number; canAttempt: boolean; notice: ReactionNotice | null };
   dutch: { announcerId: string; lastTurns: number } | null;
   canAnnounceDutch: boolean;
@@ -236,7 +237,9 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     topDiscard: topDiscard ? getCardFace(topDiscard) : null,
     power: turn.power ? getPowerView(state, turn.power, canSeePrivateCards) : null,
     cardMotion: getCardMotionView(state, now),
-    players: state.players.map(({ id, pseudo, cards, handVersion }) => ({ id, pseudo, cardCount: cards.length, handVersion })),
+    players: state.players.map(({ id, pseudo, cards, handVersion, handLayout }) => ({
+      id, pseudo, cardCount: cards.length, handVersion, ...(handLayout && { handLayout }),
+    })),
     reaction: {
       reference: state.reaction.reference,
       canAttempt: canReactToDiscard(state, viewerId),

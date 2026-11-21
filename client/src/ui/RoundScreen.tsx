@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { HubPlayer } from "../../../shared/hubTypes";
 import {
@@ -11,7 +11,7 @@ import type { useHubPeers } from "../network/useHubPeers";
 import { useTableEmojis } from "../network/useTableEmojis";
 import GameTable from "./GameTable";
 import EmojiButtons from "./EmojiButtons";
-import { useCardFeedback, type useGameAudio } from "./useCardFeedback";
+import { useCardFeedback, type PlayGameSound } from "./useCardFeedback";
 import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
 
@@ -28,7 +28,7 @@ type RoundScreenProps = {
   onLeave: () => void;
   hostManagement: ReactNode;
   settings: ReactNode;
-  playSound: ReturnType<typeof useGameAudio>["playSound"];
+  playSound: PlayGameSound;
   canLeave: boolean;
   clockVersion: number;
   pause: { reason: "host" | "local"; deadline?: number } | null;
@@ -45,6 +45,8 @@ export default function RoundScreen({
   const [now, setNow] = useState(() => performance.now());
   const [memory, setMemory] = useState<Memorization>(emptySelection);
   const requestId = useRef(0);
+  const dealtRound = useRef(0);
+  const visibleMemory = useRef(0);
   const paused = pause !== null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
     hostRound, peers, updateHostRound, now, paused, clockVersion });
@@ -62,11 +64,25 @@ export default function RoundScreen({
   const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && canLeave &&
     (phase === "memorization" || phase === "playing");
   const feedback = useCardFeedback(
-    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playSound,
+    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playerId, playSound,
   );
+  const soundEmoji = useCallback(() => playSound("emoji"), [playSound]);
   const { choose: chooseEmoji, receive: receiveEmoji, visible: tableEmojis } = useTableEmojis({
-    playerId, hostId, roundNumber, clockVersion, enabled: emojisEnabled, now, hostRound, members, send,
+    playerId, hostId, roundNumber, clockVersion, enabled: emojisEnabled, now, hostRound, members, send, onShow: soundEmoji,
   });
+
+  useEffect(() => {
+    if (paused || !connectionReady || turn.waitingForClock || dealtRound.current === roundNumber ||
+        (phase !== "dealing" && phase !== "memorization")) return;
+    dealtRound.current = roundNumber;
+    playSound("deal");
+  }, [connectionReady, paused, phase, playSound, roundNumber, turn.waitingForClock]);
+
+  useEffect(() => {
+    const count = canSelect ? revealed.length : 0;
+    if (canSelect && visibleMemory.current !== count) playSound("flip");
+    visibleMemory.current = count;
+  }, [canSelect, playSound, revealed.length]);
 
   useEffect(() => {
     if (!ticking) return;
@@ -195,9 +211,9 @@ export default function RoundScreen({
       return (
         <main className="game-screen">
           {gameActions()}
-          <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion}
-            players={scene.result.players.map(({ id, pseudo, cards }) => ({ id, pseudo, cardCount: cards.length }))}
-            controls={<section className="round-panel"><strong>Fin de la manche</strong></section>} />
+          <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion} playSound={playSound}
+            players={scene.result.players.map(({ id, pseudo, cards, handLayout }) => ({ id, pseudo, cardCount: cards.length, handLayout }))}
+            controls={<section className="round-panel"><strong>Manche {roundNumber}</strong></section>} />
         </main>
       );
     }
@@ -205,7 +221,8 @@ export default function RoundScreen({
       <RoundResults
         key={roundNumber}
         result={scene.result}
-        hostManagement={gameActions(hostManagement)}
+        hostManagement={hostManagement}
+        settings={settings}
         roundNumber={roundNumber}
         remaining={turn.remaining}
         isHost={playerId === hostId}
@@ -260,12 +277,14 @@ export default function RoundScreen({
       </div>}
       <GameTable
         localPlayerId={playerId}
+        playSound={playSound}
         players={scene.phase === "playing" ? scene.turn.players : scene.players}
         memorization={memorization}
         dealing={phase === "dealing"}
         activePlayerId={turnControls?.view.playerId}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
         power={powerControls}
+        exchangeTargets={power?.exchangeTargets}
         tableEmojis={emojisEnabled ? tableEmojis : undefined}
         reaction={reaction}
         cardMotion={turn.view?.cardMotion}

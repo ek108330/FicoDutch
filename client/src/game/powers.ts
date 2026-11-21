@@ -1,7 +1,7 @@
 import { getCardFace, type Card, type CardFace, type CardRank } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
-import { changeHand } from "./hands.ts";
-import type { CardTarget, GameState, Power, PowerKind, PublicCardMove, SelectedCard, Turn } from "./gameTypes";
+import { appendCard, changeHand, recordCardMove } from "./hands.ts";
+import type { CardTarget, GameState, Power, PowerKind, SelectedCard, Turn } from "./gameTypes";
 
 export const POWER_DURATION_MS = 60_000;
 
@@ -13,6 +13,7 @@ export type PowerAction =
 
 export type PowerView = {
   kind: PowerKind;
+  exchangeTargets?: CardTarget[];
   selection: {
     targets: CardTarget[];
     remaining: number;
@@ -86,10 +87,6 @@ function resolveCard(state: GameState, selected: SelectedCard) {
     : null;
 }
 
-function recordMove(state: GameState, move: PublicCardMove, now: number): GameState["cardMotion"] {
-  return { id: (state.cardMotion?.id ?? 0) + 1, at: now, move };
-}
-
 function swapCards(state: GameState, first: SelectedCard, second: SelectedCard, now: number): GameState | null {
   const a = resolveCard(state, first);
   const b = resolveCard(state, second);
@@ -97,7 +94,7 @@ function swapCards(state: GameState, first: SelectedCard, second: SelectedCard, 
 
   return {
     ...state,
-    cardMotion: recordMove(state, { kind: "swap", targets: [a.target, b.target] }, now),
+    cardMotion: recordCardMove(state, { kind: "swap", targets: [a.target, b.target] }, now),
     players: state.players.map((player) => {
       if (player.id !== first.playerId && player.id !== second.playerId) return player;
       const cards = player.cards.slice();
@@ -118,9 +115,9 @@ function giveCard(state: GameState, actorId: string, recipient: unknown, now: nu
   return {
     ...state,
     ...piles,
-    cardMotion: recordMove(state, { kind: "gift", target: { playerId: target.id, position: target.cards.length } }, now),
+    cardMotion: recordCardMove(state, { kind: "gift", target: { playerId: target.id, position: target.cards.length } }, now),
     players: state.players.map((player) => player.id === target.id
-      ? changeHand(player, [...player.cards, card])
+      ? appendCard(player, card)
       : player),
   };
 }
@@ -179,20 +176,23 @@ export function updatePowerAfterReaction(power: Power | null, cardId: string) {
 }
 
 export function getPowerView(state: GameState, power: Power, canSee: boolean): PowerView {
-  if (!canSee) return { kind: power.kind, selection: null };
-
-  const remaining = powerCardCount(power.kind) - power.selected.length;
   const available = power.selected.flatMap((selected) => {
     const resolved = resolveCard(state, selected);
     return resolved ? [resolved] : [];
   });
+  const targets = available.map(({ target }) => target);
+  const exchangeTargets = power.kind === "blind-swap" || power.kind === "look-and-swap" ? targets : undefined;
+  if (!canSee) return { kind: power.kind, exchangeTargets, selection: null };
+
+  const remaining = powerCardCount(power.kind) - power.selected.length;
   const revealed = power.kind !== "blind-swap" && remaining === 0
     ? available.map(({ target, card }) => ({ target, face: getCardFace(card) }))
     : [];
   return {
     kind: power.kind,
+    exchangeTargets,
     selection: {
-      targets: available.map(({ target }) => target),
+      targets,
       remaining,
       revealed,
       canSwap: power.kind === "look-and-swap" && available.length === 2 &&

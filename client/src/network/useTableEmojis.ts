@@ -19,22 +19,24 @@ type Options = {
   hostRound: GameState | null;
   members: HubPlayer[];
   send: ReturnType<typeof useHubPeers>["send"];
+  onShow: () => void;
 };
 
 export function useTableEmojis({
-  playerId, hostId, roundNumber, clockVersion, enabled, now, hostRound, members, send,
+  playerId, hostId, roundNumber, clockVersion, enabled, now, hostRound, members, send, onShow,
 }: Options) {
   const [recent, setRecent] = useState<Map<string, VisibleEmoji>>(() => new Map());
   const lastSentAt = useRef(new Map<string, number>());
 
   const show = useCallback((senderId: string, emoji: HubEmoji) => {
     const receivedAt = performance.now();
+    onShow();
     setRecent((current) => {
       const next = new Map(Array.from(current).filter(([, entry]) => entry.until > receivedAt));
       next.set(senderId, { emoji, roundNumber, clockVersion, until: receivedAt + EMOJI_DURATION_MS });
       return next;
     });
-  }, [clockVersion, roundNumber]);
+  }, [clockVersion, onShow, roundNumber]);
 
   const broadcast = useCallback((senderId: string, emoji: HubEmoji) => {
     if (!enabled || !hostRound?.players.some(({ id, hasLeft }) => id === senderId && !hasLeft) ||

@@ -2,13 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { drawDeck, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const next = (page: Page) => page.getByRole("button", { name: "Lancer la manche suivante" });
-const resultTitle = (page: Page) => page.getByRole("heading", { name: /^Fin de la (manche|partie)$/ });
+const resultTitle = (page: Page) => page.locator(".result-screen").getByRole("heading", { level: 1 });
 const ranking = (page: Page) => page.getByRole("table", { name: "Classement cumulé" });
 const sixCards = (page: Page) => page.getByRole("button", { name: "6 cartes", exact: true });
 
 async function swipeLeftOnResults(page: Page) {
   const session = await page.context().newCDPSession(page);
-  const box = (await resultTitle(page).boundingBox())!;
+  const box = (await page.getByRole("region", { name: "Résultat de la manche" }).boundingBox())!;
   const y = Math.round(box.y + box.height / 2);
   const right = Math.round(box.x + box.width * 0.8);
   try {
@@ -44,7 +44,9 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
     await finishWithDutch(guest, host);
 
     for (const page of [host, guest]) {
-      await expect(page.getByRole("heading", { name: "Fin de la manche" })).toBeVisible();
+      await expect(resultTitle(page)).toHaveText("Manche 1");
+      await expect(page.getByRole("progressbar", { name: "Temps avant la manche suivante" })).toBeVisible();
+      await expect(page.getByRole("timer")).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Main de AliceManches" }).getByText("27 points")).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de BobManches" }).getByText("46 points")).toBeVisible();
       await expect(next(page)).toHaveCount(0);

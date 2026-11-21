@@ -1,6 +1,7 @@
 import type { CardTarget, PublicCardMove } from "../game/gameTypes";
 
-type Flight = "reaction" | "swap" | "gift" | "discard";
+type Flight = "reaction" | "swap" | "gift" | "penalty" | "discard";
+const flightDuration: Record<Flight, number> = { reaction: 360, swap: 1_060, gift: 460, penalty: 540, discard: 360 };
 
 export const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -30,12 +31,12 @@ export function flyCard(from: DOMRect, to: DOMRect, kind: Flight) {
     { transform: `translate(${x / 2 - y / distance * arc}px, ${y / 2 + x / distance * arc}px) rotate(${rotation}deg)`, opacity: 1, offset: 0.48 },
     { transform: arrival, opacity: 1, offset: 0.83 },
     { transform: arrival, opacity: 0 },
-  ], { duration: kind === "swap" ? 620 : 360, easing: "ease-in-out", fill: "forwards" });
+  ], { duration: flightDuration[kind], easing: "ease-in-out", fill: "forwards" });
   void animation.finished.then(() => card.remove(), () => card.remove());
 }
 
 export function animatePublicMove(table: HTMLElement, move: PublicCardMove) {
-  if (!move || (move.kind !== "swap" && move.kind !== "gift")) return;
+  if (!move || (move.kind !== "swap" && move.kind !== "gift" && move.kind !== "penalty")) return;
   function getCard(target: CardTarget | undefined) {
     if (!target || typeof target.playerId !== "string" || !Number.isSafeInteger(target.position)) return null;
     return table.querySelector<HTMLElement>(`[data-hand-player="${CSS.escape(target.playerId)}"] [data-card-position="${target.position}"]`);
@@ -54,6 +55,6 @@ export function animatePublicMove(table: HTMLElement, move: PublicCardMove) {
     const highlight = "0 0 0 2px #f3de9a";
     const opacity = reducedMotion() ? 1 : 0.45;
     card.animate([{ boxShadow: highlight, opacity }, { boxShadow: highlight, opacity, offset: 0.75 },
-      { boxShadow: "0 0 0 0 transparent", opacity: 1 }], { duration: move.kind === "swap" ? 620 : 360 });
+      { boxShadow: "0 0 0 0 transparent", opacity: 1 }], { duration: flightDuration[move.kind] });
   }
 }

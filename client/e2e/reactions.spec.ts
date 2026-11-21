@@ -57,9 +57,12 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
 
     await react(host, 1);
     await expect(host.locator('[data-card-animation="reaction"]')).toHaveCount(1);
+    await expect(guest.locator('[data-card-animation="penalty"]')).toHaveCount(1);
+    await expect(host.locator('[data-card-animation="penalty"] .card-face')).toHaveCount(0);
     await host.screenshot({ path: testInfo.outputPath("06-reaction-triple-appui.png") });
     await expect(host.getByText("AliceReflexe reçoit une carte de pénalité.")).toBeVisible();
     await expect(ownCards(host)).toHaveCount(5);
+    await expect(ownCards(host).nth(4)).toHaveAttribute("data-hand-slot", "4");
     await expect(ownCards(host).nth(4)).toHaveAttribute("aria-label", "Carte 5 face cachée");
     await expect(discard(guest)).toHaveAccessibleName("Défausse, 5 de pique");
     await expectTableFits(host);
@@ -72,8 +75,13 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
     await expect(ownCards(guest)).toHaveCount(4);
     await expect.poll(() => ownCards(guest).nth(3).evaluate((card) => card.getAnimations().length)).toBe(0);
+    const fixedSlot = guest.locator('.position-bottom [data-hand-slot="2"]');
+    const originalSlot = (await fixedSlot.boundingBox())!;
     await dragCard(guest, 3, true, testInfo.outputPath("02-carte-glissee-portrait.png"));
     await expect(ownCards(guest)).toHaveCount(3);
+    const retainedSlot = (await fixedSlot.boundingBox())!;
+    expect(retainedSlot.x).toBeCloseTo(originalSlot.x, 1);
+    expect(retainedSlot.y).toBeCloseTo(originalSlot.y, 1);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");
     await expect(host.locator(".discard-slot")).toHaveAttribute("data-stacked", "true");
     await expect(reactiveCards(guest)).toHaveCount(0);
@@ -98,8 +106,8 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     for (let i = 0; i < 3; i++) await guest.touchscreen.tap(last.x + last.width / 2, last.y + last.height / 2);
 
     for (const page of [host, guest]) {
-      await expect(page.getByRole("heading", { name: "Fin de la manche" })).toBeVisible();
-      await expect(page.getByText("BobReflexe remporte la manche.")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de BobReflexe" }).getByRole("img", { name: "Manche remportée" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de AliceReflexe" }).getByText("4 points")).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de BobReflexe" }).getByText("0 point")).toBeVisible();
       await expect(page.locator(".result-cards .face-up")).toHaveCount(2);

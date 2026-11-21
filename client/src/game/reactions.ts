@@ -1,7 +1,7 @@
 import type { Card, CardRank } from "./cards";
 import { takeFromPile } from "./deck.ts";
 import type { GameState, ReactionNotice } from "./gameTypes";
-import { changeHand, finishRound } from "./hands.ts";
+import { appendCard, finishRound, recordCardMove, removeCard } from "./hands.ts";
 import { isExchangeTargetLocked, updatePowerAfterReaction } from "./powers.ts";
 
 export type ReactionAction = {
@@ -68,16 +68,17 @@ export function reactToDiscard(
     const { card: penalty, ...piles } = drawn;
     return {
       ...state, ...piles, reaction,
-      players: state.players.map((entry) => entry === player ? changeHand(entry, [...entry.cards, penalty]) : entry),
+      cardMotion: recordCardMove(state, { kind: "penalty", target: { playerId, position: player.cards.length } }, now),
+      players: state.players.map((entry) => entry === player ? appendCard(entry, penalty) : entry),
     };
   }
 
-  const cards = player.cards.filter((_, index) => index !== position);
+  const remaining = removeCard(player, position);
   const next = presentDiscard({
     ...state,
-    players: state.players.map((entry) => entry === player ? changeHand(entry, cards) : entry),
+    players: state.players.map((entry) => entry === player ? remaining : entry),
     turn: state.turn ? { ...state.turn, power: updatePowerAfterReaction(state.turn.power, card.id) } : null,
   }, [...state.discardPile, card], { playerId, outcome: "played" });
 
-  return cards.length ? next : finishRound(next, now, playerId);
+  return remaining.cards.length ? next : finishRound(next, now, playerId);
 }

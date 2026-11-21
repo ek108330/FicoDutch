@@ -6,11 +6,13 @@ import { reducedMotion } from "./cardAnimations";
 
 type PlayingCardProps = {
   index: number;
+  slot?: number;
   face?: CardFace;
   onToggle?: () => void;
   disabled?: boolean;
   actionLabel?: string;
   selected?: boolean;
+  exchangeSelected?: boolean;
   dealOrder?: number;
   reaction?: CardReaction;
   powerReveal?: boolean;
@@ -31,7 +33,7 @@ export function CardBackMark({ backRef }: { backRef?: RefObject<HTMLSpanElement 
   return <span ref={backRef} className="card-back-pattern" aria-hidden="true"><span>F</span></span>;
 }
 
-export default function PlayingCard({ index, face, onToggle, disabled, actionLabel, selected, dealOrder, reaction,
+export default function PlayingCard({ index, slot, face, onToggle, disabled, actionLabel, selected, exchangeSelected, dealOrder, reaction,
   powerReveal = false }: PlayingCardProps) {
   const card = useRef<HTMLButtonElement>(null);
   const back = useRef<HTMLSpanElement>(null);
@@ -47,9 +49,15 @@ export default function PlayingCard({ index, face, onToggle, disabled, actionLab
     className: `playing-card ${face ? "face-up" : "face-down"}`,
     "aria-label": actionLabel ?? `Carte ${index + 1} ${face ? describeCardFace(face) : "face cachée"}`,
     "data-selected": selected || undefined,
+    "data-exchange-selected": exchangeSelected || undefined,
     "data-card-position": index,
+    "data-hand-slot": slot,
     "data-power-reveal": powerReveal || undefined,
-    style: dealOrder === undefined ? undefined : { animationDelay: `${dealOrder * 45}ms` },
+    style: {
+      animationDelay: dealOrder === undefined ? undefined : `${dealOrder * 45}ms`,
+      gridColumn: slot === undefined ? undefined : Math.floor(slot / 2) + 1,
+      gridRow: slot === undefined ? undefined : slot % 2 + 1,
+    },
   };
   const content = face && powerReveal ? (
     <span className="power-card-turn" aria-hidden="true">

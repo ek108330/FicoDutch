@@ -92,10 +92,25 @@ test("une tentative incorrecte garde la carte et donne une seule pénalité cach
   assert.equal(penalized.reaction.reference, state.reaction.reference);
   assert.equal(penalized.phase, "playing");
   assert.equal(penalized.reaction.notice?.outcome, "penalty");
+  assert.deepEqual(getTurnView(penalized, "bob", 1_001)?.cardMotion?.move,
+    { kind: "penalty", target: { playerId: "alice", position: 1 } });
   assert.doesNotMatch(JSON.stringify(getTurnView(penalized, "alice", 1_001)), /hidden-penalty|"rank":"J"/);
   assert.equal(playTurn(penalized, "alice", 1,
     { kind: "reaction", position: 0, reference: penalized.reaction.reference, handVersion: 0 }, 1_005), penalized);
   assert.equal(attempt(penalized, "alice", 0).reaction.notice?.outcome, "empty-pile");
+});
+
+test("retirer une carte conserve les emplacements et la pénalité réutilise la place libre", () => {
+  const start = setup([
+    [card("a-2", "2"), card("a-4", "4"), card("a-6", "6"), card("a-8", "8")],
+    [card("b-4", "4")], [card("c-7", "7")],
+  ], card("top", "4"), [card("first-penalty", "3"), card("second-penalty", "10")], { infinitePose: true });
+  const removed = attempt(start, "alice", 1);
+  assert.deepEqual(removed.players[0].handLayout, { columns: 2, slots: [0, 1, 3] });
+  const filled = attempt(removed, "alice", 0);
+  assert.deepEqual(filled.players[0].handLayout, { columns: 2, slots: [0, 1, 3, 2] });
+  const expanded = attempt(filled, "alice", 0);
+  assert.deepEqual(expanded.players[0].handLayout, { columns: 3, slots: [0, 1, 3, 2, 4] });
 });
 
 test("la pose infinie autorise deux réussites consécutives du même joueur", () => {

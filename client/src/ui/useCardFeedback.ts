@@ -2,13 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TurnView } from "../game/turn";
 
 type FeedbackKind = "draw" | "discard" | "power" | "reaction";
+export type GameSound = FeedbackKind | "tap" | "slide" | "flip" | "select" | "swap" | "gift" | "penalty" | "deal" | "emoji";
+export type PlayGameSound = (sound: GameSound) => void;
 export type CardFeedback = { kind: FeedbackKind; pile: "deck" | "discard"; id: number };
 const soundKey = "ficodutch-game-sound";
-const tones: Record<FeedbackKind, [number, number]> = {
-  draw: [360, 460],
-  discard: [295, 210],
-  power: [480, 690],
-  reaction: [510, 410],
+const tones: Record<GameSound, readonly [start: number, end: number, seconds: number, peak: number]> = {
+  draw: [360, 490, 0.17, 0.16],
+  discard: [295, 180, 0.16, 0.17],
+  power: [480, 720, 0.21, 0.16],
+  reaction: [540, 360, 0.19, 0.18],
+  tap: [670, 540, 0.07, 0.12],
+  slide: [280, 510, 0.14, 0.15],
+  flip: [610, 420, 0.16, 0.16],
+  select: [560, 680, 0.11, 0.12],
+  swap: [335, 670, 0.44, 0.17],
+  gift: [430, 580, 0.25, 0.17],
+  penalty: [260, 115, 0.32, 0.21],
+  deal: [220, 400, 0.25, 0.17],
+  emoji: [720, 900, 0.12, 0.12],
 };
 
 export function useGameAudio() {
@@ -42,26 +53,30 @@ export function useGameAudio() {
     audio.current = null;
   }, []);
 
-  const playSound = useCallback((kind: FeedbackKind) => {
+  const playSound = useCallback<PlayGameSound>((kind) => {
     const context = audio.current;
-    if (!sound || !context || context.state !== "running") return;
+    const tone = tones[kind];
+    if (!sound || !context || context.state !== "running" || !Array.isArray(tone)) return;
     const start = context.currentTime;
+    const [from, to, seconds, peak] = tone;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.frequency.setValueAtTime(tones[kind][0], start);
-    oscillator.frequency.exponentialRampToValueAtTime(tones[kind][1], start + 0.09);
-    gain.gain.setValueAtTime(0.035, start);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(from, start);
+    oscillator.frequency.exponentialRampToValueAtTime(to, start + seconds * 0.72);
+    gain.gain.setValueAtTime(0.001, start);
+    gain.gain.linearRampToValueAtTime(peak, start + 0.014);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + seconds);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
-    oscillator.stop(start + 0.14);
+    oscillator.stop(start + seconds + 0.01);
   }, [sound]);
 
   return { sound, toggleSound, playSound };
 }
 
-export function useCardFeedback(view: TurnView | null, roundNumber: number, clockVersion: number,
-  playSound: ReturnType<typeof useGameAudio>["playSound"]) {
+export function useCardFeedback(view: TurnView | null, roundNumber: number, clockVersion: number, playerId: string,
+  playSound: PlayGameSound) {
   const [feedback, setFeedback] = useState<CardFeedback | null>(null);
   const previous = useRef<{ view: TurnView; roundNumber: number; clockVersion: number } | null>(null);
   const nextId = useRef(0);
@@ -74,6 +89,12 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
       return;
     }
     const before = prior.view;
+    const faces = view.power?.selection?.revealed.length ?? 0;
+    const previousFaces = before.power?.selection?.revealed.length ?? 0;
+    const newMove = view.cardMotion && view.cardMotion.id !== before.cardMotion?.id;
+    if (faces !== previousFaces && !newMove) playSound("flip");
+    else if ((view.power?.exchangeTargets?.length ?? 0) > (before.power?.exchangeTargets?.length ?? 0)) playSound("select");
+
     let kind: FeedbackKind;
     let pile: CardFeedback["pile"] = "discard";
     if (view.reaction.notice && view.reaction.notice !== before.reaction.notice &&
@@ -87,8 +108,10 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
     else return;
 
     setFeedback({ kind, pile, id: ++nextId.current });
-    playSound(kind);
-  }, [clockVersion, playSound, roundNumber, view]);
+    if (kind !== "reaction") playSound(kind);
+    else if (view.reaction.notice?.outcome === "empty-pile") playSound("penalty");
+    else if (view.reaction.notice?.outcome === "played" && view.reaction.notice.playerId !== playerId) playSound("reaction");
+  }, [clockVersion, playSound, playerId, roundNumber, view]);
 
   return feedback;
 }

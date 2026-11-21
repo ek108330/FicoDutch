@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
@@ -83,6 +83,7 @@ for (const count of [4, 5, 6]) {
         if (!joker) return;
 
         await drawDeck(last).click();
+        await last.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
         await last.getByRole("button", { name: "Défausser la carte tirée" }).click();
         await expectLocalTurn(host);
         await drawDeck(host).click();
@@ -92,6 +93,33 @@ for (const count of [4, 5, 6]) {
           await last.setViewportSize({ width, height });
           await checkSeats(last, 6, 7);
           await last.screenshot({ path: testInfo.outputPath(`${name}-joker.png`), fullPage: true });
+        }
+        for (const guest of guests.slice(0, -1)) {
+          await expectLocalTurn(guest);
+          const label = await activeTurn(guest).textContent();
+          await drawDeck(guest).click();
+          await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+          const pass = guest.getByRole("button", { name: "Passer le pouvoir" });
+          await expect.poll(async () => (await activeTurn(guest).allTextContents())[0] !== label || await pass.isVisible()).toBe(true);
+          if (await pass.isVisible()) await pass.click();
+        }
+
+        await expect(host.locator(".result-screen").getByRole("heading", { name: "Manche 1" })).toBeVisible();
+        for (const [width, height] of [[320, 568], [740, 360]]) {
+          await host.setViewportSize({ width, height });
+          const hands = host.getByRole("region", { name: /^Main de / });
+          await expect(hands).toHaveCount(6);
+          for (const hand of await hands.all()) await expect(hand).toBeInViewport({ ratio: 1 });
+          await expectScreenFits(host);
+          await expect(host.getByRole("region", { name: "Main de Invite5" }).getByRole("img", { name: /Annonce Dutch/ })).toBeVisible();
+          const variants = host.getByRole("group", { name: "Variantes", exact: true }).getByRole("button");
+          const rows = await variants.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
+          expect(rows).toHaveLength(4);
+          expect(new Set(rows).size).toBe(1);
+          const pager = (await host.getByRole("button", { name: "Afficher le classement cumulé" }).boundingBox())!;
+          const management = (await host.getByRole("button", { name: "Gérer la table" }).boundingBox())!;
+          expect(pager.x + pager.width).toBeLessThan(management.x);
+          await host.screenshot({ path: testInfo.outputPath(`resultats-six-${width}.png`) });
         }
       } finally {
         await Promise.all(guests.map((guest) => guest.close()));

@@ -26,21 +26,23 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await start.click();
     await expectLocalTurn(guest, 17_000);
     await expect(guest.getByRole("timer")).toHaveCount(0);
-    const progress = turnClock(guest).locator(".turn-clock-progress");
+    const progress = turnClock(guest).locator(".perimeter-clock-progress");
     const originalOffset = Number(await progress.getAttribute("stroke-dashoffset"));
-    await expect.poll(async () => Number(await progress.getAttribute("stroke-dashoffset"))).toBeGreaterThan(originalOffset);
+    await expect.poll(async () => Number(await progress.getAttribute("stroke-dashoffset"))).toBeLessThan(originalOffset);
     await expect(turnClock(guest)).toHaveAttribute("aria-valuenow", "58");
 
     await playSpecialCard(guest, 2, "10");
     await expect(turnClock(guest)).toHaveAttribute("aria-valuenow", /^(59|60)$/);
     await targetCard(guest, 1, bob).click();
     await expect(guest.locator(".position-bottom .playing-card[data-selected=true]")).toHaveCount(1);
+    await expect(host.locator(".position-top .playing-card[data-exchange-selected=true]")).toHaveCount(1);
     await expect(faceUpHands(guest)).toHaveCount(0);
     await expect(faceUpHands(host)).toHaveCount(0);
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("01-dix-echange-aveugle.png") });
     await targetCard(guest, 1, alice).click();
     await expect(host.locator('[data-card-animation="swap"]')).toHaveCount(2);
+    expect(await host.locator('[data-card-animation="swap"]').first().evaluate((card) => card.getAnimations()[0].effect?.getTiming().duration)).toBeGreaterThan(900);
     await expect(host.locator(".flying-card .card-face")).toHaveCount(0);
     await expectLocalTurn(host);
 
@@ -55,6 +57,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expect(guest.getByRole("heading", { name: "Pouvoir du Valet" })).toBeVisible();
     await expect(faceUpHands(guest)).toHaveCount(0);
     await expect(guest.locator(".power-card-turn")).toHaveCount(0);
+    await expect(guest.locator(".playing-card[data-exchange-selected=true]")).toHaveCount(2);
 
     await host.setViewportSize({ width: 390, height: 844 });
     await expectTableFits(host);

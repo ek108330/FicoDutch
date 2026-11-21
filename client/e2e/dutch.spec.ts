@@ -45,9 +45,9 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await host.getByRole("button", { name: "Garder en place" }).click();
 
     for (const page of [host, guest]) {
-      await expect(page.getByRole("heading", { name: "Fin de la manche" })).toBeVisible();
-      await expect(page.getByText("AliceDutch remporte la manche.")).toBeVisible();
-      await expect(page.getByText("BobDutch reçoit 10 points de pénalité Dutch.")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de AliceDutch" }).getByRole("img", { name: "Manche remportée" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByRole("img", { name: "Annonce Dutch, pénalité de 10 points" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de AliceDutch" }).getByText("20 points")).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByText("46 points")).toBeVisible();
     }

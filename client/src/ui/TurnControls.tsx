@@ -5,6 +5,7 @@ import { TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
 import { CardBackMark, CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
 import type { CardFeedback } from "./useCardFeedback";
+import PerimeterClock from "./PerimeterClock";
 
 type TurnControlsProps = {
   view: TurnView;
@@ -80,18 +81,12 @@ export function TurnPanel({
       Dutch
     </button>
   );
-  const fraction = Math.min(1, Math.max(0, remaining / TURN_DURATION_MS));
-  const seconds = Math.ceil(fraction * TURN_DURATION_MS / 1_000);
   const discarding = canPlay && view.hasDrawn;
   return (
     <section className="turn-layout" aria-label="Tour de jeu">
       <div className="round-panel turn-panel">
-        <svg key={`${view.number}:${power?.kind ?? "turn"}`} className="turn-clock" role="progressbar"
-          aria-label="Temps restant" aria-valuemin={0} aria-valuemax={TURN_DURATION_MS / 1_000}
-          aria-valuenow={seconds} aria-valuetext={`${seconds} secondes`}>
-          <rect className="turn-clock-track" x="1.5" y="1.5" rx="10" />
-          <rect className="turn-clock-progress" x="1.5" y="1.5" rx="10" pathLength="100" strokeDashoffset={100 * (1 - fraction)} />
-        </svg>
+        <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}`} remaining={remaining}
+          duration={TURN_DURATION_MS} label="Temps restant" />
         <strong className="turn-player" role="status">{view.playerName} joue</strong>
       </div>
       {(power || message || dutchButton || discarding) && (

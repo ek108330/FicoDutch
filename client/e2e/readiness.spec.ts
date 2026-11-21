@@ -70,15 +70,16 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await openSettings(guest);
     await expect(sound).toHaveAttribute("aria-pressed", "true");
     await closeSettings(guest);
+    const tones = Number(await guest.locator("html").getAttribute("data-test-tones"));
     await drawDeck(guest).click();
     await expect(guest.locator(".feedback-draw")).toHaveCount(1);
-    await expect(guest.locator("html")).toHaveAttribute("data-test-tones", "1");
+    await expect(guest.locator("html")).toHaveAttribute("data-test-tones", String(tones + 1));
     await openSettings(guest);
     await sound.click();
     await closeSettings(guest);
     await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
     await expect(guest.locator(".card-feedback:not(.feedback-draw)")).toHaveCount(1);
-    await expect(guest.locator("html")).toHaveAttribute("data-test-tones", "1");
+    await expect(guest.locator("html")).toHaveAttribute("data-test-tones", String(tones + 1));
   } finally {
     await guest.close();
   }

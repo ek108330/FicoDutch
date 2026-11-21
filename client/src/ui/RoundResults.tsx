@@ -1,12 +1,15 @@
 import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Megaphone, Trophy } from "lucide-react";
+import { GAME_CONFIG } from "../config/gameConfig";
 import type { RoundResultView } from "../game/hands";
 import { VARIANT_LABELS, type GameVariants } from "../game/variants";
 import PlayingCard from "./PlayingCard";
+import PerimeterClock from "./PerimeterClock";
 
 type Props = {
   result: RoundResultView;
   hostManagement: ReactNode;
+  settings: ReactNode;
   roundNumber: number;
   remaining: number;
   isHost: boolean;
@@ -21,22 +24,20 @@ const variantKeys = Object.keys(VARIANT_LABELS) as Array<keyof GameVariants>;
 const interactive = "button, a, input, select, textarea, summary, dialog";
 
 function RoundHands({ result }: { result: RoundResultView }) {
-  const emptyPlayer = result.players.find(({ id }) => id === result.emptyHandPlayerId);
-  const announcer = result.players.find(({ id }) => id === result.dutchAnnouncerId);
   const winners = result.players.filter(({ id }) => result.winnerIds.includes(id));
   const winnerNames = new Intl.ListFormat("fr").format(winners.map(({ pseudo }) => pseudo));
 
   return (
     <div role="region" aria-label="Résultat de la manche">
-      {emptyPlayer && <p>{emptyPlayer.pseudo} a posé sa dernière carte.</p>}
-      {!emptyPlayer && announcer && <p>{announcer.pseudo} a annoncé Dutch.</p>}
-      {result.dutchPenalty && announcer && <p>{announcer.pseudo} reçoit 10 points de pénalité Dutch.</p>}
-      <p className="round-winners">{winnerNames} {winners.length > 1 ? "remportent" : "remporte"} la manche.</p>
+      <p className="result-sr-only">{winnerNames} {winners.length > 1 ? "remportent" : "remporte"} la manche.</p>
       <div className="result-hands">
         {result.players.map(({ id, pseudo, cards, roundScore }) => (
-          <section key={id} className="result-hand" aria-label={`Main de ${pseudo}`}>
-            <h2>{pseudo}</h2>
-            <p>{roundScore} {roundScore > 1 ? "points" : "point"}</p>
+          <section key={id} className="result-hand" data-winner={result.winnerIds.includes(id)} aria-label={`Main de ${pseudo}`}>
+            <div className="result-player-heading">
+              <h2>{pseudo}</h2>
+              <PlayerBadges id={id} result={result} />
+            </div>
+            <p className="result-points">{roundScore} {roundScore > 1 ? "points" : "point"}</p>
             {cards.length ? (
               <div className="result-cards">
                 {cards.map((face, index) => <PlayingCard key={index} face={face} index={index} />)}
@@ -46,6 +47,22 @@ function RoundHands({ result }: { result: RoundResultView }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function PlayerBadges({ id, result }: { id: string; result: RoundResultView }) {
+  const won = result.winnerIds.includes(id);
+  const announced = id === result.dutchAnnouncerId;
+  return (
+    <>
+      {won && <span className="result-badge" role="img" aria-label="Manche remportée" title="Manche remportée"><Trophy size={13} /></span>}
+      {announced && (
+        <span className="result-badge result-dutch" role="img" title={result.dutchPenalty ? "Dutch · pénalité de 10 points" : "Annonce Dutch"}
+          aria-label={result.dutchPenalty ? "Annonce Dutch, pénalité de 10 points" : "Annonce Dutch"}>
+          <Megaphone size={13} />{result.dutchPenalty && <span>+10</span>}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -60,7 +77,7 @@ function Ranking({ result }: { result: RoundResultView }) {
         {sorted.map(({ id, pseudo, totalScore, scoreHistory }) => (
           <tr key={id}>
             <td>{sorted.findIndex((player) => player.totalScore === totalScore) + 1}</td>
-            <th scope="row">{pseudo}</th>
+            <th scope="row"><span className="result-player-heading"><span>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
             <td>{totalScore}</td>
             <td>{scoreHistory.join(" → ")}</td>
           </tr>
@@ -71,7 +88,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, hostManagement, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
+  result, hostManagement, settings, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
 }: Props) {
   const [panel, setPanel] = useState<"round" | "ranking">("round");
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
@@ -111,10 +128,10 @@ export default function RoundResults({
   return (
     <main className="game-screen result-screen" onClick={clickScreen} onPointerDown={beginSwipe} onPointerUp={endSwipe}
       onPointerCancel={() => { touchOrigin.current = null; }}>
-      {hostManagement}
       <section className="round-results" aria-labelledby="result-title">
+        {!isFinal && <PerimeterClock remaining={remaining} duration={GAME_CONFIG.round.resultsMs} label="Temps avant la manche suivante" />}
         <div className="result-heading">
-          <p className="result-round-label">Manche {roundNumber}</p>
+          <h1 id="result-title">{isFinal ? "Fin de la partie" : `Manche ${roundNumber}`}</h1>
           <button type="button" className="result-progress" onClick={flipPage}
             aria-label={panel === "round" ? "Afficher le classement cumulé" : "Afficher les cartes de la manche"}
             aria-keyshortcuts="ArrowLeft ArrowRight" onKeyDown={(event) => {
@@ -126,19 +143,14 @@ export default function RoundResults({
             <span data-current={panel === "ranking"} aria-hidden="true" />
             <ChevronRight size={15} aria-hidden="true" />
           </button>
+          <div className="result-tools">{hostManagement}{settings}</div>
         </div>
-        <h1 id="result-title">{isFinal ? "Fin de la partie" : "Fin de la manche"}</h1>
         {isFinal ? (
           <>
             <p className="round-winners">{winnerNames} {gameWinners.length > 1 ? "remportent" : "remporte"} la partie.</p>
             <p>Seuil de {result.endThreshold} points atteint.</p>
           </>
-        ) : (
-          <p className="result-countdown">
-            {seconds > 0 ? <>Prochaine manche dans <span role="timer">{seconds} s</span></>
-              : "En attente de joueurs disponibles pour la prochaine manche."}
-          </p>
-        )}
+        ) : seconds === 0 && <p role="status">En attente de joueurs disponibles.</p>}
         {!isFinal && waitingPlayers.length > 0 && (
           <p>En attente de la prochaine manche · {new Intl.ListFormat("fr").format(waitingPlayers)}</p>
         )}
@@ -146,14 +158,18 @@ export default function RoundResults({
           {panel === "round" ? <RoundHands result={result} /> : <Ranking result={result} />}
         </div>
         <fieldset className="result-variants" disabled={!isHost || isFinal || seconds === 0}>
-          <legend>{isFinal ? "Variantes de la partie" : "Variantes de la prochaine manche"}</legend>
+          <legend>{isFinal ? "Variantes de la partie" : "Variantes"}</legend>
           {isFinal ? (
             <p>{activeVariants.length ? new Intl.ListFormat("fr").format(activeVariants.map((key) => VARIANT_LABELS[key])) : "Aucune"}</p>
-          ) : variantKeys.map((key) => (
-            <button key={key} type="button" aria-pressed={result.nextVariants[key]} onClick={() => toggleVariant(key)}>
-              {VARIANT_LABELS[key]}
-            </button>
-          ))}
+          ) : (
+            <div className="result-variant-tiles">
+              {variantKeys.map((key) => (
+                <button key={key} type="button" aria-pressed={result.nextVariants[key]} onClick={() => toggleVariant(key)}>
+                  {VARIANT_LABELS[key]}
+                </button>
+              ))}
+            </div>
+          )}
         </fieldset>
         {!isFinal && isHost && panel === "ranking" && (
           <button type="button" className="result-primary" disabled={!canStartNext} onClick={startNext}>

@@ -4,7 +4,7 @@ import { drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } 
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
 const waiting = (page: Page) => page.getByRole("heading", { name: "En attente de la prochaine manche" });
-const showRanking = (page: Page) => page.getByRole("heading", { name: /^Fin de la (manche|partie)$/ });
+const showRanking = (page: Page) => page.locator(".result-screen").getByRole("heading", { level: 1 });
 
 async function playTurn(page: Page, announceDutch = false) {
   await expectLocalTurn(page, 18_000);
