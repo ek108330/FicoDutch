@@ -50,7 +50,7 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
   }, [generation, hubId, hostId, hostVersion, ownVersion, playerId]);
 
   useEffect(() => {
-    if (players) transport.current?.syncGuests(players);
+    if (players) transport.current?.syncGuests(players.filter(({ isBot }) => !isBot));
   }, [generation, players]);
 
   const send = useCallback((peerId: string, message: unknown) => {

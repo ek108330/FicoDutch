@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const {
-  completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
+  addHubBot, completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
   relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, resumeHub, startHubGame, updateHubSettings,
 } = require("./hubManager");
 
@@ -24,6 +24,26 @@ function signal(hubId, recipient, type, senderVersion = 1, recipientVersion = 1)
     negotiationId: "test", description: { type, sdp: "v=0" },
   };
 }
+
+test("seul l’hôte peut ajouter des bots dans les places libres de son Hub", (t) => {
+  const { hub } = openTable(t, "bot-host", "bot-guest");
+  assert.equal(addHubBot("bot-guest", hub.id), false);
+  assert.equal(addHubBot("bot-host", "autre-hub"), false);
+  for (let i = 0; i < 4; i++) assert.equal(addHubBot("bot-host", hub.id), true);
+  assert.equal(addHubBot("bot-host", hub.id), false);
+  assert.equal(joinHub(hub.id, "bot-overflow", "Chloe"), null);
+  const full = getAllHubs().find(({ id }) => id === hub.id);
+  const bots = full.players.filter(({ isBot }) => isBot);
+  assert.deepEqual(bots.map(({ pseudo }) => pseudo), ["Bot 1", "Bot 2", "Bot 3", "Bot 4"]);
+  assert.equal(new Set(bots.map(({ id }) => id)).size, 4);
+  assert.equal(bots.some((bot) => "token" in bot || "socketId" in bot), false);
+  assert.equal(resolvePeerRelay("bot-host", signal(hub.id, { playerId: bots[0].id }, "answer", 1, 0)), null);
+  assert.ok(removeHubGuest("bot-host", hub.id, bots[0].id));
+  const participants = full.players.filter(({ id }) => id !== bots[0].id);
+  const cardCounts = Object.fromEntries(participants.map(({ id }) => [id, 4]));
+  assert.ok(startHubGame("bot-host", { hubId: hub.id, cardCounts, variants: hub.variants, endThreshold: hub.endThreshold }).hub);
+  assert.equal(addHubBot("bot-host", hub.id), false);
+});
 
 test("seul l’hôte peut publier la distribution pour les joueurs et paramètres courants", (t) => {
   const { host, guest, request } = openTable(t, "host", "guest");

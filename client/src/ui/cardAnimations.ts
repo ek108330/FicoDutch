@@ -1,7 +1,9 @@
 import type { CardTarget, PublicCardMove } from "../game/gameTypes";
 
-type Flight = "reaction" | "reaction-discard" | "swap" | "gift" | "penalty" | "discard";
-const flightDuration: Record<Flight, number> = { reaction: 360, "reaction-discard": 640, swap: 1_060, gift: 460, penalty: 540, discard: 360 };
+type Flight = "reaction" | "reaction-discard" | "bot-discard" | "swap" | "gift" | "penalty" | "discard";
+const flightDuration: Record<Flight, number> = {
+  reaction: 360, "reaction-discard": 640, "bot-discard": 640, swap: 1_060, gift: 460, penalty: 540, discard: 360,
+};
 
 export const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -39,11 +41,11 @@ export function flyCard(from: DOMRect, to: DOMRect, kind: Flight, face?: Element
 }
 
 export function animatePublicMove(table: HTMLElement, move: PublicCardMove) {
-  if (move?.kind === "reaction") {
-    const source = table.querySelector(".reaction-origin");
+  if (move?.kind === "reaction" || move?.kind === "bot-discard") {
+    const source = table.querySelector(".discard-origin");
     const target = table.querySelector(".discard-slot, .discard-placeholder");
     if (source && target) {
-      const kind = "reaction-discard";
+      const kind = move.kind === "reaction" ? "reaction-discard" : "bot-discard";
       flyCard(source.getBoundingClientRect(), target.getBoundingClientRect(), kind, source.querySelector(".card-face"));
       if (!reducedMotion()) {
         target.querySelector(".card-face")?.animate(

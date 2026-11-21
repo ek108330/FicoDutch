@@ -12,6 +12,8 @@ export type GamePhase =
 export type GamePlayer = {
   id: string;
   pseudo: string;
+  isBot?: true;
+  botMemory?: BotObservation[];
   cards: Card[];
   handVersion: number;
   handLayout?: HandLayout;
@@ -23,9 +25,11 @@ export type GamePlayer = {
 };
 
 export type CardTarget = { playerId: string; position: number };
+export type BotObservation = { playerId: string; slot: number; cardId: string; points: number };
 export type PublicCardMove = { kind: "swap"; targets: [CardTarget, CardTarget] } |
   { kind: "gift" | "penalty"; target: CardTarget } |
-  { kind: "reaction"; playerId: string; slot: number; face: CardFace };
+  { kind: "reaction"; playerId: string; slot: number; face: CardFace } |
+  { kind: "bot-discard"; playerId: string; slot?: number; face: CardFace };
 export type PowerKind = "look-own" | "look-other" | "blind-swap" | "look-and-swap" | "give-card";
 export type SelectedCard = { playerId: string; cardId: string };
 export type Power = { kind: PowerKind; selected: SelectedCard[] };

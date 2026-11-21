@@ -6,6 +6,7 @@ export type HubPlayer = {
   id: string;
   pseudo: string;
   isHost: boolean;
+  isBot?: true;
   connected: boolean;
   connectionVersion: number;
 };

@@ -6,7 +6,7 @@ const { Server } = require("socket.io");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame,
-  removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay,
+  addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay,
 } = require("./hubManager");
 
 const app = express();
@@ -140,6 +140,14 @@ io.on("connection", (socket) => {
 
   socket.on("hub:finish", () => {
     if (finishHubGame(socket.id)) broadcastHubs();
+  });
+
+  socket.on("hub:add-bot", (request) => {
+    if (!addHubBot(socket.id, request?.hubId)) {
+      socket.emit("hub:error", "L’ajout d’un bot nécessite une place libre dans la salle d’attente de ton Hub.");
+      return;
+    }
+    broadcastHubs();
   });
 
   socket.on("hub:remove-guest", (request) => {

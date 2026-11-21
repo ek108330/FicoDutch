@@ -27,6 +27,7 @@ export default function HubPreview({ hub, canJoin, onClose, onJoin }: Props) {
           <li key={player.id}>
             <strong>{player.pseudo}</strong>
             {player.isHost && <span>Hôte</span>}
+            {player.isBot && <span>Bot</span>}
           </li>
         ))}
       </ul>

@@ -41,7 +41,7 @@ function App() {
   const playerId = session?.playerId;
   const peers = useHubPeers(currentHub, playerId, networkReady);
   const awaitingPeers = !!currentHub && !currentHub.gameStarted &&
-    currentHub.players.some(({ id }) => id !== currentHub.hostId && (playerId === currentHub.hostId
+    currentHub.players.some(({ id, isBot }) => !isBot && id !== currentHub.hostId && (playerId === currentHub.hostId
       ? !peers.connectedPeers.includes(id) : !peers.hostConnected));
 
   const storeHostRound = useCallback((round: HostRound | null) => {
@@ -225,7 +225,7 @@ function App() {
     if (!networkReady || !currentHub?.hostPause || currentHub.hostId !== playerId ||
         hostRoundRef.current?.hubId !== currentHub.id) return;
     const activeIds = new Set(hostRoundRef.current.state.players.filter(({ hasLeft }) => !hasLeft).map(({ id }) => id));
-    const others = currentHub.players.filter(({ id, connected }) => connected && id !== playerId && activeIds.has(id));
+    const others = currentHub.players.filter(({ id, connected, isBot }) => !isBot && connected && id !== playerId && activeIds.has(id));
     if (others.every(({ id }) => peers.connectedPeers.includes(id))) socket.emit("hub:host-ready");
   }, [currentHub, networkReady, peers.connectedPeers, playerId]);
 
@@ -283,7 +283,7 @@ function App() {
     if (!networkReady || hostRoundRef.current?.hubId === hub.id) return;
 
     const state = createRound(
-      hub.players.map(({ id, pseudo }) => ({ id, pseudo, totalScore: 0 })),
+      hub.players.map(({ id, pseudo, isBot }) => ({ id, pseudo, isBot, totalScore: 0 })),
       hub.variants,
       hub.endThreshold
     );
@@ -389,6 +389,7 @@ function App() {
               canStart={networkReady && !awaitingPeers && currentHub.players.length >= GAME_CONFIG.players.min &&
                 hostRound?.hubId !== currentHub.id}
               onStart={() => startGame(currentHub)} onLeave={leaveHub}
+              onAddBot={() => socket.emit("hub:add-bot", { hubId: currentHub.id })}
               onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })}
               management={manageHub(currentHub)} />
           ) : (

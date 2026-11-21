@@ -5,6 +5,7 @@ import type { GameVariants } from "./variants";
 type RoundPlayer = {
   id: string;
   pseudo: string;
+  isBot?: true;
   totalScore: number;
   scoreHistory?: number[];
 };
@@ -31,6 +32,7 @@ export function createRound(
   const gamePlayers: GamePlayer[] = players.map((player) => ({
     id: player.id,
     pseudo: player.pseudo,
+    ...(player.isBot && { isBot: player.isBot }),
     cards: hands[player.id],
     handVersion: 0,
     roundScore: 0,

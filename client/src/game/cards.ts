@@ -46,7 +46,7 @@ export const CARD_VALUES: Record<CardRank, number> = {
   JOKER: 14,
 };
 
-export function getCardValue(card: Card): number {
+export function getCardValue(card: CardFace): number {
   if (card.rank === "K") {
     return card.suit === "hearts" || card.suit === "diamonds"
       ? 13

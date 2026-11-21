@@ -108,7 +108,7 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
     else return;
 
     setFeedback({ kind, pile, id: ++nextId.current });
-    if (kind !== "reaction") playSound(kind);
+    if (kind !== "reaction" && (!newMove || view.cardMotion?.move.kind !== "bot-discard")) playSound(kind);
     else if (view.reaction.notice?.outcome === "empty-pile") playSound("penalty");
   }, [clockVersion, playSound, roundNumber, view]);
 

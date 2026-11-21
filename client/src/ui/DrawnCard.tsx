@@ -3,7 +3,11 @@ import type { CardFace } from "../game/cards";
 import { describeCardFace } from "./cardLabels";
 import { CardBackMark, CardFaceMark } from "./PlayingCard";
 
-export default function DrawnCard({ face, center }: { face: CardFace; center: RefObject<HTMLDivElement | null> }) {
+export default function DrawnCard({ face, center, botName }: {
+  face?: CardFace;
+  center: RefObject<HTMLDivElement | null>;
+  botName?: string;
+}) {
   const card = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -17,11 +21,14 @@ export default function DrawnCard({ face, center }: { face: CardFace; center: Re
   }, [center]);
 
   return (
-    <div ref={card} className="drawn-card" role="img" aria-label={`Carte tirée, ${describeCardFace(face)}`}>
-      <span className="drawn-card-turn" aria-hidden="true">
-        <span className="drawn-card-front"><CardFaceMark face={face} /></span>
-        <span className="drawn-card-back"><CardBackMark /></span>
-      </span>
+    <div ref={card} className={`drawn-card${botName ? " bot-drawn-card" : ""}`} role="img"
+      aria-label={face ? `Carte tirée, ${describeCardFace(face)}` : `Carte tirée par ${botName}, face cachée`}>
+      {face ? (
+        <span className="drawn-card-turn" aria-hidden="true">
+          <span className="drawn-card-front"><CardFaceMark face={face} /></span>
+          <span className="drawn-card-back"><CardBackMark /></span>
+        </span>
+      ) : <span className="bot-drawn-back"><CardBackMark /></span>}
     </div>
   );
 }

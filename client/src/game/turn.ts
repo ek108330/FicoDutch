@@ -2,7 +2,8 @@ import { getCardFace, type Card, type CardFace } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
 import type { HandLayout } from "./handLayout";
 import type { GameState, GamePlayer, PublicCardMove, ReactionNotice, Turn } from "./gameTypes";
-import { changeHand, finishRound } from "./hands.ts";
+import { changeHand, finishRound, recordCardMove } from "./hands.ts";
+import { getHandLayout } from "./handLayout.ts";
 import { applyPowerAction, getPowerView, POWER_DURATION_MS, startPower, type PowerAction, type PowerView } from "./powers.ts";
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
 
@@ -13,6 +14,7 @@ export type TurnAction =
   | { kind: "draw"; source: "deck" }
   | { kind: "replace"; position: number; handVersion: number }
   | { kind: "discard" }
+  | { kind: "skip-empty" }
   | { kind: "dutch-intent"; enabled: boolean }
   | PowerAction
   | ReactionAction;
@@ -29,7 +31,7 @@ export type TurnView = {
   topDiscard: CardFace | null;
   power: PowerView | null;
   cardMotion: CardMotionView | null;
-  players: Array<{ id: string; pseudo: string; cardCount: number; handVersion: number; handLayout?: HandLayout }>;
+  players: Array<{ id: string; pseudo: string; isBot?: true; cardCount: number; handVersion: number; handLayout?: HandLayout }>;
   reaction: { reference: number; canAttempt: boolean; notice: ReactionNotice | null };
   dutch: { announcerId: string; lastTurns: number } | null;
   canAnnounceDutch: boolean;
@@ -112,9 +114,12 @@ function draw(state: GameState, turn: Turn): GameState {
   };
 }
 
-function finishDiscard(state: GameState, actorId: string, turn: Turn, discarded: Card, now: number): GameState {
-  const next = presentDiscard(state, [...state.discardPile, discarded]);
-  const power = startPower(next, actorId, discarded);
+function finishDiscard(state: GameState, player: GamePlayer, turn: Turn, discarded: Card, now: number, slot?: number): GameState {
+  const prepared = player.isBot ? {
+    ...state, cardMotion: recordCardMove(state, { kind: "bot-discard", playerId: player.id, slot, face: getCardFace(discarded) }, now),
+  } : state;
+  const next = presentDiscard(prepared, [...state.discardPile, discarded]);
+  const power = startPower(next, player.id, discarded);
   if (!power) return moveToNextPlayer(next, turn, now);
 
   return {
@@ -133,7 +138,7 @@ function replaceCard(state: GameState, player: GamePlayer, turn: Turn, position:
   return finishDiscard({
     ...state,
     players: state.players.map((entry) => entry === player ? changeHand(entry, cards) : entry),
-  }, player.id, turn, discarded, now);
+  }, player, turn, discarded, now, player.isBot ? getHandLayout(player.cards.length, player.handLayout).slots[position] : undefined);
 }
 
 export function playTurn(
@@ -178,8 +183,11 @@ export function playTurn(
         : state;
     case "discard":
       return turn.drawnCard
-        ? finishDiscard(state, actorId, turn, turn.drawnCard, now)
+        ? finishDiscard(state, player, turn, turn.drawnCard, now)
         : state;
+    case "skip-empty":
+      return player.isBot && !turn.drawnCard && !state.drawPile.length && state.discardPile.length < 2
+        ? skipTurn(state, turn, now) : state;
     default:
       return state;
   }
@@ -237,8 +245,8 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     topDiscard: topDiscard ? getCardFace(topDiscard) : null,
     power: turn.power ? getPowerView(state, turn.power, canSeePrivateCards) : null,
     cardMotion: getCardMotionView(state, now),
-    players: state.players.map(({ id, pseudo, cards, handVersion, handLayout }) => ({
-      id, pseudo, cardCount: cards.length, handVersion, ...(handLayout && { handLayout }),
+    players: state.players.map(({ id, pseudo, isBot, cards, handVersion, handLayout }) => ({
+      id, pseudo, cardCount: cards.length, handVersion, ...(isBot && { isBot }), ...(handLayout && { handLayout }),
     })),
     reaction: {
       reference: state.reaction.reference,

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { Crown } from "lucide-react";
+import { Bot, Crown } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
@@ -12,6 +12,7 @@ type Props = {
   isHost: boolean;
   canStart: boolean;
   onStart: () => void;
+  onAddBot: () => void;
   onLeave: () => void;
   onUpdate: (variants: Hub["variants"], endThreshold: Hub["endThreshold"]) => void;
   management: ReactNode;
@@ -32,7 +33,7 @@ function PlayerConnectionNotice() {
 }
 
 export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, isHost, canStart,
-  onStart, onLeave, onUpdate, management }: Props) {
+  onStart, onAddBot, onLeave, onUpdate, management }: Props) {
   const thresholdId = useId();
   const points = hub.endThreshold === null ? "Sans limite" : `${hub.endThreshold} points`;
   return (
@@ -67,8 +68,9 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
             const status = player.connected ? "Connecté" : "Déconnecté";
             return (
               <li key={player.id}>
-                <span className="player-connection" data-connected={player.connected} role="img"
-                  aria-label={status} title={status} />
+                {player.isBot ? <Bot className="player-bot" size={15} role="img" aria-label="Bot" />
+                  : <span className="player-connection" data-connected={player.connected} role="img"
+                    aria-label={status} title={status} />}
                 <strong>{player.pseudo}</strong>
                 {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
               </li>
@@ -87,6 +89,9 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
           </button>
         )}
         <div className="lobby-actions">
+          {isHost && <button type="button" onClick={onAddBot} disabled={!connected || hub.players.length >= hub.maxPlayers}>
+            Ajouter un bot
+          </button>}
           {management}
           <button type="button" className="lobby-leave" onClick={onLeave}>Quitter le Hub</button>
         </div>

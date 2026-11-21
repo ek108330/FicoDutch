@@ -4,6 +4,7 @@ import { GAME_CONFIG } from "../config/gameConfig";
 import type { useHubPeers } from "../network/useHubPeers";
 import type { GameState } from "./gameTypes";
 import { getRoundResultView, type RoundResultView } from "./hands";
+import { getBotStep, playBotStep } from "./bot";
 import { getMemorizedCards, memorizeCard, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
@@ -140,6 +141,18 @@ export function useRoundTurn({
       if (connectedPeers.includes(id)) sendView(id);
     }
   }, [connectedPeers, members, sendView]);
+
+  useEffect(() => {
+    if (!isHost || paused || !hostRound) return;
+    const step = getBotStep(hostRound);
+    if (!step) return;
+    const motionEnd = hostRound.cardMotion?.move.kind === "swap" ? hostRound.cardMotion.at + 1_100 : 0;
+    const delay = Math.max(step.delay, motionEnd - performance.now());
+    const timer = window.setTimeout(() => updateHostRound(hubId, (state) =>
+      state === hostRound ? playBotStep(state, step, performance.now()) : state
+    ), delay);
+    return () => window.clearTimeout(timer);
+  }, [hostRound, hubId, isHost, paused, updateHostRound]);
 
   useEffect(() => {
     if (paused || hostDeadline === null || hostRoundNumber === undefined || !hostPhase) return;

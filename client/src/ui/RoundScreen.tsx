@@ -237,6 +237,8 @@ export default function RoundScreen({
         reaction={reaction}
         cardMotion={turn.view?.cardMotion}
         drawnCard={turnControls?.canPlay ? turnControls.view.drawnCard ?? undefined : undefined}
+        botDrawingId={turn.view?.hasDrawn && turn.view.players.some(({ id, isBot }) => id === turn.view?.playerId && isBot)
+          ? turn.view.playerId : undefined}
         onReplace={turnControls?.canPlay && !power && turnControls.view.hasDrawn && localHand
           ? (position) => turn.act({ kind: "replace", position, handVersion: localHand.handVersion })
           : undefined}

@@ -32,7 +32,7 @@ export default function HubManagement({ members, onRemove, onInterrupt, classNam
           <>
             <h2 id={heading}>{target ? `Retirer ${target.pseudo} ?` : "Interrompre la partie ?"}</h2>
             <p id={description}>{target
-              ? "Ce joueur retournera à l’accueil."
+              ? target.isBot ? "Ce bot quittera la table." : "Ce joueur retournera à l’accueil."
               : "Le Hub sera fermé et tous les joueurs retourneront à l’accueil."}</p>
             <div className="hub-management-actions">
               <button type="button" autoFocus onClick={() => setConfirmation(null)}>Annuler</button>
@@ -52,7 +52,7 @@ export default function HubManagement({ members, onRemove, onInterrupt, classNam
                   <li key={guest.id}>
                     <span>
                       <strong>{guest.pseudo}</strong>
-                      <small>{guest.connected ? "Connecté" : "Déconnecté"}</small>
+                      <small>{guest.isBot ? "Bot" : guest.connected ? "Connecté" : "Déconnecté"}</small>
                     </span>
                     <button type="button" onClick={() => setConfirmation({ kind: "remove", playerId: guest.id })}
                       aria-label={`Retirer ${guest.pseudo}`}>Retirer</button>

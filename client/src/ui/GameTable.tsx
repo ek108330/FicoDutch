@@ -31,6 +31,7 @@ type GameTableProps = {
   onReplace?: (position: number) => void;
   reaction?: { scope: string; play: (position: number) => void };
   drawnCard?: CardFace;
+  botDrawingId?: string;
   cardMotion?: TurnView["cardMotion"];
   exchangeTargets?: CardTarget[];
   playSound: PlayGameSound;
@@ -68,6 +69,7 @@ export default function GameTable({
   onReplace,
   reaction,
   drawnCard,
+  botDrawingId,
   cardMotion,
   exchangeTargets,
   playSound,
@@ -78,11 +80,12 @@ export default function GameTable({
   const table = useRef<HTMLDivElement>(null);
   const lastMotion = useRef(0);
   const publicMove = cardMotion?.move.kind === "reaction" && cardMotion.move.playerId === localPlayerId ? undefined : cardMotion;
+  const move = publicMove?.move;
   useLayoutEffect(() => {
     if (!publicMove || !table.current || publicMove.id <= lastMotion.current) return;
     lastMotion.current = publicMove.id;
     animatePublicMove(table.current, publicMove.move);
-    playSound(publicMove.move.kind);
+    playSound(publicMove.move.kind === "bot-discard" ? "discard" : publicMove.move.kind);
   }, [publicMove, playSound]);
 
   function replaceCard(position: number) {
@@ -125,7 +128,8 @@ export default function GameTable({
         const emoji = tableEmojis?.get(player.id);
         const layout = getHandLayout(player.cardCount, player.handLayout);
         const handStyle = { "--hand-columns": layout.columns } as CSSProperties;
-        const played = publicMove?.move.kind === "reaction" && publicMove.move.playerId === player.id ? publicMove.move : undefined;
+        const played = (move?.kind === "reaction" || move?.kind === "bot-discard") && move.playerId === player.id ? move : undefined;
+        const slot = played?.slot;
         return (
           <div className={`table-player position-${position}${active}`} key={player.id} data-hand-player={player.id}>
             {emoji && <span className="table-emoji" role="status"
@@ -169,14 +173,20 @@ export default function GameTable({
                     />
                   );
                 })}
-                {played && (
-                  <span className="reaction-origin" aria-hidden="true"
-                    style={{ gridColumn: Math.floor(played.slot / 2) + 1, gridRow: played.slot % 2 + 1 }}>
+                {played && slot !== undefined && (
+                  <span className="discard-origin" aria-hidden="true"
+                    style={{ gridColumn: Math.floor(slot / 2) + 1, gridRow: slot % 2 + 1 }}>
                     <CardFaceMark face={played.face} />
                   </span>
                 )}
               </div>
               {position === "bottom" && drawnCard && <DrawnCard face={drawnCard} center={center} />}
+              {botDrawingId === player.id && <DrawnCard center={center} botName={player.pseudo} />}
+              {played && slot === undefined && (
+                <span className="drawn-card bot-drawn-card discard-origin" aria-hidden="true">
+                  <CardFaceMark face={played.face} />
+                </span>
+              )}
             </div>
           </div>
         );

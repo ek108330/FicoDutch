@@ -30,8 +30,8 @@ function getHubStatus(hub) {
 function getPublicHub(hub) {
   return {
     ...hub,
-    players: hub.players.map(({ id, pseudo, isHost, connected, connectionVersion }) => ({
-      id, pseudo, isHost, connected, connectionVersion,
+    players: hub.players.map(({ id, pseudo, isHost, isBot, connected, connectionVersion }) => ({
+      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }),
     })),
     status: getHubStatus(hub),
   };
@@ -121,6 +121,19 @@ function updateHubSettings(socketId, settings) {
   };
   hub.endThreshold = threshold;
   return getPublicHub(hub);
+}
+
+function addHubBot(socketId, hubId) {
+  const current = findPlayerHub(socketId);
+  if (!current?.player.isHost || current.hub.id !== hubId || current.hub.gameStarted) return false;
+  const { hub } = current;
+  if (hub.players.length >= hub.maxPlayers) return false;
+  let number = 1;
+  while (hub.players.some(({ pseudo }) => pseudo === `Bot ${number}`)) number++;
+  hub.players.push({
+    id: randomUUID(), pseudo: `Bot ${number}`, isHost: false, isBot: true, connected: true, connectionVersion: 0,
+  });
+  return true;
 }
 
 function removePlayer(socketId) {
@@ -279,5 +292,5 @@ module.exports = {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
   finishHubGame, resolveEncryptedRelay,
-  removeHubGuest, interruptHub, relayLobbyMessage,
+  addHubBot, removeHubGuest, interruptHub, relayLobbyMessage,
 };
