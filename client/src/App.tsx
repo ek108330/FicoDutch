@@ -390,8 +390,8 @@ function App() {
                 createHub();
               }}>
                 {sessionNotice && <p className="home-notice" role="status">{sessionNotice}</p>}
-                <label htmlFor="pseudo">Choisis ton pseudo</label>
-                <input id="pseudo" type="text" value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
+                <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
+                  value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
                   onChange={(event) => savePseudo(event.target.value)} />
                 <button className="primary-button" type="submit">
                   <Plus size={19} aria-hidden="true" /> Créer un Hub

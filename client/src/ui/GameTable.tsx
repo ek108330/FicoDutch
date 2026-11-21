@@ -7,13 +7,14 @@ import type { CardTarget, PowerKind } from "../game/gameTypes";
 import { getHandLayout, type HandLayout } from "../game/handLayout";
 import type { MemorizedCard } from "../game/memorization";
 import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
-import type { TurnView } from "../game/turn";
+import { TURN_DURATION_MS, type TurnView } from "../game/turn";
 import PlayingCard, { CardFaceMark } from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
 import { animatePublicMove, flyCard } from "./cardAnimations";
 import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
 import { useTapAction } from "./useTapAction";
+import PerimeterClock from "./PerimeterClock";
 
 export type TablePlayer = {
   id: string;
@@ -28,6 +29,7 @@ type GameTableProps = {
   controls: ReactNode;
   piles?: ReactNode;
   activePlayerId?: string;
+  opponentClock?: { turn: number; remaining: number };
   dealing?: boolean;
   protectedPlayerId?: string;
   tableEmojis?: ReadonlyMap<string, HubEmoji>;
@@ -80,6 +82,7 @@ export default function GameTable({
   controls,
   piles,
   activePlayerId,
+  opponentClock,
   dealing,
   protectedPlayerId,
   tableEmojis,
@@ -140,7 +143,8 @@ export default function GameTable({
         const ownSelection = position === "bottom" ? memorization : undefined;
         const replace = position === "bottom" ? onReplace : undefined;
         const react = position === "bottom" ? reaction : undefined;
-        const active = player.id === activePlayerId ? " is-active-player" : "";
+        const active = player.id === activePlayerId;
+        const clock = active && opponentClock;
         const giveToPlayer = power?.kind === "give-card" && player.id !== localPlayerId;
         const canChooseFromHand = power && power.selection.remaining > 0 &&
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
@@ -152,25 +156,28 @@ export default function GameTable({
         const played = (move?.kind === "reaction" || move?.kind === "bot-discard") && move.playerId === player.id ? move : undefined;
         const slot = played?.slot;
         return (
-          <div className={`table-player position-${position}${active}`} key={player.id} data-hand-player={player.id}>
+          <div className={`table-player position-${position}${active ? " is-active-player" : ""}`} key={player.id} data-hand-player={player.id}
+            data-gift-recipient={giveToPlayer ? player.id : undefined}>
             {emoji && <span className="table-emoji" role="status"
               aria-label={`${player.pseudo} · ${emojis[emoji].label}`}>{emojis[emoji].symbol}</span>}
-            {giveToPlayer ? (
-              <button type="button" className="player-name power-recipient" onClick={() => power.choosePlayer(player.id)}>
-                Donner à {player.pseudo}
-              </button>
-            ) : (
-              <div className="player-name">
-                <span>{name}</span>
-                {announce && <DutchButton {...announce} />}
-                {player.id === protectedPlayerId && (
-                  <span className="dutch-icon dutch-announced" role="img" aria-label={`${player.pseudo} a annoncé Dutch`}
-                    title={`${player.pseudo} a annoncé Dutch`}>
-                    <Megaphone size={15} aria-hidden="true" />
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="player-name">
+              <span className="player-name-label">
+                {giveToPlayer ? (
+                  <button type="button" className="gift-recipient-name" aria-label={`Donner une carte à ${player.pseudo}`}
+                    onClick={(event) => { if (event.detail === 0) power.choosePlayer(player.id); }}>
+                    {name}
+                  </button>
+                ) : name}
+                {clock && <PerimeterClock key={clock.turn} remaining={clock.remaining} duration={TURN_DURATION_MS} label="Temps restant" />}
+              </span>
+              {announce && <DutchButton {...announce} />}
+              {player.id === protectedPlayerId && (
+                <span className="dutch-icon dutch-announced" role="img" aria-label={`${player.pseudo} a annoncé Dutch`}
+                  title={`${player.pseudo} a annoncé Dutch`}>
+                  <Megaphone size={15} aria-hidden="true" />
+                </span>
+              )}
+            </div>
             <div className="hand-line">
               <div className="player-cards" style={handStyle}>
                 {Array.from({ length: player.cardCount }, (_, index) => {

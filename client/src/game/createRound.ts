@@ -51,7 +51,7 @@ export function createRound(
     discardPile: [],
     currentPlayerId: null,
     turn: null,
-    reaction: { reference: 0, lastPlayerId: null, notice: null },
+    reaction: { reference: 0, notice: null },
     dutch: null,
     result: null,
     variants: { ...variants },

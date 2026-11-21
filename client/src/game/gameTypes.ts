@@ -34,7 +34,7 @@ export type PowerKind = "look-own" | "look-other" | "blind-swap" | "look-and-swa
 export type SelectedCard = { playerId: string; cardId: string };
 export type Power = { kind: PowerKind; selected: SelectedCard[] };
 export type ReactionNotice = { playerId: string; outcome: "played" | "penalty" | "empty-pile" };
-export type ReactionState = { reference: number; lastPlayerId: string | null; notice: ReactionNotice | null };
+export type ReactionState = { reference: number; notice: ReactionNotice | null };
 export type Dutch = { announcerId: string; remainingPlayerIds: string[] };
 export type RoundResult = {
   emptyHandPlayerId: string | null;

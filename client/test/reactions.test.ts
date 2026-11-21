@@ -61,6 +61,8 @@ test("la première réaction valide remplace la référence et bloque les tentat
   assert.equal(winner.currentPlayerId, "alice");
   assert.equal(winner.reaction.reference, start.reaction.reference + 1);
   assert.equal(attempt(winner, "charlie", 0, start.reaction.reference), winner);
+  assert.equal(attempt(winner, "charlie", 0), winner);
+  assert.equal(getTurnView(winner, "charlie", 1_001)?.reaction.canAttempt, false);
   assert.equal(attempt(winner, "alice", 0, start.reaction.reference), winner);
   assert.equal(winner.drawPile.length, 1);
   assert.deepEqual(getTurnView(winner, "alice", 1_001)?.cardMotion?.move, {

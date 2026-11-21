@@ -51,7 +51,7 @@ test("un bot utilise le Valet et les deux joueurs humains voient l’échange", 
     await expect(activeTurn(guest)).toHaveText("Bot 1 joue", { timeout: 18_000 });
     const drawn = guest.getByRole("img", { name: "Carte tirée par Bot 1, face cachée" });
     await expect(drawn).toBeVisible();
-    await expect(guest.getByRole("heading", { name: "Pouvoir du Valet" })).toBeVisible();
+    await expect(guest.getByRole("heading", { name: "Pouvoir du Valet" })).toHaveCount(0);
     await expect(discard(guest)).toHaveAccessibleName("Défausse, Valet de pique");
     const selected = guest.locator('.player-cards [data-exchange-selected="true"]');
     await expect(selected).toHaveCount(2);

@@ -31,7 +31,6 @@ export function presentDiscard(
     discardPile,
     reaction: {
       reference: state.reaction.reference + 1,
-      lastPlayerId: notice?.outcome === "played" ? notice.playerId : null,
       notice,
     },
   };
@@ -39,7 +38,7 @@ export function presentDiscard(
 
 export function canReactToDiscard(state: GameState, playerId: string) {
   return state.phase === "playing" && state.discardPile.length > 0 &&
-    (state.variants.infinitePose || state.reaction.lastPlayerId !== playerId) &&
+    (state.variants.infinitePose || state.reaction.notice?.outcome !== "played") &&
     state.players.some(({ id, hasLeft, cards }) => id === playerId && !hasLeft && cards.length > 0);
 }
 

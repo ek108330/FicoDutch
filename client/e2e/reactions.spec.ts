@@ -53,7 +53,7 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
   test.setTimeout(55_000);
   const guest = await browser.newPage({ baseURL, hasTouch: true });
   try {
-    await openReactionRound(host, guest, "AliceReflexe", "BobReflexe");
+    await openReactionRound(host, guest, "AliceReflexe", "BobReflexe", true);
 
     await react(host, 1);
     await expect(host.locator('[data-card-animation="reaction"]')).toHaveCount(1);
@@ -97,7 +97,7 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     expect(retainedSlot.y).toBeCloseTo(originalSlot.y, 1);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");
     await expect(host.locator(".discard-slot")).toHaveAttribute("data-stacked", "true");
-    await expect(reactiveCards(guest)).toHaveCount(0);
+    await expect(reactiveCards(guest)).toHaveCount(3);
 
     await react(host, 4);
     await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");
@@ -169,9 +169,14 @@ test("trois appuis réagissent sans remplacer la carte tirée et un clic simple 
     await react(host, 1);
     await expect(ownCards(host)).toHaveCount(5);
     await expect(drawnCard(host)).toHaveAccessibleName("Carte tirée, 4 de pique");
+    await react(guest, 4);
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");
+    await expect(reactiveCards(host)).toHaveCount(0);
+    await expect(reactiveCards(guest)).toHaveCount(0);
     await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
     await expect(drawnCard(host)).toHaveCount(0);
     await expect(discard(guest)).toHaveAccessibleName("Défausse, Roi de pique");
+    await expect(reactiveCards(guest)).toHaveCount(3);
   } finally {
     await guest.close();
   }

@@ -113,10 +113,10 @@ function Rules({ onBack, titleId }: RulesProps) {
               <strong>10 — Échange :</strong> échanger deux cartes quelconques, qu'elles appartiennent au même joueur ou à deux joueurs différents.
             </li>
             <li>
-              <strong>Valet — Vision et échange :</strong> retourne deux cartes, puis touche les flèches près du nom du joueur actif pour les échanger. « Garder en place » termine le tour en les laissant où elles sont.
+              <strong>Valet — Vision et échange :</strong> retourne deux cartes, puis touche les flèches près de ton nom pour les échanger ou la croix pour les laisser en place.
             </li>
             <li>
-              <strong>Joker — Carte supplémentaire :</strong> choisir un autre joueur et lui ajouter une carte aléatoire de la pioche, face cachée. Il ne peut pas la regarder immédiatement.
+              <strong>Joker — Carte supplémentaire :</strong> glisse une carte de la pioche vers un autre joueur. Elle rejoint sa main face cachée.
             </li>
           </ul>
           <p>Avec le 8 ou le 9, la carte reste visible au plus 10 secondes. Touche-la pour la retourner plus tôt et terminer ton tour. Le compte à rebours est visible de tous.</p>
@@ -140,20 +140,16 @@ function Rules({ onBack, titleId }: RulesProps) {
             une réaction en touchant trois fois rapidement une carte correspondante ou en la glissant vers le centre de la table.
           </p>
           <p>
-            Une réaction valide devient la nouvelle carte de référence
-            pour les réactions suivantes. Une réaction ne déclenche
-            pas le pouvoir spécial de la carte posée.
+            Une défausse normale permet une seule pose en réaction. La carte posée en réaction ne déclenche aucun pouvoir.
           </p>
           <ul>
             <li>La première réaction valide reçue par l'hôte est prioritaire.</li>
             <li>Une tentative reçue après le changement de la défausse laisse la main intacte.</li>
             <li>Une réaction invalide entraîne la récupération de la carte tentée et l'ajout d'une carte de pénalité aléatoire face cachée.</li>
-            <li>La chaîne de réactions continue à partir de la dernière défausse valide.</li>
             <li>Après la fin du dernier tour, la dernière défausse ouvre une fenêtre de réaction de 3 secondes avant le calcul des scores.</li>
           </ul>
           <p>
-            La variante Pose infinie permet de poursuivre les réactions
-            sans limite, y compris pour un même joueur.
+            Avec Pose infinie, chaque carte posée en réaction sert de référence à la suivante, y compris pour un même joueur.
           </p>
           <p>
             Une réaction peut passer avant la sélection des deux cibles du 10

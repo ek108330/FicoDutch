@@ -62,7 +62,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     expect(await removed.locator(".hub-list").evaluate((list) => list.scrollWidth <= list.clientWidth)).toBe(true);
     await removed.screenshot({ path: testInfo.outputPath("02-joueuse-retiree.png") });
     await removed.reload();
-    await expect(removed.getByRole("textbox", { name: "Choisis ton pseudo" })).toBeVisible();
+    await expect(removed.getByRole("textbox", { name: "Pseudo" })).toBeVisible();
     await expectLocalTurn(host);
     await expect(discard(host)).toHaveAccessibleName("Défausse, As de pique");
     const formerHand = host.locator(".table-player").filter({ hasText: "ChloeGestion" });

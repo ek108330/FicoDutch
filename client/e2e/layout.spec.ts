@@ -5,6 +5,14 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
   const guest = await browser.newPage({ baseURL });
   const gear = page.getByRole("button", { name: "Paramètres du jeu" });
   try {
+    await page.setViewportSize({ width: 393, height: 702 });
+    await page.goto("/");
+    const pseudo = page.getByRole("textbox", { name: "Pseudo" });
+    await expect(pseudo).toHaveAttribute("placeholder", "Pseudo");
+    await expect(pseudo).toHaveValue("");
+    await expect(page.getByText("Choisis ton pseudo", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Rejoindre une partie" })).toHaveCSS("text-align", "center");
+    await page.screenshot({ path: testInfo.outputPath("accueil-pseudo-vide.png") });
     await Promise.all([openLobby(page, "AliceLayout"), openLobby(guest, "BobLayout")]);
     for (const [width, height] of [[320, 568], [740, 360], [1280, 800]]) {
       await page.setViewportSize({ width, height });

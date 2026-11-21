@@ -100,7 +100,7 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
     await guest.setViewportSize({ width: 390, height: 844 });
     await guest.screenshot({ path: testInfo.outputPath("05-classement-final-portrait.png"), fullPage: true });
     await guest.getByRole("button", { name: "Quitter la table" }).click();
-    await expect(guest.getByRole("textbox", { name: "Choisis ton pseudo" })).toBeVisible();
+    await expect(guest.getByRole("textbox", { name: "Pseudo" })).toBeVisible();
     await expect(host.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
   } finally {
     await guest.close();

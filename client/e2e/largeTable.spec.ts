@@ -108,7 +108,8 @@ for (const count of [4, 5, 6]) {
         await expectLocalTurn(host);
         await drawDeck(host).click();
         await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
-        await host.getByRole("button", { name: "Donner à Invite5", exact: true }).click();
+        await host.getByRole("button", { name: "Carte de la pioche à donner" }).press("Enter");
+        await host.getByRole("button", { name: "Donner une carte à Invite5", exact: true }).press("Enter");
         for (const { name, width, height } of seatsViewports) {
           await last.setViewportSize({ width, height });
           await checkSeats(last, 6, 7);

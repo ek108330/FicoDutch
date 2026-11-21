@@ -37,12 +37,12 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await host.getByRole("button", { name: "Choisir la carte 1 de BobDutch" }).click();
     await host.getByRole("button", { name: "Choisir la carte 1 de AliceDutch" }).click();
     await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
-    await expect(host.getByRole("button", { name: "Échanger les cartes" })).toHaveCount(0);
+    await expect(host.getByRole("button", { name: "Échanger les cartes" })).toBeDisabled();
     await expect(host.getByText("La protection Dutch empêche l’échange.")).toBeVisible();
     await expect(guest.locator(".player-cards .face-up")).toHaveCount(0);
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("03-protection-valet.png") });
-    await host.getByRole("button", { name: "Garder en place" }).click();
+    await host.locator(".turn-player-row").getByRole("button", { name: "Annuler l’échange" }).click();
 
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();

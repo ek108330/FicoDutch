@@ -101,3 +101,22 @@ test("les bots réagissent selon la variante puis restent présents à la manche
   assert.equal(next.players[0].isBot, true);
   assert.equal(next.players[0].cards.length, 4);
 });
+
+test("deux bots ne peuvent enchaîner leurs réactions qu’avec Pose infinie", () => {
+  const base = table(["6", "K"]);
+  const state = {
+    ...base,
+    currentPlayerId: "bob",
+    discardPile: [card("6", "top")],
+    players: base.players.map((player) => player.id === "alice"
+      ? { ...player, isBot: true as const, cards: [card("6", "second"), ...player.cards] } : player),
+  };
+  const first = step(state);
+  assert.equal(first.reaction.notice?.playerId, "bot");
+  assert.equal(getBotStep(first), null);
+
+  const infinite = { ...first, variants: { ...first.variants, infinitePose: true } };
+  const second = step(infinite, 2_100);
+  assert.equal(second.reaction.notice?.playerId, "alice");
+  assert.equal(second.discardPile.at(-1)?.id, "second");
+});

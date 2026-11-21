@@ -229,6 +229,9 @@ export default function RoundScreen({
         memorization={memorization}
         dealing={phase === "dealing"}
         activePlayerId={turnControls?.view.playerId}
+        opponentClock={turnControls && turnControls.view.playerId !== playerId &&
+          !turnControls.view.finalReaction && !power?.lookTarget
+          ? { turn: turnControls.view.number, remaining: turn.remaining } : undefined}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
         dutchControl={turnControls?.canPlay && turnControls.view.canAnnounceDutch ? {
           armed: turnControls.view.dutchArmed,
@@ -253,7 +256,7 @@ export default function RoundScreen({
             <TurnPanel
               {...turnControls}
               remaining={turn.remaining}
-              piles={<TurnPiles {...turnControls} feedback={feedback} />}
+              piles={<TurnPiles {...turnControls} feedback={feedback} onGiftSlide={() => playSound("slide")} />}
             />
           ) : phase === "dealing" ? (
             <section className="round-panel" aria-label="Distribution">

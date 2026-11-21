@@ -31,7 +31,7 @@ export async function openLobby(page: Page, pseudo: string) {
     page.waitForEvent("console", (message) => message.text().startsWith("FicoDutch connecté au serveur")),
     page.goto("/"),
   ]);
-  await page.getByRole("textbox", { name: "Choisis ton pseudo" }).fill(pseudo);
+  await page.getByRole("textbox", { name: "Pseudo" }).fill(pseudo);
 }
 
 export async function openTwoPlayerHub(host: Page, guest: Page, hostPseudo: string, guestPseudo: string) {
