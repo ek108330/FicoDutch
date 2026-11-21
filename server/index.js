@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const path = require("node:path");
 const { Server } = require("socket.io");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
@@ -10,12 +11,21 @@ const {
 
 const app = express();
 const httpServer = http.createServer(app);
-app.use(cors());
+const allowedOrigins = new Set((process.env.CLIENT_ORIGINS || process.env.RENDER_EXTERNAL_URL ||
+  "http://localhost:5173,http://127.0.0.1:5173")
+  .split(",").map((origin) => origin.trim()).filter(Boolean));
+const acceptsOrigin = (origin) => !origin || allowedOrigins.has(origin);
+const originPolicy = (origin, callback) => callback(null, acceptsOrigin(origin));
+app.use(cors({ origin: originPolicy }));
 app.use(express.json());
 
 const io = new Server(httpServer, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: { origin: originPolicy, methods: ["GET", "POST"] },
+  allowRequest: (request, callback) => callback(null, acceptsOrigin(request.headers.origin)),
 });
+
+app.get("/healthz", (_request, response) => response.json({ status: "online" }));
+if (process.env.SERVE_CLIENT === "1") app.use(express.static(path.resolve(__dirname, "../client/dist")));
 
 app.get("/", (req, res) => {
   res.json({

@@ -69,7 +69,8 @@ export default function GameTable({
   if (localPlayer) positionedPlayers.push({ player: localPlayer, position: "bottom" });
 
   return (
-    <div className={dealing ? "game-table is-dealing" : "game-table"} data-player-count={players.length}>
+    <div className={`game-table${dealing ? " is-dealing" : ""}${players.length >= 4 ? " is-large-table" : ""}`}
+      data-player-count={players.length}>
       <div className="table-center">
         {controls}
         {piles ?? (

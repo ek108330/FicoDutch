@@ -1,0 +1,87 @@
+import { expect, test, type Page } from "@playwright/test";
+import { activeTurn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+
+const viewports = [
+  { name: "ordinateur", width: 1280, height: 800 },
+  { name: "portrait", width: 390, height: 844 },
+  { name: "paysage", width: 844, height: 390 },
+];
+
+async function checkSeats(page: Page, count: number, cards: number) {
+  const table = page.locator(`.game-table[data-player-count="${count}"]`);
+  await expect(table).toBeVisible();
+  await expect(table.locator(".position-bottom .playing-card")).toHaveCount(cards);
+  const boxes = await table.locator(".table-player, .table-center").evaluateAll((items) =>
+    items.map((node) => {
+      const { left, right, top, bottom } = node.getBoundingClientRect();
+      return { label: node.className, left, right, top, bottom };
+    }));
+  expect(boxes).toHaveLength(count + 1);
+  const tableBox = (await table.boundingBox())!;
+  for (const [index, box] of boxes.entries()) {
+    expect(box.left, box.label).toBeGreaterThanOrEqual(tableBox.x);
+    expect(box.right, box.label).toBeLessThanOrEqual(tableBox.x + tableBox.width);
+    expect(box.bottom, box.label).toBeLessThanOrEqual(tableBox.y + tableBox.height);
+    for (const other of boxes.slice(index + 1)) {
+      const overlap = box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top;
+      expect(overlap, `${box.label} / ${other.label}`).toBe(false);
+    }
+  }
+  const hands = await table.locator(".player-cards").evaluateAll((items) => items.map((hand) => {
+    const cards = [...hand.querySelectorAll(".playing-card")];
+    const rows = new Set(cards.map((card) => (card as HTMLElement).offsetTop)).size;
+    return { rows, minWidth: Math.min(...cards.map((card) => card.getBoundingClientRect().width)) };
+  }));
+  for (const hand of hands) {
+    expect(hand.rows).toBe(2);
+    expect(hand.minWidth).toBeGreaterThanOrEqual(24);
+  }
+}
+
+for (const count of [4, 5, 6]) {
+  for (const cards of [4, 6]) {
+    test(`table à ${count} joueurs et ${cards} cartes sur trois formats`, async ({ page: host, browser, baseURL }, testInfo) => {
+      test.setTimeout(75_000);
+      await fixDeckOrder(host);
+      const guests = await Promise.all(Array.from({ length: count - 1 }, () => browser.newPage({ baseURL })));
+      const hostName = `Table${count}C${cards}`;
+      const joker = count === 6 && cards === 6;
+      try {
+        const start = await openTwoPlayerHub(host, guests[0], hostName, "Invite1");
+        for (const [index, guest] of guests.slice(1).entries()) {
+          await openLobby(guest, `Invite${index + 2}`);
+          await guest.locator(".hub-item").filter({ hasText: `Hub de ${hostName}` })
+            .getByRole("button", { name: "Rejoindre" }).click();
+          await expect(guest.getByText("Salle d'attente")).toBeVisible();
+        }
+        if (cards === 6) await host.getByRole("button", { name: "6 cartes", exact: true }).click();
+        if (joker) await host.getByRole("button", { name: "Joker +", exact: true }).click();
+        await expect(host.getByText(`${count}/6 joueurs`, { exact: true })).toBeVisible();
+        await start.click();
+        const last = guests.at(-1)!;
+        await expect(activeTurn(last)).toHaveText("À toi de jouer", { timeout: 21_000 });
+        for (const { name, width, height } of viewports) {
+          await last.setViewportSize({ width, height });
+          await checkSeats(last, count, cards);
+          await expect(drawDeck(last)).toBeEnabled();
+          await last.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
+        }
+        if (!joker) return;
+
+        await drawDeck(last).click();
+        await last.getByRole("button", { name: "Défausser la carte tirée" }).click();
+        await expect(activeTurn(host)).toHaveText("À toi de jouer");
+        await drawDeck(host).click();
+        await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
+        await host.getByRole("button", { name: "Donner à Invite5", exact: true }).click();
+        for (const { name, width, height } of viewports) {
+          await last.setViewportSize({ width, height });
+          await checkSeats(last, 6, 7);
+          await last.screenshot({ path: testInfo.outputPath(`${name}-joker.png`), fullPage: true });
+        }
+      } finally {
+        await Promise.all(guests.map((guest) => guest.close()));
+      }
+    });
+  }
+}

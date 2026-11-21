@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { GAME_CONFIG } from "./config/gameConfig";
+import { GAME_CONFIG, hubStatusLabels } from "./config/gameConfig";
 import { Users, BookOpen, Plus, Spade } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
@@ -15,6 +15,7 @@ import type { UpdateHostRound } from "./game/useRoundTurn";
 import Rules from "./ui/Rules";
 import HubManagement from "./ui/HubManagement";
 import LobbyChat from "./ui/LobbyChat";
+import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
@@ -24,6 +25,7 @@ function App() {
   const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
   const [showRules, setShowRules] = useState(false);
   const [hubs, setHubs] = useState<Hub[]>([]);
+  const [previewHubId, setPreviewHubId] = useState<string | null>(null);
   const [currentHub, setCurrentHub] = useState<CurrentHub | null>(null);
   const [session, setSession] = useState(readHubSession);
   const [networkReady, setNetworkReady] = useState(false);
@@ -115,6 +117,7 @@ function App() {
       storeSession(session);
       storeReady(true);
       setSessionNotice(null);
+      setPreviewHubId(null);
       applyHub(hub, serverTime);
     }
 
@@ -315,6 +318,10 @@ function App() {
     );
   }
 
+  function canJoinHub(hub: Hub) {
+    return networkReady && !!pseudo.trim() && (hub.status === "waiting" || hub.status === "in-progress");
+  }
+
   if (showRules) {
   return <Rules onBack={() => setShowRules(false)} />;
   }
@@ -505,8 +512,11 @@ function App() {
     );
   }
 
+  const previewHub = hubs.find(({ id }) => id === previewHubId);
   return (
     <main className="home-page">
+      {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
+        onClose={() => setPreviewHubId(null)} onJoin={() => joinHub(previewHub.id)} />}
       <header className="top-bar">
         <div className="brand">
           <Spade size={28} />
@@ -568,15 +578,14 @@ function App() {
 
                   <div className="hub-actions">
                     <div className="hub-status">
-                      {hub.status === "waiting" && "En attente"}
-                      {hub.status === "in-progress" && "En cours"}
-                      {hub.status === "full" && "Complet"}
-                      {hub.status === "finished" && "Terminée"}
+                      {hubStatusLabels[hub.status]}
                     </div>
+                    <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
+                      onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>
 
                     <button
                       className="join-button"
-                      disabled={!networkReady || !pseudo.trim() || hub.status === "full" || hub.status === "finished"}
+                      disabled={!canJoinHub(hub)}
                       onClick={() => joinHub(hub.id)}
                     >
                       Rejoindre

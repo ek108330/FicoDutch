@@ -11,6 +11,7 @@ import type { useHubPeers } from "../network/useHubPeers";
 import { useTableEmojis } from "../network/useTableEmojis";
 import GameTable from "./GameTable";
 import { TableEmojiPicker } from "./EmojiButtons";
+import { useCardFeedback } from "./useCardFeedback";
 import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
 
@@ -58,6 +59,9 @@ export default function RoundScreen({
   const finished = !paused && (phase === "results" && deadline === null || phase === "waiting" && gameFinished);
   const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && canLeave &&
     (phase === "memorization" || phase === "playing");
+  const { feedback, sound, toggleSound } = useCardFeedback(
+    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion,
+  );
   const { choose: chooseEmoji, receive: receiveEmoji, visible: tableEmojis } = useTableEmojis({
     playerId, hostId, roundNumber, clockVersion, enabled: emojisEnabled, now, hostRound, members, send,
   });
@@ -231,7 +235,11 @@ export default function RoundScreen({
   return (
     <main className="game-screen">
       {hostManagement ?? (canLeave && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>)}
-      {emojisEnabled && <TableEmojiPicker onChoose={chooseEmoji} />}
+      {emojisEnabled && <div className="table-options">
+        <TableEmojiPicker onChoose={chooseEmoji} />
+        <button type="button" className="sound-toggle" aria-label="Sons de jeu" aria-pressed={sound}
+          onClick={toggleSound}>Son {sound ? "activé" : "coupé"}</button>
+      </div>}
       <GameTable
         localPlayerId={playerId}
         players={scene.phase === "playing" ? scene.turn.players : scene.players}
@@ -248,7 +256,7 @@ export default function RoundScreen({
         onReplace={turnControls?.canPlay && !power && turnControls.view.hasDrawn && localHand
           ? (position) => turn.act({ kind: "replace", position, handVersion: localHand.handVersion })
           : undefined}
-        piles={turnControls && <TurnPiles {...turnControls} />}
+        piles={turnControls && <TurnPiles {...turnControls} feedback={feedback} />}
         controls={
           turnControls ? (
             <TurnPanel

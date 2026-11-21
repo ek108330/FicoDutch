@@ -4,6 +4,7 @@ import { powerCardCount, type PowerView } from "../game/powers";
 import type { TurnAction, TurnView } from "../game/turn";
 import { CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
+import type { CardFeedback } from "./useCardFeedback";
 
 type TurnControlsProps = {
   view: TurnView;
@@ -118,7 +119,7 @@ export function TurnPanel({
   );
 }
 
-export function TurnPiles({ view, canPlay, act }: TurnControlsProps) {
+export function TurnPiles({ view, canPlay, act, feedback }: TurnControlsProps & { feedback: CardFeedback | null }) {
   const canDraw = canPlay && !view.hasDrawn && !view.power;
   const drawnCard = canPlay ? view.drawnCard : null;
 
@@ -133,6 +134,7 @@ export function TurnPiles({ view, canPlay, act }: TurnControlsProps) {
       >
         <span>Pioche</span>
         <span className="pile-card deck-slot">
+          {feedback?.pile === "deck" && <span key={feedback.id} className="card-feedback feedback-draw" aria-hidden="true" />}
           {view.deckCount === 0 && view.discardCount > 1 ? "À refaire" : view.deckCount}
         </span>
       </button>
@@ -145,6 +147,8 @@ export function TurnPiles({ view, canPlay, act }: TurnControlsProps) {
       >
         <span>Défausse</span>
         <span className={`pile-card discard-slot${view.topDiscard ? " face-up" : ""}`}>
+          {feedback?.pile === "discard" && <span key={feedback.id}
+            className={`card-feedback feedback-${feedback.kind}`} aria-hidden="true" />}
           {view.topDiscard ? <CardFaceMark face={view.topDiscard} /> : "Vide"}
         </span>
       </button>

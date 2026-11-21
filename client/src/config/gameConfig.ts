@@ -1,4 +1,13 @@
 
+import type { HubStatus } from "../../../shared/hubTypes";
+
+export const hubStatusLabels: Record<HubStatus, string> = {
+  waiting: "En attente",
+  "in-progress": "En cours",
+  full: "Complet",
+  finished: "Terminée",
+};
+
 export const GAME_CONFIG = {
   name: "FicoDutch",
   version: "0.1.0",

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ficodutch-preprod
+    runtime: node
+    region: frankfurt
+    plan: free
+    autoDeployTrigger: 'off'
+    buildCommand: npm --prefix server ci --omit=dev && npm --prefix client ci --include=dev && npm --prefix client run build
+    startCommand: npm --prefix server start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: '24.x'
+      - key: SERVE_CLIENT
+        value: '1'

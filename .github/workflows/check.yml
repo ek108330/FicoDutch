@@ -1,0 +1,40 @@
+name: Vérifier FicoDutch
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - run: npm --prefix server ci
+      - run: npm --prefix client ci
+      - run: npm --prefix client run build
+      - run: npm --prefix client run lint -- --deny-warnings
+      - run: npm --prefix client run test:unit
+      - run: npx playwright install --with-deps chromium
+        working-directory: client
+      - run: npm --prefix client run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-resultats
+          path: client/test-results/
+          if-no-files-found: ignore
