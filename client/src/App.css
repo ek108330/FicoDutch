@@ -1534,6 +1534,9 @@ input {
 
 [data-look-card] > .perimeter-clock .perimeter-clock-progress { stroke: #ffe39a; }
 
+button[data-look-card] { cursor: pointer; touch-action: manipulation; }
+.power-card-turn { pointer-events: none; }
+
 @media (prefers-reduced-motion: no-preference) {
   .perimeter-clock-progress { transition: stroke-dashoffset 130ms linear; }
 }

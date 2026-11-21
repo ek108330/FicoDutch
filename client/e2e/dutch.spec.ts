@@ -77,9 +77,6 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
     await expect(guest.getByRole("button", { name: "+1 / -1", exact: true })).toHaveAttribute("aria-pressed", "true");
     await start.click();
     await expectLocalTurn(guest, 17_000);
-    const dutch = guest.locator(".position-bottom .player-name").getByRole("button", { name: "Annoncer Dutch en fin de tour" });
-    await dutch.tap();
-    await expect(dutch).toHaveAttribute("aria-pressed", "true");
     await drawDeck(guest).click();
     const cdp = await guest.context().newCDPSession(guest);
     try {
@@ -99,6 +96,9 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
       await card.evaluate(async (element) => {
         await Promise.all(element.getAnimations().map((animation) => animation.finished));
       });
+      const dutch = guest.locator(".position-bottom .player-name").getByRole("button", { name: "Annoncer Dutch en fin de tour" });
+      await dutch.tap();
+      await expect(dutch).toHaveAttribute("aria-pressed", "true");
       await expect(guest.getByRole("button", { name: "Défausser la carte tirée" })).toHaveCount(0);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [origin] });
       await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [target] });

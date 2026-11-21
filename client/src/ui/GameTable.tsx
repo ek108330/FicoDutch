@@ -13,6 +13,7 @@ import DrawnCard from "./DrawnCard";
 import { animatePublicMove, flyCard } from "./cardAnimations";
 import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
+import { useTapAction } from "./useTapAction";
 
 export type TablePlayer = {
   id: string;
@@ -62,6 +63,16 @@ const positionLayouts: Record<number, string[]> = {
   5: ["left-top", "left-bottom", "right-top", "right-bottom"],
   6: ["top", "left-top", "left-bottom", "right-top", "right-bottom"],
 };
+
+function DutchButton({ armed, toggle }: NonNullable<GameTableProps["dutchControl"]>) {
+  const tap = useTapAction(toggle);
+  return (
+    <button type="button" className="dutch-icon" aria-label="Annoncer Dutch en fin de tour"
+      title="Annoncer Dutch en fin de tour" aria-pressed={armed} {...tap}>
+      <Megaphone size={15} aria-hidden="true" />
+    </button>
+  );
+}
 
 export default function GameTable({
   localPlayerId,
@@ -151,12 +162,7 @@ export default function GameTable({
             ) : (
               <div className="player-name">
                 <span>{name}</span>
-                {announce && (
-                  <button type="button" className="dutch-icon" aria-label="Annoncer Dutch en fin de tour"
-                    title="Annoncer Dutch en fin de tour" aria-pressed={announce.armed} onClick={announce.toggle}>
-                    <Megaphone size={15} aria-hidden="true" />
-                  </button>
-                )}
+                {announce && <DutchButton {...announce} />}
                 {player.id === protectedPlayerId && (
                   <span className="dutch-icon dutch-announced" role="img" aria-label={`${player.pseudo} a annoncé Dutch`}
                     title={`${player.pseudo} a annoncé Dutch`}>

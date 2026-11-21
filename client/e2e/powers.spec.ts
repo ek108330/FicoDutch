@@ -17,7 +17,7 @@ async function playSpecialCard(page: Page, position: number, power: string) {
 test("vision et échange des cartes spéciales", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(110_000);
   await fixDeckOrder(host);
-  const guest = await browser.newPage({ baseURL });
+  const guest = await browser.newPage({ baseURL, hasTouch: true, isMobile: true });
   const alice = "AlicePouvoir";
   const bob = "BobPouvoir";
 
@@ -85,7 +85,11 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     await guest.screenshot({ path: testInfo.outputPath("07-huit-carte-retournee.png") });
-    await hideOwn.click();
+    // Certains navigateurs tactiles n’émettent pas de clic après un appui.
+    await hideOwn.evaluate((element) => {
+      element.addEventListener("click", (event) => event.stopImmediatePropagation(), { once: true });
+    });
+    await hideOwn.tap();
     await expect(lookClock(host)).toHaveCount(0);
 
     await playSpecialCard(host, 3, "9");

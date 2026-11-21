@@ -5,6 +5,7 @@ import { describeCardFace, suits } from "./cardLabels";
 import { useCardGestures, type CardReaction } from "./useCardGestures";
 import { reducedMotion } from "./cardAnimations";
 import PerimeterClock from "./PerimeterClock";
+import { useTapAction } from "./useTapAction";
 
 type PlayingCardProps = {
   index: number;
@@ -42,6 +43,7 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
   const back = useRef<HTMLSpanElement>(null);
   const previouslyRevealed = useRef(false);
   const gestures = useCardGestures(card, reaction, onToggle, actionLabel);
+  const lookTap = useTapAction(lookRemaining === undefined ? undefined : onToggle);
   useLayoutEffect(() => {
     if (previouslyRevealed.current && !powerReveal && !reducedMotion()) {
       back.current?.animate([{ transform: "rotateY(90deg)" }, { transform: "rotateY(0deg)" }], { duration: 200 });
@@ -99,7 +101,7 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
   if (onToggle) {
     return (
       <button {...shared} type="button" disabled={disabled}
-        aria-pressed={actionLabel ? undefined : !!face} onClick={onToggle}>
+        aria-pressed={actionLabel ? undefined : !!face} {...(lookRemaining === undefined ? { onClick: onToggle } : lookTap)}>
         {content}
         {clock}
       </button>
