@@ -35,9 +35,13 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await expectScreenFits(page);
     await expect(start).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath("hub-360.png") });
-    await openSettings(page);
-    await settings.screenshot({ path: testInfo.outputPath("parametres-hub.png") });
-    await closeSettings(page);
+    const threshold = page.getByRole("slider", { name: "Fin de partie" });
+    const guestThreshold = guest.getByRole("slider", { name: "Fin de partie" });
+    await expect(guestThreshold).toBeDisabled();
+    await threshold.press("End");
+    await expect(guestThreshold).toHaveAttribute("aria-valuetext", "Sans limite");
+    await threshold.press("Home");
+    await expect(guestThreshold).toHaveAttribute("aria-valuetext", "50 points");
 
     for (const [width, height] of [[360, 640], [740, 360]]) {
       await page.setViewportSize({ width, height });
@@ -49,6 +53,12 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
       const chatBox = (await chat.boundingBox())!;
       expect(playerBox.y + playerBox.height).toBeLessThanOrEqual(chatBox.y);
       await expect(start).toBeInViewport();
+      const tiles = page.getByRole("group", { name: "Variantes", exact: true }).getByRole("button");
+      await expect(tiles).toHaveCount(4);
+      for (const tile of await tiles.all()) {
+        await expect(tile).toBeInViewport({ ratio: 1 });
+        expect((await tile.boundingBox())!.y).toBe((await tiles.first().boundingBox())!.y);
+      }
       await page.screenshot({ path: testInfo.outputPath(`chat-${width}.png`) });
     }
 

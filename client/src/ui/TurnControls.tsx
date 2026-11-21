@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { PowerKind } from "../game/gameTypes";
 import { powerCardCount, type PowerView } from "../game/powers";
 import type { TurnAction, TurnView } from "../game/turn";
-import { CardFaceMark } from "./PlayingCard";
+import { CardBackMark, CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
 import type { CardFeedback } from "./useCardFeedback";
 
@@ -55,11 +55,11 @@ function PowerControls({
 }
 
 export function TurnPanel({
-  view, canPlay, act, remaining, playerId, reaction,
+  view, canPlay, act, remaining, playerId, canReact,
 }: TurnControlsProps & {
   remaining: number;
   playerId: string;
-  reaction: { armed: boolean; toggle: () => void } | null;
+  canReact: boolean;
 }) {
   const { power } = view;
   const activeLabel = view.playerId === playerId ? "À toi de jouer" : `Au tour de ${view.playerName}`;
@@ -75,23 +75,16 @@ export function TurnPanel({
     ? `${announcer} a annoncé Dutch. ${view.dutch.lastTurns === 1 ? "Dernier tour." : `${view.dutch.lastTurns} tours restants.`}`
     : null;
   const pending = view.dutchArmed && !power ? "Dutch sera annoncé en fin de tour." : null;
-  const message = reaction?.armed ? "Choisis une de tes cartes à poser."
-    : feedback ?? (power && canPlay ? null : dutchNotice) ?? pending;
-  const reactionButton = reaction && (
-    <button type="button" aria-pressed={reaction.armed} onClick={reaction.toggle}>
-      {reaction.armed ? "Annuler la réaction" : "Réagir"}
-    </button>
-  );
+  const message = feedback ?? (power && canPlay ? null : dutchNotice) ?? pending;
   const dutchButton = canPlay && view.canAnnounceDutch && (
     <button type="button" aria-label="Annoncer Dutch en fin de tour" aria-pressed={view.dutchArmed}
       onClick={() => act({ kind: "dutch-intent", enabled: !view.dutchArmed })}>
       Dutch
     </button>
   );
-  const extraActions = <>{reactionButton}{dutchButton}</>;
   const normalInstruction = canPlay
     ? view.hasDrawn ? "Choisis une carte à remplacer." : "Prends une carte dans la pioche."
-    : null;
+    : canReact ? "Touche 3 fois ou glisse une carte." : null;
   return (
     <section className="round-panel" aria-label="Tour de jeu">
       <div className="round-heading">
@@ -99,18 +92,18 @@ export function TurnPanel({
         <span role="timer" className="round-timer">{Math.ceil(remaining / 1_000)} s</span>
       </div>
       {power && canPlay ? (
-        <PowerControls power={power} act={act} message={message} extraActions={extraActions} />
+        <PowerControls power={power} act={act} message={message} extraActions={dutchButton} />
       ) : (
         <>
           {(message || (power ? activeLabel : normalInstruction)) && (
             <p aria-live="polite">{message ?? (power ? activeLabel : normalInstruction)}</p>
           )}
-          {(reactionButton || dutchButton || (canPlay && view.hasDrawn)) && (
+          {(dutchButton || (canPlay && view.hasDrawn)) && (
             <div className="power-actions">
               {canPlay && view.hasDrawn && (
                 <button type="button" onClick={() => act({ kind: "discard" })}>Défausser la carte tirée</button>
               )}
-              {extraActions}
+              {dutchButton}
             </div>
           )}
         </>
@@ -121,7 +114,6 @@ export function TurnPanel({
 
 export function TurnPiles({ view, canPlay, act, feedback }: TurnControlsProps & { feedback: CardFeedback | null }) {
   const canDraw = canPlay && !view.hasDrawn && !view.power;
-  const drawnCard = canPlay ? view.drawnCard : null;
 
   return (
     <div className="table-piles">
@@ -133,28 +125,22 @@ export function TurnPiles({ view, canPlay, act, feedback }: TurnControlsProps & 
         onClick={() => act({ kind: "draw", source: "deck" })}
       >
         <span>Pioche</span>
-        <span className="pile-card deck-slot">
+        <span className={`pile-card deck-slot${view.deckCount > 0 ? " pile-backed" : ""}`}
+          data-stacked={view.deckCount > 1 || undefined}>
           {feedback?.pile === "deck" && <span key={feedback.id} className="card-feedback feedback-draw" aria-hidden="true" />}
-          {view.deckCount === 0 && view.discardCount > 1 ? "À refaire" : view.deckCount}
+          {view.deckCount > 0 ? <CardBackMark /> : view.discardCount > 1 ? "À refaire" : "Vide"}
         </span>
       </button>
       <div className="pile-slot" role="img"
         aria-label={view.topDiscard ? `Défausse, ${describeCardFace(view.topDiscard)}` : "Défausse vide"}>
         <span>Défausse</span>
-        <span className={`pile-card discard-slot${view.topDiscard ? " face-up" : ""}`}>
+        <span className={`pile-card discard-slot${view.topDiscard ? " face-up" : ""}`}
+          data-stacked={view.discardCount > 1 || undefined}>
           {feedback?.pile === "discard" && <span key={feedback.id}
             className={`card-feedback feedback-${feedback.kind}`} aria-hidden="true" />}
           {view.topDiscard ? <CardFaceMark face={view.topDiscard} /> : "Vide"}
         </span>
       </div>
-      {drawnCard && (
-        <div className="pile-slot">
-          <span>Carte tirée</span>
-          <span className="pile-card face-up" role="img" aria-label={`Carte tirée, ${describeCardFace(drawnCard)}`}>
-            <CardFaceMark face={drawnCard} />
-          </span>
-        </div>
-      )}
     </div>
   );
 }

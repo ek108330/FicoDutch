@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, closeSettings, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openSettings, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
 
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
@@ -57,10 +57,8 @@ for (const count of [4, 5, 6]) {
           await expect(guest.getByText("Salle d'attente")).toBeVisible();
         }
         if (cards === 6) {
-          const settings = await openSettings(host);
-          await settings.getByRole("button", { name: "6 cartes", exact: true }).click();
-          if (joker) await settings.getByRole("button", { name: "Joker +", exact: true }).click();
-          await closeSettings(host);
+          await host.getByRole("button", { name: "6 cartes", exact: true }).click();
+          if (joker) await host.getByRole("button", { name: "Joker +", exact: true }).click();
         }
         await expect(host.getByText(`${count}/6 joueurs`, { exact: true })).toBeVisible();
         if (joker) {

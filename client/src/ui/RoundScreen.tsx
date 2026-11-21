@@ -44,7 +44,6 @@ export default function RoundScreen({
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
   const [memory, setMemory] = useState<Memorization>(emptySelection);
-  const [armedReaction, setArmedReaction] = useState<{ roundNumber: number; reference: number } | null>(null);
   const requestId = useRef(0);
   const paused = pause !== null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
@@ -224,9 +223,12 @@ export default function RoundScreen({
   const memorization = canSelect ? { revealed, selected, limit, toggle } : undefined;
   const turnControls = turn.view ? { view: turn.view, canPlay: turn.canPlay, act: turn.act } : null;
   const power = turnControls?.view.power;
-  const reaction = turnControls && turn.canReact ? turnControls.view.reaction : null;
-  const armed = reaction !== null && armedReaction?.roundNumber === roundNumber && armedReaction.reference === reaction.reference;
   const localHand = turnControls?.view.players.find(({ id }) => id === playerId);
+  const reaction = turnControls && localHand && turn.canReact ? {
+    scope: [roundNumber, clockVersion, turnControls.view.number, turnControls.view.reaction.reference,
+      localHand.handVersion, turnControls.view.hasDrawn, power?.kind].join(":"),
+    play: turn.react,
+  } : undefined;
   const powerControls = turnControls?.canPlay && power?.selection
     ? {
         kind: power.kind,
@@ -254,10 +256,8 @@ export default function RoundScreen({
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
         power={powerControls}
         tableEmojis={emojisEnabled ? tableEmojis : undefined}
-        onReact={armed ? (position) => {
-          setArmedReaction(null);
-          turn.react(position);
-        } : undefined}
+        reaction={reaction}
+        drawnCard={turnControls?.canPlay ? turnControls.view.drawnCard ?? undefined : undefined}
         onReplace={turnControls?.canPlay && !power && turnControls.view.hasDrawn && localHand
           ? (position) => turn.act({ kind: "replace", position, handVersion: localHand.handVersion })
           : undefined}
@@ -268,10 +268,7 @@ export default function RoundScreen({
               {...turnControls}
               playerId={playerId}
               remaining={turn.remaining}
-              reaction={reaction && {
-                armed,
-                toggle: () => setArmedReaction(armed ? null : { roundNumber, reference: reaction.reference }),
-              }}
+              canReact={!!reaction}
             />
           ) : phase === "dealing" ? (
             <section className="round-panel" aria-label="Distribution">

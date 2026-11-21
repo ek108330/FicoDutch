@@ -1,10 +1,12 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { emojis } from "../../../shared/hubSocial.json";
 import type { HubEmoji } from "../../../shared/hubTypes";
+import type { CardFace } from "../game/cards";
 import type { CardTarget, PowerKind } from "../game/gameTypes";
 import type { MemorizedCard } from "../game/memorization";
 import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
 import PlayingCard from "./PlayingCard";
+import DrawnCard from "./DrawnCard";
 
 export type TablePlayer = {
   id: string;
@@ -22,7 +24,8 @@ type GameTableProps = {
   protectedPlayerId?: string;
   tableEmojis?: ReadonlyMap<string, HubEmoji>;
   onReplace?: (position: number) => void;
-  onReact?: (position: number) => void;
+  reaction?: { scope: string; play: (position: number) => void };
+  drawnCard?: CardFace;
   power?: {
     kind: PowerKind;
     selection: NonNullable<PowerView["selection"]>;
@@ -55,10 +58,12 @@ export default function GameTable({
   protectedPlayerId,
   tableEmojis,
   onReplace,
-  onReact,
+  reaction,
+  drawnCard,
   memorization,
   power,
 }: GameTableProps) {
+  const center = useRef<HTMLDivElement>(null);
   const localPlayer = players.find((player) => player.id === localPlayerId);
   const opponents = players.filter((player) => player.id !== localPlayerId);
   const positions = positionLayouts[players.length] || [];
@@ -71,7 +76,7 @@ export default function GameTable({
   return (
     <div className={`game-table${dealing ? " is-dealing" : ""}${players.length >= 4 ? " is-large-table" : ""}`}
       data-player-count={players.length}>
-      <div className="table-center">
+      <div className="table-center" ref={center}>
         {controls}
         {piles ?? (
           <div className="table-piles">
@@ -84,10 +89,10 @@ export default function GameTable({
       {positionedPlayers.map(({ player, position }) => {
         const ownSelection = position === "bottom" ? memorization : undefined;
         const replace = position === "bottom" ? onReplace : undefined;
-        const react = position === "bottom" ? onReact : undefined;
+        const react = position === "bottom" ? reaction : undefined;
         const active = player.id === activePlayerId ? " is-active-player" : "";
-        const giveToPlayer = !onReact && power?.kind === "give-card" && player.id !== localPlayerId;
-        const canChooseFromHand = !onReact && power && power.selection.remaining > 0 &&
+        const giveToPlayer = power?.kind === "give-card" && player.id !== localPlayerId;
+        const canChooseFromHand = power && power.selection.remaining > 0 &&
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
         const name = player.pseudo + (position === "bottom" ? " (Moi)" : "");
         const emoji = tableEmojis?.get(player.id);
@@ -103,34 +108,36 @@ export default function GameTable({
             ) : (
               <div className="player-name">{name}</div>
             )}
-            <div className="player-cards" style={handStyle}>
-              {Array.from({ length: player.cardCount }, (_, index) => {
-                const target = { playerId: player.id, position: index };
-                const selected = power?.selection.targets.some((card) => sameTarget(card, target));
-                const canChoose = canChooseFromHand && !selected;
-                const revealed = power?.selection.revealed.find(({ target: card }) => sameTarget(card, target))?.face ??
-                  ownSelection?.revealed.find(({ position }) => position === index)?.face;
-                const cardAction = react ? () => react(index)
-                  : canChoose ? () => power.chooseCard(target)
-                  : ownSelection ? () => ownSelection.toggle(index)
-                  : replace && (() => replace(index));
-                const actionLabel = react ? `Poser la carte ${index + 1} en réaction`
-                  : canChoose ? `Choisir la carte ${index + 1} de ${player.pseudo}`
-                  : replace ? `Remplacer la carte ${index + 1}` : undefined;
-                return (
-                  <PlayingCard
-                    key={index}
-                    index={index}
-                    dealOrder={dealing ? index : undefined}
-                    face={revealed}
-                    onToggle={cardAction}
-                    actionLabel={actionLabel}
-                    selected={selected}
-                    disabled={ownSelection && ownSelection.selected.length >= ownSelection.limit
-                      && !ownSelection.selected.includes(index)}
-                  />
-                );
-              })}
+            <div className="hand-line">
+              <div className="player-cards" style={handStyle}>
+                {Array.from({ length: player.cardCount }, (_, index) => {
+                  const target = { playerId: player.id, position: index };
+                  const selected = power?.selection.targets.some((card) => sameTarget(card, target));
+                  const canChoose = canChooseFromHand && !selected;
+                  const revealed = power?.selection.revealed.find(({ target: card }) => sameTarget(card, target))?.face ??
+                    ownSelection?.revealed.find(({ position }) => position === index)?.face;
+                  const cardAction = canChoose ? () => power.chooseCard(target)
+                    : ownSelection ? () => ownSelection.toggle(index)
+                    : replace && (() => replace(index));
+                  const actionLabel = canChoose ? `Choisir la carte ${index + 1} de ${player.pseudo}`
+                    : replace ? `Remplacer la carte ${index + 1}` : undefined;
+                  return (
+                    <PlayingCard
+                      key={index}
+                      index={index}
+                      dealOrder={dealing ? index : undefined}
+                      face={revealed}
+                      onToggle={cardAction}
+                      reaction={react && { scope: react.scope, center, play: () => react.play(index) }}
+                      actionLabel={actionLabel}
+                      selected={selected}
+                      disabled={ownSelection && ownSelection.selected.length >= ownSelection.limit
+                        && !ownSelection.selected.includes(index)}
+                    />
+                  );
+                })}
+              </div>
+              {position === "bottom" && drawnCard && <DrawnCard face={drawnCard} center={center} />}
             </div>
           </div>
         );

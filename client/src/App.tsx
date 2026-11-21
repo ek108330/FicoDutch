@@ -389,6 +389,7 @@ function App() {
               canStart={networkReady && !awaitingPeers && currentHub.players.length >= GAME_CONFIG.players.min &&
                 hostRound?.hubId !== currentHub.id}
               onStart={() => startGame(currentHub)} onLeave={leaveHub}
+              onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })}
               management={manageHub(currentHub)} />
           ) : (
             <div className="home-panel home-entry">
@@ -437,9 +438,7 @@ function App() {
   return (
     <>
       {renderScreen()}
-      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound}
-        hub={currentHub?.gameStarted ? null : currentHub} canEdit={networkReady && currentHub?.hostId === playerId}
-        onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })} />
+      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} />
     </>
   );
 }

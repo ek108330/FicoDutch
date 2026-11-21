@@ -1,28 +1,49 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, closeSettings, discard, drawDeck, expectTableFits, fixDeckOrder, openSettings, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
 
-const reactButton = (page: Page) => page.getByRole("button", { name: "Réagir", exact: true });
 const ownCards = (page: Page) => page.locator(".position-bottom .playing-card");
+const reactiveCards = (page: Page) => ownCards(page).and(page.locator("[data-reactable]"));
 
 async function react(page: Page, position: number) {
-  await reactButton(page).click();
-  await page.getByRole("button", { name: `Poser la carte ${position} en réaction`, exact: true }).click();
+  await ownCards(page).nth(position - 1).click({ clickCount: 3 });
+}
+
+async function dragCard(page: Page, index: number, towardCenter: boolean, screenshot?: string) {
+  const card = ownCards(page).nth(index);
+  const source = (await card.boundingBox())!;
+  const discard = (await page.locator(".discard-slot").boundingBox())!;
+  const x = source.x + source.width / 2;
+  const y = source.y + source.height / 2;
+  const endX = towardCenter ? discard.x + discard.width / 2 : x + 55;
+  const endY = towardCenter ? discard.y + discard.height / 2 : y + 10;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    const halfway = { x: (x + endX) / 2, y: (y + endY) / 2 };
+    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [halfway] });
+    await expect(card).toHaveClass(/is-dragging/);
+    const moved = (await card.boundingBox())!;
+    expect(Math.abs(moved.x - source.x - halfway.x + x)).toBeLessThan(3);
+    expect(Math.abs(moved.y - source.y - halfway.y + y)).toBeLessThan(3);
+    if (screenshot) await page.screenshot({ path: screenshot });
+    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: endX, y: endY }] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } finally {
+    await session.detach();
+  }
 }
 
 async function openReactionRound(host: Page, guest: Page, hostName: string, guestName: string, infinite = false) {
   await fixDeckOrder(host);
   const start = await openTwoPlayerHub(host, guest, hostName, guestName);
   const variants = infinite ? ["+1 / -1", "Pose infinie"] : ["+1 / -1"];
-  const hostSettings = await openSettings(host);
-  const guestSettings = await openSettings(guest);
   for (const variant of variants) {
-    await hostSettings.getByRole("button", { name: variant, exact: true }).click();
-    await expect(guestSettings.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await host.getByRole("button", { name: variant, exact: true }).click();
+    await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
   }
-  await Promise.all([closeSettings(host), closeSettings(guest)]);
   await start.click();
   await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
-  await expect(reactButton(guest)).toHaveCount(0);
+  await expect(reactiveCards(guest)).toHaveCount(0);
   await drawDeck(guest).click();
   await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
   await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
@@ -30,7 +51,7 @@ async function openReactionRound(host: Page, guest: Page, hostName: string, gues
 
 test("réaction adjacente, pénalité et fin de manche", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(55_000);
-  const guest = await browser.newPage({ baseURL });
+  const guest = await browser.newPage({ baseURL, hasTouch: true });
   try {
     await openReactionRound(host, guest, "AliceReflexe", "BobReflexe");
 
@@ -43,15 +64,17 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await host.screenshot({ path: testInfo.outputPath("01-penalite-ordinateur.png") });
 
     await guest.setViewportSize({ width: 390, height: 844 });
-    await reactButton(guest).click();
-    const sixth = guest.getByRole("button", { name: "Poser la carte 4 en réaction", exact: true });
-    await expect(sixth).toBeVisible();
+    await expect(reactiveCards(guest)).toHaveCount(4);
     await expectTableFits(guest);
-    await guest.screenshot({ path: testInfo.outputPath("02-choix-portrait.png") });
-    await sixth.click();
+    await dragCard(guest, 3, false);
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
+    await expect(ownCards(guest)).toHaveCount(4);
+    await expect.poll(() => ownCards(guest).nth(3).evaluate((card) => card.getAnimations().length)).toBe(0);
+    await dragCard(guest, 3, true, testInfo.outputPath("02-carte-glissee-portrait.png"));
     await expect(ownCards(guest)).toHaveCount(3);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");
-    await expect(reactButton(guest)).toHaveCount(0);
+    await expect(host.locator(".discard-slot")).toHaveAttribute("data-stacked", "true");
+    await expect(reactiveCards(guest)).toHaveCount(0);
 
     await react(host, 4);
     await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");
@@ -69,7 +92,8 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await expect(discard(host)).toHaveAccessibleName("Défausse, 10 de pique");
     await react(host, 2);
     await expect(discard(guest)).toHaveAccessibleName("Défausse, Valet de pique");
-    await react(guest, 1);
+    const last = (await ownCards(guest).first().boundingBox())!;
+    for (let i = 0; i < 3; i++) await guest.touchscreen.tap(last.x + last.width / 2, last.y + last.height / 2);
 
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Fin de la manche" })).toBeVisible();
@@ -104,9 +128,26 @@ test("pose infinie autorise deux réactions de suite", async ({ page: host, brow
     await expect(discard(host)).toHaveAccessibleName("Défausse, 3 de pique");
     await expect(ownCards(guest)).toHaveCount(4);
     await expect(guest.getByText("BobInfini a réagi.")).toBeVisible();
-    await expect(reactButton(guest)).toBeEnabled();
+    await expect(reactiveCards(guest)).toHaveCount(4);
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("01-pose-infinie.png") });
+  } finally {
+    await guest.close();
+  }
+});
+
+test("trois appuis réagissent sans remplacer la carte tirée et un clic simple la remplace", async ({ page: host, browser, baseURL }) => {
+  const guest = await browser.newPage({ baseURL });
+  try {
+    await openReactionRound(host, guest, "Alice3Appuis", "Bob3Appuis");
+    await drawDeck(host).click();
+    await expect(drawnCard(host)).toHaveAccessibleName("Carte tirée, 4 de pique");
+    await react(host, 1);
+    await expect(ownCards(host)).toHaveCount(5);
+    await expect(drawnCard(host)).toHaveAccessibleName("Carte tirée, 4 de pique");
+    await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
+    await expect(drawnCard(host)).toHaveCount(0);
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, Roi de pique");
   } finally {
     await guest.close();
   }

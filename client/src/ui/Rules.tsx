@@ -137,7 +137,7 @@ function Rules({ onBack, titleId }: RulesProps) {
           <h2>6. Réactions à la défausse</h2>
           <p>
             Lorsqu'une carte est défaussée, les joueurs peuvent tenter
-            une réaction en posant une carte correspondante.
+            une réaction en touchant trois fois rapidement une carte correspondante ou en la glissant vers le centre de la table.
           </p>
           <p>
             Une réaction valide devient la nouvelle carte de référence

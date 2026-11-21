@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { activeTurn, closeSettings, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openSettings, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
 
 for (const cardsPerPlayer of [4, 6]) {
   test(`mémorisation à ${cardsPerPlayer} cartes pour l’hôte et l’invité`, async ({
@@ -18,16 +18,12 @@ for (const cardsPerPlayer of [4, 6]) {
     try {
       const start = await openTwoPlayerHub(host, guest, hostPseudo, guestPseudo);
 
-      const guestSettings = await openSettings(guest);
-      const guestVariant = guestSettings.getByRole("button", { name: "6 cartes", exact: true });
+      const guestVariant = guest.getByRole("button", { name: "6 cartes", exact: true });
       await expect(guestVariant).toBeDisabled();
       if (cardsPerPlayer === 6) {
-        const hostSettings = await openSettings(host);
-        await hostSettings.getByRole("button", { name: "6 cartes", exact: true }).click();
+        await host.getByRole("button", { name: "6 cartes", exact: true }).click();
         await expect(guestVariant).toHaveAttribute("aria-pressed", "true");
-        await closeSettings(host);
       }
-      await closeSettings(guest);
 
       await start.click();
       for (const [page, pseudo] of [[host, hostPseudo], [guest, guestPseudo]] as const) {

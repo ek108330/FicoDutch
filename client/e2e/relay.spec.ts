@@ -29,8 +29,21 @@ test("la partie démarre avec le relais quand la liaison directe ne répond pas"
     await expect(host.locator(".position-top .playing-card.face-up")).toHaveCount(0);
     await guest.screenshot({ path: testInfo.outputPath("02-carte-privee-portrait.png") });
     await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 18_000 });
+    await expect(guest.locator(".deck-slot .card-back-pattern")).toBeVisible();
+    await expect(guest.locator(".deck-slot")).not.toContainText(/\d/);
     await drawDeck(guest).click();
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
+    await expect(drawnCard(host)).toHaveCount(0);
+    await expect(guest.locator(".table-piles .drawn-card")).toHaveCount(0);
+    await expect(guest.locator(".position-bottom .drawn-card")).toHaveAttribute("data-animated", "true");
+    expect(await drawnCard(guest).evaluate((element) => getComputedStyle(element).animationName)).toBe("draw-travel");
+    expect(await drawnCard(guest).locator(".drawn-card-turn").evaluate((element) => getComputedStyle(element).animationName)).toBe("draw-flip");
+    const hand = (await guest.locator(".position-bottom .player-cards").boundingBox())!;
+    await expect.poll(async () => (await drawnCard(guest).boundingBox())!.x).toBeGreaterThan(hand.x + hand.width);
+    await drawnCard(guest).locator(".drawn-card-turn").evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    await guest.screenshot({ path: testInfo.outputPath("03-carte-tiree-a-droite.png") });
     await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
     await expect(activeTurn(host)).toHaveText("À toi de jouer");
     await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");

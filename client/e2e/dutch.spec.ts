@@ -26,7 +26,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     }
     await expect(activeTurn(host)).toHaveText("À toi de jouer");
     await expect(drawDeck(guest)).toBeDisabled();
-    await expect(guest.getByRole("button", { name: "Réagir", exact: true })).toBeEnabled();
+    await expect(guest.locator(".position-bottom [data-reactable]")).toHaveCount(4);
 
     await host.setViewportSize({ width: 390, height: 844 });
     await expectTableFits(host);

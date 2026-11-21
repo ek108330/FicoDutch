@@ -275,7 +275,7 @@ input {
 .lobby-panel {
   width: min(100%, 540px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 9px;
 }
 
@@ -510,12 +510,13 @@ input {
   }
 
   .lobby-panel {
-    grid-template: "heading body" auto "actions body" 1fr / minmax(170px, 0.95fr) minmax(0, 1.25fr);
+    grid-template: "heading body" auto "settings body" auto "actions body" 1fr / minmax(0, 1.1fr) minmax(0, 1.25fr);
     width: min(100%, 720px);
     padding: 12px;
   }
 
   .lobby-heading { grid-area: heading; }
+  .hub-settings { grid-area: settings; }
   .lobby-body { grid-area: body; }
   .lobby-footer { grid-area: actions; align-self: end; }
 
@@ -617,8 +618,7 @@ input {
   padding: 0;
 }
 
-.settings-links,
-.variant-grid {
+.settings-links {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
@@ -639,63 +639,72 @@ input {
 }
 
 .hub-settings {
+  display: grid;
+  gap: 4px;
   min-width: 0;
-  margin: 14px 0 0;
-  padding: 8px;
-  border: 1px solid #64957a;
+  margin: 0;
+  padding: 5px 6px 6px;
+  border: 1px solid var(--line);
   border-radius: 8px;
-}
-
-.hub-settings legend {
-  padding: 0 5px;
-  font-size: 0.86rem;
-  font-weight: 700;
+  background: #fffefa;
 }
 
 .threshold-setting {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 4px;
-  font-size: 0.83rem;
+  display: grid;
+  grid-template-columns: auto minmax(36px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.threshold-setting label {
+  margin: 0;
+  font-size: 0.78rem;
 }
 
 .threshold-setting span {
-  color: #f3de9a;
+  min-width: 9ch;
+  color: #176343;
+  font-weight: 750;
+  font-size: 0.78rem;
+  text-align: right;
 }
 
-.hub-settings input {
+.hub-settings input[type="range"] {
+  min-width: 0;
   width: 100%;
-  height: 25px;
+  height: 24px;
   margin: 0;
-  accent-color: #f3de9a;
+  padding: 0;
+  accent-color: #176343;
+  cursor: pointer;
+  color-scheme: light;
 }
 
-.threshold-labels {
-  display: flex;
-  justify-content: space-between;
-  gap: 3px;
-  color: #c2dfcd;
-  font-size: 0.69rem;
-}
-
-.hub-settings h3 {
-  margin: 8px 0 4px;
-  font-size: 0.83rem;
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .variant-grid button {
   min-height: 34px;
-  padding: 4px;
-  font-size: 0.83rem;
-  line-height: 1.2;
+  padding: 3px 2px;
+  border: 1px solid #bac8bc;
+  border-radius: 6px;
+  background: #edf2eb;
+  color: var(--ink);
+  font: 700 0.75rem/1.1 var(--sans);
+  cursor: pointer;
 }
 
-.game-settings .variant-grid button[aria-pressed="true"] {
-  border-color: #f3de9a;
-  background: #f3de9a;
-  color: #243428;
-  opacity: 1;
+.variant-grid button[aria-pressed="true"] {
+  border-color: #ba9234;
+  background: #f6dda1;
+}
+
+.hub-settings :disabled {
+  cursor: default;
 }
 
 .rules-dialog {
@@ -1604,12 +1613,117 @@ input {
   background: #145c3b;
 }
 
+.pile-card.pile-backed {
+  border-style: solid;
+}
+
+.pile-card[data-stacked="true"] {
+  box-shadow: 2px 3px 0 #175437, 3px 4px 0 #b1cdbb, 5px 6px 0 #16492f, 6px 7px 0 #82a992;
+}
+
+.pile-card .card-back-pattern span {
+  font-size: clamp(1rem, 3.6dvh, 1.8rem);
+}
+
+.position-bottom .hand-line {
+  --drawn-width: clamp(43px, 8dvh, 82px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 2vw, 12px);
+}
+
+.game-table .position-bottom .hand-line:has(.drawn-card) .player-cards {
+  --hand-width: min(84vw - var(--drawn-width) - 8px, 810px);
+}
+
+.drawn-card {
+  flex: none;
+  width: var(--drawn-width);
+  height: clamp(51px, 11dvh, 111px);
+  perspective: 450px;
+}
+
+.drawn-card-turn {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.drawn-card-front,
+.drawn-card-back {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 2px solid #edc65b;
+  border-radius: 8px;
+  backface-visibility: hidden;
+}
+
+.drawn-card-front {
+  background: #fff9e9;
+  color: #252b26;
+  box-shadow: 0 2px 12px rgb(237 198 91 / 30%);
+}
+
+.drawn-card-back {
+  background: #145c3b;
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drawn-card[data-animated="true"] {
+    animation: draw-travel 360ms ease-out both;
+  }
+
+  .drawn-card[data-animated="true"] .drawn-card-turn {
+    animation: draw-flip 360ms ease-in-out both;
+  }
+}
+
+@keyframes draw-travel {
+  from { transform: translate(var(--draw-from-x), var(--draw-from-y)) scale(0.83); }
+  to { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes draw-flip {
+  0%, 38% { transform: rotateY(-180deg); }
+  100% { transform: rotateY(0); }
+}
+
+.game-table .playing-card[data-reactable="true"] {
+  position: relative;
+  touch-action: none;
+  cursor: grab;
+}
+
+.game-table .playing-card.is-dragging {
+  z-index: 3;
+  cursor: grabbing;
+}
+
+.projected-card {
+  position: fixed;
+  z-index: 5;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.projected-card.face-up {
+  background: #fff9e9;
+  color: #252b26;
+}
+
 button.pile-slot:not(:disabled) {
   cursor: pointer;
 }
 
 button.pile-slot:not(:disabled) .pile-card,
-.game-table button.playing-card:not([aria-pressed]) {
+.game-table button.playing-card:not([aria-pressed], [data-react-only]) {
   border-style: solid;
   border-color: #f3de9a;
 }

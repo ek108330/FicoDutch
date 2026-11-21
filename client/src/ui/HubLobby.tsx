@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Crown } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
+import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
 
 type Props = {
@@ -12,8 +13,12 @@ type Props = {
   canStart: boolean;
   onStart: () => void;
   onLeave: () => void;
+  onUpdate: (variants: Hub["variants"], endThreshold: Hub["endThreshold"]) => void;
   management: ReactNode;
 };
+
+const thresholds = [50, 100, 200, 500, 1000, null];
+const variantKeys = Object.keys(VARIANT_LABELS) as (keyof Hub["variants"])[];
 
 function PlayerConnectionNotice() {
   const [delayed, setDelayed] = useState(false);
@@ -27,7 +32,9 @@ function PlayerConnectionNotice() {
 }
 
 export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, isHost, canStart,
-  onStart, onLeave, management }: Props) {
+  onStart, onLeave, onUpdate, management }: Props) {
+  const thresholdId = useId();
+  const points = hub.endThreshold === null ? "Sans limite" : `${hub.endThreshold} points`;
   return (
     <section className="home-panel lobby-panel" aria-labelledby="lobby-title">
       <header className="lobby-heading">
@@ -37,6 +44,23 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
           <p>{hub.players.length}/{hub.maxPlayers} joueurs</p>
         </div>
       </header>
+      <fieldset className="hub-settings" aria-label="Paramètres de la partie" disabled={!isHost || !connected}>
+        <div className="threshold-setting">
+          <label htmlFor={thresholdId}>Fin de partie</label>
+          <input id={thresholdId} type="range" min="0" max={thresholds.length - 1}
+            value={thresholds.indexOf(hub.endThreshold)} aria-valuetext={points}
+            onChange={(event) => onUpdate(hub.variants, thresholds[Number(event.target.value)])} />
+          <span>{points}</span>
+        </div>
+        <div className="variant-grid" role="group" aria-label="Variantes">
+          {variantKeys.map((key) => (
+            <button key={key} type="button" aria-pressed={hub.variants[key]}
+              onClick={() => onUpdate({ ...hub.variants, [key]: !hub.variants[key] }, hub.endThreshold)}>
+              {VARIANT_LABELS[key]}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <div className="lobby-body">
         <ul className="lobby-players" aria-label="Joueurs présents">
           {hub.players.map((player) => {

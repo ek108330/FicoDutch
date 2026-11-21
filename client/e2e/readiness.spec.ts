@@ -53,9 +53,7 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await sound.click();
     await closeSettings(guest);
     await host.getByRole("button", { name: "Créer un Hub" }).click();
-    const hostSettings = await openSettings(host);
-    await hostSettings.getByRole("button", { name: "6 cartes", exact: true }).click();
-    await closeSettings(host);
+    await host.getByRole("button", { name: "6 cartes", exact: true }).click();
     await guest.getByRole("button", { name: "Aperçu du Hub de AliceApercu" }).click();
     const preview = guest.getByRole("dialog", { name: "Hub de AliceApercu" });
     await expect(preview).toContainText("1/6 joueurs");
