@@ -88,7 +88,7 @@ for (const cardsPerPlayer of [4, 6]) {
         await first.setViewportSize({ width: 1280, height: 720 });
         await expect(drawDeck(first)).toBeEnabled();
         await expect(drawDeck(second)).toBeDisabled();
-        await expect(first.getByRole("button", { name: "Défausse vide" })).toBeDisabled();
+        await expect(first.getByRole("img", { name: "Défausse vide" })).toBeVisible();
         await drawDeck(first).click();
         await expect(drawnCard(first)).toBeVisible();
         await expect(drawnCard(second)).toHaveCount(0);
@@ -100,19 +100,22 @@ for (const cardsPerPlayer of [4, 6]) {
         await first.getByRole("button", { name: "Défausser la carte tirée" }).click();
         await expect(activeTurn(second)).toHaveText("À toi de jouer");
         for (const page of [first, second]) {
-          await expect(discard(page)).toHaveAccessibleName(`Prendre la défausse, ${firstFace}`);
+          await expect(discard(page)).toHaveAccessibleName(`Défausse, ${firstFace}`);
         }
         await discard(second).click();
-        await expect(drawnCard(second)).toHaveAccessibleName(`Carte tirée, ${firstFace}`);
+        await expect(drawnCard(second)).toHaveCount(0);
+        await expect(drawDeck(second)).toBeEnabled();
+        await drawDeck(second).click();
+        await expect(drawnCard(second)).toBeVisible();
         await expect(drawnCard(first)).toHaveCount(0);
-        await expect(second.getByRole("button", { name: "Défausse vide" })).toBeDisabled();
+        await expect(discard(second)).toHaveAccessibleName(`Défausse, ${firstFace}`);
 
         await second.setViewportSize({ width: 390, height: 844 });
         await expectTableFits(second);
         await second.screenshot({ path: testInfo.outputPath("06-remplacement-portrait.png") });
         await second.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
         await expect(activeTurn(first)).toHaveText("À toi de jouer");
-        await expect(discard(first)).toBeEnabled();
+        await expect(discard(first)).toBeVisible();
         await expect(discard(second)).toHaveAccessibleName((await discard(first).getAttribute("aria-label"))!);
         for (const page of [first, second]) {
           await expect(page.locator(".position-bottom .playing-card.face-down")).toHaveCount(6);
@@ -129,7 +132,7 @@ for (const cardsPerPlayer of [4, 6]) {
         await first.screenshot({ path: testInfo.outputPath("09-tour-reaction-paysage.png") });
         const expiredFace = (await drawnCard(first).getAttribute("aria-label"))?.replace("Carte tirée, ", "");
         await expect(activeTurn(second)).toHaveText("À toi de jouer", { timeout: 65_000 });
-        await expect(discard(second)).toHaveAccessibleName(`Prendre la défausse, ${expiredFace}`);
+        await expect(discard(second)).toHaveAccessibleName(`Défausse, ${expiredFace}`);
         await expect(drawnCard(first)).toHaveCount(0);
         await second.screenshot({ path: testInfo.outputPath("08-tour-apres-expiration.png") });
       }

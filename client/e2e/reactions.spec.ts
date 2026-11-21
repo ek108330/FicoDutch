@@ -22,7 +22,7 @@ async function openReactionRound(host: Page, guest: Page, hostName: string, gues
   await expect(reactButton(guest)).toHaveCount(0);
   await drawDeck(guest).click();
   await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
-  await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 5 de pique");
+  await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
 }
 
 test("réaction adjacente, pénalité et fin de manche", async ({ page: host, browser, baseURL }, testInfo) => {
@@ -35,7 +35,7 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await expect(host.getByText("AliceReflexe reçoit une carte de pénalité.")).toBeVisible();
     await expect(ownCards(host)).toHaveCount(5);
     await expect(ownCards(host).nth(4)).toHaveAttribute("aria-label", "Carte 5 face cachée");
-    await expect(discard(guest)).toHaveAccessibleName("Prendre la défausse, 5 de pique");
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, 5 de pique");
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("01-penalite-ordinateur.png") });
 
@@ -47,13 +47,13 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await guest.screenshot({ path: testInfo.outputPath("02-choix-portrait.png") });
     await sixth.click();
     await expect(ownCards(guest)).toHaveCount(3);
-    await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 6 de pique");
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");
     await expect(reactButton(guest)).toHaveCount(0);
 
     await react(host, 4);
-    await expect(discard(guest)).toHaveAccessibleName("Prendre la défausse, 7 de pique");
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");
     await react(guest, 3);
-    await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 8 de pique");
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 8 de pique");
     await expect(activeTurn(host)).toHaveText("À toi de jouer");
     await expect(activeTurn(guest)).toHaveText("Au tour de AliceReflexe");
     await guest.setViewportSize({ width: 844, height: 390 });
@@ -61,11 +61,11 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await guest.screenshot({ path: testInfo.outputPath("03-chaine-paysage.png") });
 
     await react(host, 3);
-    await expect(discard(guest)).toHaveAccessibleName("Prendre la défausse, 9 de pique");
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, 9 de pique");
     await react(guest, 2);
-    await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 10 de pique");
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 10 de pique");
     await react(host, 2);
-    await expect(discard(guest)).toHaveAccessibleName("Prendre la défausse, Valet de pique");
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, Valet de pique");
     await react(guest, 1);
 
     for (const page of [host, guest]) {
@@ -95,10 +95,10 @@ test("pose infinie autorise deux réactions de suite", async ({ page: host, brow
     await expect(ownCards(guest)).toHaveCount(6);
 
     await react(guest, 5);
-    await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 4 de pique");
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 4 de pique");
     await expect(ownCards(guest)).toHaveCount(5);
     await react(guest, 5);
-    await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 3 de pique");
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 3 de pique");
     await expect(ownCards(guest)).toHaveCount(4);
     await expect(guest.getByText("BobInfini a réagi.")).toBeVisible();
     await expect(reactButton(guest)).toBeEnabled();

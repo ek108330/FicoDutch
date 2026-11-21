@@ -1,4 +1,5 @@
 import type { HubPlayer, PeerDescription, PeerSignal } from "../../../shared/hubTypes";
+import { createEncryptedPeerRelay } from "./encryptedPeerRelay";
 import { socket } from "./socket";
 
 async function describePeer(
@@ -42,13 +43,22 @@ export function connectHubPeers(
   localVersion: number,
   hostVersion: number | undefined,
   onMessage: (senderId: string, message: unknown) => void,
-  onConnection: (peerId: string, connected: boolean) => void
+  onConnection: (peerId: string, connected: boolean, route?: "relay") => void
 ) {
   const isHost = playerId === hostId;
   const peers = new Map<string, Peer>();
   const stunUrl = import.meta.env.VITE_STUN_URL;
   let closed = false;
   let retry: number | undefined;
+  let directTimeout: number | undefined;
+  const relay = createEncryptedPeerRelay(hubId, hostId, playerId, localVersion, hostVersion,
+    (id) => dropPeer(id), (id, ready) => onConnection(id, ready, "relay"), onMessage);
+
+  function startRelayFallback() {
+    window.clearTimeout(directTimeout);
+    window.clearInterval(retry);
+    relay.start();
+  }
 
   function createPeer(peerId: string, version: number, negotiationId: string) {
     const peer = {
@@ -69,10 +79,15 @@ export function connectHubPeers(
     const opened = () => {
       if (!isCurrent(peerId, peer)) return;
       window.clearInterval(retry);
+      if (!isHost) window.clearTimeout(directTimeout);
       onConnection(peerId, true);
     };
     channel.onopen = opened;
-    channel.onclose = () => { if (isCurrent(peerId, peer)) onConnection(peerId, false); };
+    channel.onclose = () => {
+      if (!isCurrent(peerId, peer)) return;
+      onConnection(peerId, false);
+      if (!isHost) startRelayFallback();
+    };
     if (channel.readyState === "open") opened();
     channel.onmessage = ({ data }) => {
       if (!isCurrent(peerId, peer) || typeof data !== "string" || data.length > 8_192) return;
@@ -104,7 +119,7 @@ export function connectHubPeers(
   }
 
   async function onSignal({ hubId: signalHub, senderId, senderVersion, recipientVersion, negotiationId, description }: PeerSignal) {
-    if (signalHub !== hubId || recipientVersion !== localVersion || closed) return;
+    if (signalHub !== hubId || recipientVersion !== localVersion || closed || relay.has(senderId)) return;
 
     let peer = peers.get(senderId);
     try {
@@ -137,16 +152,23 @@ export function connectHubPeers(
         await peer.connection.setRemoteDescription(description);
       }
     } catch {
-      if (peer && isCurrent(senderId, peer)) dropPeer(senderId);
+      if (peer && isCurrent(senderId, peer)) {
+        dropPeer(senderId);
+        if (!isHost) startRelayFallback();
+      }
     }
   }
 
   socket.on("hub:peer-signal", onSignal);
   if (!isHost && hostVersion !== undefined) {
+    directTimeout = window.setTimeout(startRelayFallback, 7_000);
     try {
       const peer = createPeer(hostId, hostVersion, crypto.randomUUID());
       const { connection } = peer;
       watchChannel(hostId, peer, connection.createDataChannel("round"));
+      connection.oniceconnectionstatechange = () => {
+        if (isCurrent(hostId, peer) && connection.iceConnectionState === "failed") startRelayFallback();
+      };
       void connection.createOffer()
         .then((offer) => describePeer(connection, offer))
         .then((offer) => {
@@ -154,14 +176,15 @@ export function connectHubPeers(
           signalPeer(hostId, peer, offer);
           retry = window.setInterval(() => signalPeer(hostId, peer, offer), 1_000);
         })
-        .catch(() => { if (isCurrent(hostId, peer)) dropPeer(hostId); });
+        .catch(() => { if (isCurrent(hostId, peer)) startRelayFallback(); });
     } catch {
-      dropPeer(hostId);
+      startRelayFallback();
     }
   }
 
   return {
     syncGuests(players: HubPlayer[]) {
+      relay.syncGuests(players);
       if (!isHost) return;
       for (const [id, peer] of peers) {
         if (!players.some((player) => player.id === id && player.connected && player.connectionVersion === peer.version)) {
@@ -170,6 +193,7 @@ export function connectHubPeers(
       }
     },
     send(peerId: string, message: unknown) {
+      if (relay.has(peerId)) return relay.send(peerId, message);
       const channel = peers.get(peerId)?.channel;
       if (channel?.readyState !== "open") return false;
       try {
@@ -182,6 +206,8 @@ export function connectHubPeers(
     close() {
       closed = true;
       window.clearInterval(retry);
+      window.clearTimeout(directTimeout);
+      relay.close();
       socket.off("hub:peer-signal", onSignal);
       for (const id of peers.keys()) dropPeer(id);
     },

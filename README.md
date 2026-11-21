@@ -45,7 +45,7 @@ npm.cmd --prefix server start
 
 Placez le serveur derrière un proxy HTTPS qui transmet les connexions WebSocket. La route `/healthz` fournit un contrôle de disponibilité. Pour un essai local sur le port par défaut, définissez `CLIENT_ORIGINS` à `http://localhost:3000`. Si le client et le serveur ont des domaines distincts, renseignez `VITE_SERVER_URL` avec l’URL HTTPS du serveur avant la compilation et ajoutez l’origine du client à `CLIENT_ORIGINS`.
 
-Les navigateurs échangent les cartes via WebRTC. `VITE_STUN_URL` peut être défini avant la compilation pour les essais entre réseaux distincts. Testez le lancement d’une partie puis la reconnexion entre un PC en Wi-Fi et un téléphone sur le réseau mobile. Un échec de connexion directe sur ces réseaux peut nécessiter un relais TURN.
+Les navigateurs tentent d’abord une connexion directe WebRTC. Si elle ne s’établit pas, ils échangent des messages chiffrés avec des clés temporaires via Socket.IO. Le serveur central relaie les messages chiffrés. `VITE_STUN_URL` permet de configurer un serveur STUN facultatif avant la compilation. Testez le lancement et la reconnexion sur deux téléphones reliés à des réseaux différents.
 
 ## Reprendre une partie
 

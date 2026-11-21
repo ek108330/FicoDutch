@@ -43,24 +43,21 @@ export function shuffleDeck<T>(cards: T[]): T[] {
   return shuffled;
 }
 
-export type DrawSource = "deck" | "discard";
-
 export function takeFromPile(
   drawPile: Card[],
-  discardPile: Card[],
-  source: DrawSource
+  discardPile: Card[]
 ) {
-  if (source === "deck" && !drawPile.length && discardPile.length > 1) {
+  if (!drawPile.length && discardPile.length > 1) {
     drawPile = shuffleDeck(discardPile.slice(0, -1));
     discardPile = discardPile.slice(-1);
   }
 
-  const card = (source === "deck" ? drawPile : discardPile).at(-1);
+  const card = drawPile.at(-1);
   if (!card) return null;
 
   return {
     card,
-    drawPile: source === "deck" ? drawPile.slice(0, -1) : drawPile,
-    discardPile: source === "discard" ? discardPile.slice(0, -1) : discardPile,
+    drawPile: drawPile.slice(0, -1),
+    discardPile,
   };
 }

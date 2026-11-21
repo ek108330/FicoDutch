@@ -1,5 +1,5 @@
 import { getCardFace, type Card, type CardFace } from "./cards.ts";
-import { takeFromPile, type DrawSource } from "./deck.ts";
+import { takeFromPile } from "./deck.ts";
 import type { GameState, GamePlayer, ReactionNotice, Turn } from "./gameTypes";
 import { changeHand, finishRound } from "./hands.ts";
 import { applyPowerAction, getPowerView, POWER_DURATION_MS, startPower, type PowerAction, type PowerView } from "./powers.ts";
@@ -9,7 +9,6 @@ export const TURN_DURATION_MS = 60_000;
 
 export type TurnAction =
   | { kind: "draw"; source: "deck" }
-  | { kind: "draw"; source: "discard"; reference: number }
   | { kind: "replace"; position: number; handVersion: number }
   | { kind: "discard" }
   | { kind: "dutch-intent"; enabled: boolean }
@@ -89,18 +88,17 @@ function moveToNextPlayer(state: GameState, turn: Turn, now: number): GameState 
   };
 }
 
-function draw(state: GameState, turn: Turn, source: DrawSource): GameState {
+function draw(state: GameState, turn: Turn): GameState {
   if (turn.drawnCard) return state;
-  const drawn = takeFromPile(state.drawPile, state.discardPile, source);
+  const drawn = takeFromPile(state.drawPile, state.discardPile);
   if (!drawn) return state;
 
   const { card, ...piles } = drawn;
-  const next = {
+  return {
     ...state,
     ...piles,
     turn: { ...turn, drawnCard: card },
   };
-  return source === "discard" ? presentDiscard(next, next.discardPile) : next;
 }
 
 function finishDiscard(state: GameState, actorId: string, turn: Turn, discarded: Card, now: number): GameState {
@@ -162,9 +160,7 @@ export function playTurn(
   switch (action.kind) {
     case "draw":
       if (!("source" in action)) return state;
-      if (action.source === "deck") return draw(state, turn, "deck");
-      return action.source === "discard" && "reference" in action && action.reference === state.reaction.reference
-        ? draw(state, turn, "discard") : state;
+      return action.source === "deck" ? draw(state, turn) : state;
     case "replace":
       return "position" in action && "handVersion" in action && action.handVersion === player.handVersion
         ? replaceCard(state, player, turn, action.position, now)

@@ -21,6 +21,17 @@ import RoundScreen from "./ui/RoundScreen";
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
 type HostRound = { hubId: string; state: GameState };
 
+function PlayerConnectionNotice() {
+  const [delayed, setDelayed] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDelayed(true), 15_000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return <p role="status">{delayed
+    ? "La connexion entre les joueurs prend du temps. Garde les onglets de jeu ouverts."
+    : "Connexion aux joueurs en cours…"}</p>;
+}
+
 function App() {
   const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
   const [showRules, setShowRules] = useState(false);
@@ -38,6 +49,9 @@ function App() {
   const pausedAt = useRef<number | null>(null);
   const playerId = session?.playerId;
   const peers = useHubPeers(currentHub, playerId, networkReady);
+  const awaitingPeers = !!currentHub && !currentHub.gameStarted &&
+    currentHub.players.some(({ id }) => id !== currentHub.hostId && (playerId === currentHub.hostId
+      ? !peers.connectedPeers.includes(id) : !peers.hostConnected));
 
   const storeHostRound = useCallback((round: HostRound | null) => {
     hostRoundRef.current = round;
@@ -485,9 +499,8 @@ function App() {
             ))}
 
             <p>En attente du lancement de la partie...</p>
-            {isHost && canStart && !peersReady && (
-              <p role="status">Connexion directe aux joueurs en cours…</p>
-            )}
+            {awaitingPeers && <PlayerConnectionNotice key={`connexion-${currentHub.id}`} />}
+            {!awaitingPeers && peers.relayedPeers.length > 0 && <p role="status">Le relais chiffré est actif.</p>}
             {isHost && (
               <button
                 type="button"

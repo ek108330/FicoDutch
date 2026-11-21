@@ -90,7 +90,7 @@ export function TurnPanel({
   );
   const extraActions = <>{reactionButton}{dutchButton}</>;
   const normalInstruction = canPlay
-    ? view.hasDrawn ? "Choisis une carte à remplacer." : "Prends une carte dans l’une des piles."
+    ? view.hasDrawn ? "Choisis une carte à remplacer." : "Prends une carte dans la pioche."
     : null;
   return (
     <section className="round-panel" aria-label="Tour de jeu">
@@ -138,20 +138,15 @@ export function TurnPiles({ view, canPlay, act, feedback }: TurnControlsProps & 
           {view.deckCount === 0 && view.discardCount > 1 ? "À refaire" : view.deckCount}
         </span>
       </button>
-      <button
-        className="pile-slot"
-        type="button"
-        aria-label={view.topDiscard ? `Prendre la défausse, ${describeCardFace(view.topDiscard)}` : "Défausse vide"}
-        disabled={!canDraw || !view.topDiscard}
-        onClick={() => act({ kind: "draw", source: "discard", reference: view.reaction.reference })}
-      >
+      <div className="pile-slot" role="img"
+        aria-label={view.topDiscard ? `Défausse, ${describeCardFace(view.topDiscard)}` : "Défausse vide"}>
         <span>Défausse</span>
         <span className={`pile-card discard-slot${view.topDiscard ? " face-up" : ""}`}>
           {feedback?.pile === "discard" && <span key={feedback.id}
             className={`card-feedback feedback-${feedback.kind}`} aria-hidden="true" />}
           {view.topDiscard ? <CardFaceMark face={view.topDiscard} /> : "Vide"}
         </span>
-      </button>
+      </div>
       {drawnCard && (
         <div className="pile-slot">
           <span>Carte tirée</span>

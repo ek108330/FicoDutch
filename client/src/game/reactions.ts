@@ -60,7 +60,7 @@ export function reactToDiscard(
       isExchangeTargetLocked(state.turn?.power ?? null, card.id, state.dutch?.announcerId)) return state;
 
   if (!matchesDiscard(card.rank, top.rank, state.variants.plusMinusOne)) {
-    const drawn = takeFromPile(state.drawPile, state.discardPile, "deck");
+    const drawn = takeFromPile(state.drawPile, state.discardPile);
     const notice: ReactionNotice = { playerId, outcome: drawn ? "penalty" : "empty-pile" };
     const reaction = { ...state.reaction, notice };
     if (!drawn) return { ...state, reaction };

@@ -62,7 +62,7 @@ test("la première réaction valide remplace la référence et bloque les tentat
   assert.equal(winner.drawPile.length, 1);
 });
 
-test("une ancienne référence ne permet pas de piocher la nouvelle défausse", () => {
+test("la carte de référence reste visible après un recyclage de la défausse", () => {
   const start = setup(
     [[card("a-a", "A")], [card("b-8", "8"), card("b-2", "2")], [card("c-8", "8")]],
     card("top", "8"), []
@@ -73,11 +73,10 @@ test("une ancienne référence ne permet pas de piocher la nouvelle défausse", 
   assert.equal(changed.discardPile.at(-1)?.id, "b-8");
   assert.equal(playTurn(changed, "alice", 1,
     { kind: "draw", source: "discard", reference: start.reaction.reference }, 1_001), changed);
-  const drawn = playTurn(changed, "alice", 1,
-    { kind: "draw", source: "discard", reference: changed.reaction.reference }, 1_001);
-  assert.equal(drawn.turn?.drawnCard?.id, "b-8");
-  assert.equal(drawn.reaction.reference, changed.reaction.reference + 1);
-  assert.equal(drawn.discardPile.at(-1)?.id, "top");
+  const drawn = playTurn(changed, "alice", 1, { kind: "draw", source: "deck" }, 1_001);
+  assert.equal(drawn.turn?.drawnCard?.id, "top");
+  assert.equal(drawn.reaction.reference, changed.reaction.reference);
+  assert.equal(drawn.discardPile.at(-1)?.id, "b-8");
 });
 
 test("une tentative incorrecte garde la carte et donne une seule pénalité cachée", () => {

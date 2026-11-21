@@ -18,7 +18,7 @@ export async function openTwoPlayerHub(host: Page, guest: Page, hostPseudo: stri
     .getByRole("button", { name: "Rejoindre", exact: true }).click();
   await expect(guest.getByText("Salle d'attente")).toBeVisible();
   await expect(guest.getByRole("button", { name: "Lancer la partie" })).toHaveCount(0);
-  await expect(start).toBeEnabled();
+  await expect(start).toBeEnabled({ timeout: 12_000 });
   return start;
 }
 
@@ -41,5 +41,5 @@ export async function expectTableFits(page: Page) {
 
 export const drawDeck = (page: Page) => page.getByRole("button", { name: "Piocher dans la pioche" });
 export const drawnCard = (page: Page) => page.getByRole("img", { name: /^Carte tirée, / });
-export const discard = (page: Page) => page.getByRole("button", { name: /^Prendre la défausse, / });
+export const discard = (page: Page) => page.getByRole("img", { name: /^Défausse, / });
 export const activeTurn = (page: Page) => page.getByRole("region", { name: "Tour de jeu" }).getByRole("status");

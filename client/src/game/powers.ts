@@ -106,7 +106,7 @@ function swapCards(state: GameState, first: SelectedCard, second: SelectedCard):
 function giveCard(state: GameState, actorId: string, recipient: unknown): GameState | null {
   if (typeof recipient !== "string" || recipient === actorId ||
       !state.players.some(({ id }) => id === recipient)) return null;
-  const drawn = takeFromPile(state.drawPile, state.discardPile, "deck");
+  const drawn = takeFromPile(state.drawPile, state.discardPile);
   if (!drawn) return null;
 
   const { card, ...piles } = drawn;

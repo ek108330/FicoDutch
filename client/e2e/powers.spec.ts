@@ -71,18 +71,9 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await host.setViewportSize({ width: 844, height: 390 });
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("04-neuf-paysage.png") });
-    await host.getByRole("button", { name: "Terminer le pouvoir" }).click();
-
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer");
-    await discard(guest).click();
-    await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 9 de pique");
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
-    await expect(activeTurn(guest)).toHaveText("Pouvoir du 9");
-    await targetCard(guest, 1, alice).click();
-    await expect(faceUpHands(guest)).toHaveCount(1);
-    await expect(activeTurn(host)).toHaveText("À toi de jouer", { timeout: 65_000 });
-    await expect(faceUpHands(guest)).toHaveCount(0);
-    await expect(discard(host)).toHaveAccessibleName("Prendre la défausse, 9 de pique");
+    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 65_000 });
+    await expect(faceUpHands(host)).toHaveCount(0);
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 9 de pique");
     await guest.screenshot({ path: testInfo.outputPath("05-apres-expiration.png") });
   } finally {
     await guest.close();

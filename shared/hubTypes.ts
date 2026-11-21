@@ -71,3 +71,9 @@ export type PeerSignal = {
   negotiationId: string;
   description: PeerDescription;
 };
+
+export type PeerRelayBody =
+  | { type: "offer" | "answer"; publicKey: string }
+  | { type: "data"; sequence: number; ciphertext: string };
+
+export type PeerRelaySignal = Omit<PeerSignal, "description"> & { body: PeerRelayBody };

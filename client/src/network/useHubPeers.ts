@@ -8,7 +8,7 @@ const noPeers: string[] = [];
 export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready: boolean) {
   const transport = useRef<ReturnType<typeof connectHubPeers> | null>(null);
   const listener = useRef<MessageListener | null>(null);
-  const [connected, setConnected] = useState<{ generation: string; ids: string[] } | null>(null);
+  const [connected, setConnected] = useState<{ generation: string; ids: string[]; relays: string[] } | null>(null);
   const hubId = hub?.id;
   const hostId = hub?.hostId;
   const players = hub?.players;
@@ -18,6 +18,7 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
   const hostVersion = host?.connected ? host.connectionVersion : undefined;
   const generation = `${hubId}/${playerId}/${ownVersion}/${hostVersion}`;
   const connectedPeers = connected?.generation === generation ? connected.ids : noPeers;
+  const relayedPeers = connected?.generation === generation ? connected.relays : noPeers;
 
   useEffect(() => {
     if (!hubId || !hostId || !playerId || ownVersion === undefined ||
@@ -29,10 +30,15 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
       ownVersion,
       hostVersion,
       (senderId, message) => listener.current?.(senderId, message),
-      (peerId, isConnected) => setConnected((current) => {
+      (peerId, isConnected, route) => setConnected((current) => {
         const ids = current?.generation === generation ? current.ids : noPeers;
+        const relays = current?.generation === generation ? current.relays : noPeers;
         if (ids.includes(peerId) === isConnected) return current;
-        return { generation, ids: isConnected ? [...ids, peerId] : ids.filter((id) => id !== peerId) };
+        return {
+          generation,
+          ids: isConnected ? [...ids, peerId] : ids.filter((id) => id !== peerId),
+          relays: isConnected && route === "relay" ? [...relays, peerId] : relays.filter((id) => id !== peerId),
+        };
       })
     );
     transport.current = peers;
@@ -45,7 +51,7 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
 
   useEffect(() => {
     if (players) transport.current?.syncGuests(players);
-  }, [players]);
+  }, [generation, players]);
 
   const send = useCallback((peerId: string, message: unknown) => {
     return transport.current?.send(peerId, message) ?? false;
@@ -58,6 +64,7 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
   return {
     hostConnected: !!hostId && connectedPeers.includes(hostId),
     connectedPeers,
+    relayedPeers,
     send,
     subscribe,
   };

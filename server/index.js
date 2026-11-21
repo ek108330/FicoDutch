@@ -6,7 +6,7 @@ const { Server } = require("socket.io");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame,
-  removeHubGuest, interruptHub, relayLobbyMessage,
+  removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay,
 } = require("./hubManager");
 
 const app = express();
@@ -57,6 +57,11 @@ io.on("connection", (socket) => {
   socket.on("hub:peer-signal", (request) => {
     const relay = resolvePeerRelay(socket.id, request);
     if (relay) io.to(relay.socketId).emit("hub:peer-signal", relay.signal);
+  });
+
+  socket.on("hub:peer-relay", (request) => {
+    const relay = resolveEncryptedRelay(socket.id, request);
+    if (relay) io.to(relay.socketId).emit("hub:peer-relay", relay.signal);
   });
 
   socket.on("hub:lobby-chat", (request, acknowledge) => {

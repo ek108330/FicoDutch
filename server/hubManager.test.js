@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const {
   completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
-  relayLobbyMessage, removeHubGuest, removePlayer, resolvePeerRelay, resumeHub, startHubGame, updateHubSettings,
+  relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, resumeHub, startHubGame, updateHubSettings,
 } = require("./hubManager");
 
 function openTable(t, hostSocket, guestSocket) {
@@ -192,4 +192,24 @@ test("le chat du lobby identifie l’auteur et ne relaie qu’aux membres du Hub
   startHubGame("chat-host", request);
   assert.equal(relayLobbyMessage("chat-guest", text, 3_000).status, "unavailable");
   assert.equal(relayLobbyMessage("chat-guest", emoji, 3_000).status, "unavailable");
+});
+
+test("le relais chiffré vérifie les identités et ne transmet que l’enveloppe autorisée", (t) => {
+  const { hub, host, guest } = openTable(t, "encrypted-host", "encrypted-guest");
+  const offer = { ...signal(hub.id, host, "offer"), body: { type: "offer", publicKey: "A".repeat(87) + "=" } };
+  const exchange = resolveEncryptedRelay("encrypted-guest", offer);
+  assert.equal(exchange.socketId, "encrypted-host");
+  assert.equal(exchange.signal.senderId, guest.playerId);
+  assert.equal(resolveEncryptedRelay("encrypted-host", { ...offer, recipientId: guest.playerId }), null);
+
+  const ciphertext = "A".repeat(32);
+  const data = { ...offer, body: { type: "data", sequence: 0, ciphertext, gameState: "cartes privées" } };
+  const relay = resolveEncryptedRelay("encrypted-guest", data);
+  assert.deepEqual(relay.signal.body, { type: "data", sequence: 0, ciphertext });
+  assert.equal(resolveEncryptedRelay("encrypted-guest", { ...data, senderVersion: 2 }), null);
+  assert.equal(resolveEncryptedRelay("encrypted-guest", { ...data, recipientVersion: 2 }), null);
+  assert.equal(resolveEncryptedRelay("encrypted-guest", { ...data, hubId: "autre-hub" }), null);
+  assert.equal(resolveEncryptedRelay("encrypted-guest", { ...data, body: { ...data.body, ciphertext: "du texte" } }), null);
+  removePlayer("encrypted-guest");
+  assert.equal(resolveEncryptedRelay("encrypted-guest", data), null);
 });

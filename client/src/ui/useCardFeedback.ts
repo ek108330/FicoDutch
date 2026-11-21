@@ -61,7 +61,7 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
     else if (view.power && !before.power) kind = "power";
     else if (view.hasDrawn && !before.hasDrawn) {
       kind = "draw";
-      pile = view.discardCount < before.discardCount ? "discard" : "deck";
+      pile = "deck";
     } else if (view.discardCount > before.discardCount || view.reaction.reference > before.reaction.reference) kind = "discard";
     else return;
 

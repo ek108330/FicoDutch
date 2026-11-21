@@ -87,7 +87,7 @@ function Rules({ onBack }: RulesProps) {
             une carte et terminer son action.
           </p>
           <ol>
-            <li>Il prend la carte du dessus de la pioche ou de la défausse.</li>
+            <li>Il prend la carte du dessus de la pioche.</li>
             <li>Il peut l'échanger avec une de ses cartes. La carte remplacée est alors révélée sur la défausse.</li>
             <li>Ou il peut défausser directement la carte piochée, sans la conserver.</li>
           </ol>

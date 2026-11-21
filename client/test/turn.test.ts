@@ -50,14 +50,16 @@ test("la défausse se publie et un remplacement conserve la taille de la main", 
   assert.equal(state.discardPile.at(-1), expected);
   assert.deepEqual(getTurnView(state, "guest", 1_200)?.topDiscard, getCardFace(expected));
 
-  state = playTurn(state, "guest", 2,
-    { kind: "draw", source: "discard", reference: state.reaction.reference }, 1_300);
-  assert.equal(state.discardPile.length, 0);
+  assert.equal(playTurn(state, "guest", 2,
+    { kind: "draw", source: "discard", reference: state.reaction.reference }, 1_300), state);
+  const secondDraw = state.drawPile.at(-1);
+  state = playTurn(state, "guest", 2, draw, 1_300);
+  assert.deepEqual(state.discardPile, [expected]);
   assert.equal(playTurn(state, "guest", 1, { kind: "replace", position: 0, handVersion: 0 }, 1_400), state);
   assert.equal(playTurn(state, "guest", 2, { kind: "replace", position: 9, handVersion: 0 }, 1_400), state);
   state = playTurn(state, "guest", 2, { kind: "replace", position: 0, handVersion: 0 }, 1_400);
 
-  assert.equal(state.players[1].cards[0], expected);
+  assert.equal(state.players[1].cards[0], secondDraw);
   assert.equal(state.players[1].cards.length, 4);
   assert.equal(state.discardPile.at(-1), replaced);
   assert.equal(state.currentPlayerId, "host");

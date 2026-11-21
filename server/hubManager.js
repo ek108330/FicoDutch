@@ -236,30 +236,48 @@ function finishHubGame(socketId) {
   return true;
 }
 
-function resolvePeerRelay(socketId, request) {
-  const { hubId, recipientId, senderVersion, recipientVersion, negotiationId, description } = request ?? {};
-  const { type, sdp } = description ?? {};
-  if (typeof sdp !== "string" || sdp.length === 0 || sdp.length > 65_536 ||
-      typeof negotiationId !== "string" || negotiationId.length > 64) return null;
-
+function findPeerRoute(socketId, request) {
+  const { hubId, recipientId, senderVersion, recipientVersion, negotiationId } = request ?? {};
+  if (typeof negotiationId !== "string" || !negotiationId.length || negotiationId.length > 64) return null;
   const current = findPlayerHub(socketId);
   if (!current || current.hub.id !== hubId || current.player.connectionVersion !== senderVersion) return null;
   const sender = current.player;
   const recipient = current.hub.players.find(({ id }) => id === recipientId);
-  if (!recipient?.socketId || recipient === sender || recipient.connectionVersion !== recipientVersion) return null;
-  const allowed = type === "offer" ? !sender.isHost && recipient.isHost
-    : type === "answer" && sender.isHost && !recipient.isHost;
-  if (!allowed) return null;
-
+  if (!recipient?.socketId || sender.isHost === recipient.isHost || recipient.connectionVersion !== recipientVersion) return null;
   return {
     socketId: recipient.socketId,
-    signal: { hubId, senderId: sender.id, senderVersion, recipientVersion, negotiationId, description: { type, sdp } },
+    isHost: sender.isHost,
+    signal: { hubId, senderId: sender.id, senderVersion, recipientVersion, negotiationId },
   };
+}
+
+function resolvePeerRelay(socketId, request) {
+  const { type, sdp } = request?.description ?? {};
+  if (typeof sdp !== "string" || sdp.length === 0 || sdp.length > 65_536) return null;
+  const route = findPeerRoute(socketId, request);
+  if (!route || type !== (route.isHost ? "answer" : "offer")) return null;
+  return { socketId: route.socketId, signal: { ...route.signal, description: { type, sdp } } };
+}
+
+function resolveEncryptedRelay(socketId, request) {
+  const route = findPeerRoute(socketId, request);
+  if (!route) return null;
+  const { type, publicKey, sequence, ciphertext } = request?.body ?? {};
+  let body;
+  if (type === (route.isHost ? "answer" : "offer") && typeof publicKey === "string" &&
+      /^[A-Za-z0-9+/]{87}=$/.test(publicKey)) {
+    body = { type, publicKey };
+  } else if (type === "data" && Number.isSafeInteger(sequence) && sequence >= 0 &&
+      typeof ciphertext === "string" && ciphertext.length >= 24 && ciphertext.length <= 12_000 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(ciphertext)) {
+    body = { type, sequence, ciphertext };
+  } else return null;
+  return { socketId: route.socketId, signal: { ...route.signal, body } };
 }
 
 module.exports = {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
-  finishHubGame,
+  finishHubGame, resolveEncryptedRelay,
   removeHubGuest, interruptHub, relayLobbyMessage,
 };
