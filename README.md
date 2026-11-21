@@ -32,6 +32,8 @@ Le fichier `render.yaml` crée un seul service Web Node.js, sur l’offre gratui
 
 L’origine Render est autorisée automatiquement par le serveur. Si vous utilisez un domaine personnalisé, indiquez la ou les origines exactes dans la variable `CLIENT_ORIGINS`, séparées par des virgules. Pour publier une nouvelle version, sélectionnez **Manual Deploy > Deploy latest commit** sur le service. Les Hubs sont en mémoire. Un redéploiement ferme les Hubs en cours.
 
+La version affichée en haut de l’accueil et du Hub contient les sept premiers caractères du commit compilé. Comparez ce suffixe au commit affiché par Render et vérifiez qu’il est identique sur les deux appareils avant un essai. Si un onglet ancien tente de créer ou de rejoindre un Hub, le serveur demande de recharger la page.
+
 ### Sur un autre hébergement ou en local
 
 Pour servir le client et Socket.IO sous la même origine, compilez le client puis démarrez le serveur avec les variables suivantes depuis la racine du dépôt. Remplacez le domaine d’exemple par celui de la préproduction.

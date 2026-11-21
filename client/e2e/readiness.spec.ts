@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { io } from "socket.io-client";
 import { activeTurn, drawDeck, fixDeckOrder, openLobby } from "./tableFlow";
 
 test("la signalisation accepte l’origine autorisée et refuse une autre origine", async ({ request, baseURL }) => {
@@ -8,6 +9,27 @@ test("la signalisation accepte l’origine autorisée et refuse une autre origin
   expect(allowed.headers()["access-control-allow-origin"]).toBe(baseURL);
   const blocked = await request.get(handshake, { headers: { Origin: "https://example.invalid" } });
   expect(blocked.status()).toBe(403);
+});
+
+test("la version affiche le commit et le serveur signale un onglet ancien", async ({ page }) => {
+  await openLobby(page, "HoteVersion");
+  await expect(page.getByText("Version 0.1.0+abcdef0", { exact: true })).toBeVisible();
+
+  const oldClient = io("http://127.0.0.1:15300", { autoConnect: false, reconnection: false });
+  try {
+    const warning = new Promise<string>((resolve, reject) => {
+      oldClient.once("hub:error", resolve);
+      oldClient.once("connect_error", reject);
+    });
+    oldClient.connect().emit("hub:create", { pseudo: "AncienClient" });
+    await expect(warning).resolves.toContain("Une version plus récente de FicoDutch est en ligne (abcdef0)");
+    await expect(page.getByText("Hub de AncienClient", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Créer un Hub" }).click();
+    await expect(page.getByRole("heading", { name: "Hub de HoteVersion" })).toBeVisible();
+    await expect(page.getByText("Version 0.1.0+abcdef0", { exact: true })).toBeVisible();
+  } finally {
+    oldClient.disconnect();
+  }
 });
 
 test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({

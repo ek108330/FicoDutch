@@ -11,6 +11,7 @@ const {
 
 const app = express();
 const httpServer = http.createServer(app);
+const buildRevision = process.env.RENDER_GIT_COMMIT || process.env.FICODUTCH_BUILD_REVISION;
 const allowedOrigins = new Set((process.env.CLIENT_ORIGINS || process.env.RENDER_EXTERNAL_URL ||
   "http://localhost:5173,http://127.0.0.1:5173")
   .split(",").map((origin) => origin.trim()).filter(Boolean));
@@ -25,7 +26,13 @@ const io = new Server(httpServer, {
 });
 
 app.get("/healthz", (_request, response) => response.json({ status: "online" }));
-if (process.env.SERVE_CLIENT === "1") app.use(express.static(path.resolve(__dirname, "../client/dist")));
+if (process.env.SERVE_CLIENT === "1") {
+  app.use(express.static(path.resolve(__dirname, "../client/dist"), {
+    setHeaders(response, file) {
+      if (path.extname(file) === ".html") response.setHeader("Cache-Control", "no-store");
+    },
+  }));
+}
 
 app.get("/", (req, res) => {
   res.json({
@@ -50,6 +57,12 @@ function readPseudo(data) {
   return /^[A-Za-z0-9]{2,20}$/.test(pseudo) ? pseudo : null;
 }
 
+function checkClientBuild(socket) {
+  if (!buildRevision || socket.handshake.auth?.buildRevision === buildRevision) return true;
+  socket.emit("hub:error", `Une version plus récente de FicoDutch est en ligne (${buildRevision.slice(0, 7)}). Recharge la page sur les deux appareils.`);
+  return false;
+}
+
 io.on("connection", (socket) => {
   console.log("Connexion établie :", socket.id);
   socket.emit("hubs:update", getAllHubs(), Date.now());
@@ -71,6 +84,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("hub:create", (data) => {
+    if (!checkClientBuild(socket)) return;
     const pseudo = readPseudo(data);
     if (!pseudo) {
       socket.emit("hub:error", "Pseudo invalide.");
@@ -87,6 +101,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("hub:join", (data) => {
+    if (!checkClientBuild(socket)) return;
     const pseudo = readPseudo(data);
     const hubId = data?.hubId;
     if (!pseudo || typeof hubId !== "string" || !hubId) {

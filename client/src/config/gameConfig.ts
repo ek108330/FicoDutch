@@ -1,6 +1,9 @@
 
 import type { HubStatus } from "../../../shared/hubTypes";
 
+declare const __BUILD_REVISION__: string;
+export const buildRevision = typeof __BUILD_REVISION__ === "string" ? __BUILD_REVISION__ : "";
+
 export const hubStatusLabels: Record<HubStatus, string> = {
   waiting: "En attente",
   "in-progress": "En cours",
@@ -10,7 +13,7 @@ export const hubStatusLabels: Record<HubStatus, string> = {
 
 export const GAME_CONFIG = {
   name: "FicoDutch",
-  version: "0.1.0",
+  version: buildRevision ? `0.1.0+${buildRevision.slice(0, 7)}` : "0.1.0",
 
   players: {
     min: 2,
