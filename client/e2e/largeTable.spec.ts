@@ -1,15 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, closeSettings, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
   { name: "portrait", width: 390, height: 844 },
+  { name: "portrait-compact", width: 360, height: 640 },
   { name: "paysage", width: 844, height: 390 },
 ];
 
 async function checkSeats(page: Page, count: number, cards: number) {
   const table = page.locator(`.game-table[data-player-count="${count}"]`);
   await expect(table).toBeVisible();
+  await expectScreenFits(page);
   await expect(table.locator(".position-bottom .playing-card")).toHaveCount(cards);
   const boxes = await table.locator(".table-player, .table-center").evaluateAll((items) =>
     items.map((node) => {
@@ -54,9 +56,22 @@ for (const count of [4, 5, 6]) {
             .getByRole("button", { name: "Rejoindre" }).click();
           await expect(guest.getByText("Salle d'attente")).toBeVisible();
         }
-        if (cards === 6) await host.getByRole("button", { name: "6 cartes", exact: true }).click();
-        if (joker) await host.getByRole("button", { name: "Joker +", exact: true }).click();
+        if (cards === 6) {
+          const settings = await openSettings(host);
+          await settings.getByRole("button", { name: "6 cartes", exact: true }).click();
+          if (joker) await settings.getByRole("button", { name: "Joker +", exact: true }).click();
+          await closeSettings(host);
+        }
         await expect(host.getByText(`${count}/6 joueurs`, { exact: true })).toBeVisible();
+        if (joker) {
+          for (const [width, height] of [[360, 640], [740, 360]]) {
+            await host.setViewportSize({ width, height });
+            await expectScreenFits(host);
+            await expect(host.getByRole("list", { name: "Joueurs présents" }).getByText("Invite5", { exact: true })).toBeInViewport();
+            await expect(start).toBeInViewport();
+            await host.screenshot({ path: testInfo.outputPath(`hub-${width}.png`) });
+          }
+        }
         await start.click();
         const last = guests.at(-1)!;
         await expect(activeTurn(last)).toHaveText("À toi de jouer", { timeout: 21_000 });

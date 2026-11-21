@@ -1,5 +1,23 @@
 import { expect, type Page } from "@playwright/test";
 
+export async function openSettings(page: Page) {
+  await page.getByRole("button", { name: "Paramètres du jeu" }).click();
+  return page.getByRole("dialog", { name: "Paramètres du jeu" });
+}
+
+export function closeSettings(page: Page) {
+  return page.getByRole("button", { name: "Fermer les paramètres" }).click();
+}
+
+export async function expectScreenFits(page: Page) {
+  const overflow = await page.evaluate(() => {
+    const root = document.scrollingElement!;
+    return { horizontal: root.scrollWidth - window.innerWidth, vertical: root.scrollHeight - window.innerHeight };
+  });
+  expect(overflow.horizontal, "débordement horizontal").toBeLessThanOrEqual(1);
+  expect(overflow.vertical, "débordement vertical").toBeLessThanOrEqual(1);
+}
+
 export async function openLobby(page: Page, pseudo: string) {
   await Promise.all([
     page.waitForEvent("console", (message) => message.text().startsWith("FicoDutch connecté au serveur")),

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GAME_CONFIG, hubStatusLabels } from "./config/gameConfig";
-import { Users, BookOpen, Plus, Spade } from "lucide-react";
+import { Plus, Settings, Spade } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
@@ -12,29 +12,20 @@ import { resumeGameClock } from "./game/gameClock";
 import type { GameState } from "./game/gameTypes";
 import { applyDepartures } from "./game/turn";
 import type { UpdateHostRound } from "./game/useRoundTurn";
-import Rules from "./ui/Rules";
+import GameSettings from "./ui/GameSettings";
 import HubManagement from "./ui/HubManagement";
-import LobbyChat from "./ui/LobbyChat";
+import HubLobby from "./ui/HubLobby";
 import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
+import { useGameAudio } from "./ui/useCardFeedback";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
 type HostRound = { hubId: string; state: GameState };
 
-function PlayerConnectionNotice() {
-  const [delayed, setDelayed] = useState(false);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDelayed(true), 15_000);
-    return () => window.clearTimeout(timer);
-  }, []);
-  return <p role="status">{delayed
-    ? "La connexion entre les joueurs prend du temps. Garde les onglets de jeu ouverts."
-    : "Connexion aux joueurs en cours…"}</p>;
-}
-
 function App() {
   const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
-  const [showRules, setShowRules] = useState(false);
+  const settingsDialog = useRef<HTMLDialogElement>(null);
+  const { sound, toggleSound, playSound } = useGameAudio();
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [previewHubId, setPreviewHubId] = useState<string | null>(null);
   const [currentHub, setCurrentHub] = useState<CurrentHub | null>(null);
@@ -336,293 +327,120 @@ function App() {
     return networkReady && !!pseudo.trim() && (hub.status === "waiting" || hub.status === "in-progress");
   }
 
-  if (showRules) {
-  return <Rules onBack={() => setShowRules(false)} />;
-  }
+  const settings = (
+    <button type="button" className="settings-trigger" aria-label="Paramètres du jeu" aria-haspopup="dialog"
+      onClick={() => settingsDialog.current?.showModal()}>
+      <Settings size={21} aria-hidden="true" />
+    </button>
+  );
 
-  if (currentHub?.gameStarted) {
-    const { memorizationDeadline } = currentHub;
-    if (memorizationDeadline === undefined) {
+  function renderScreen() {
+    if (currentHub?.gameStarted) {
+      const { memorizationDeadline } = currentHub;
+      if (memorizationDeadline === undefined) {
+        return (
+          <main className="game-screen">
+            <div className="game-actions">{settings}</div>
+            <p role="status">En attente de la distribution des cartes…</p>
+          </main>
+        );
+      }
+
       return (
-        <main className="game-screen">
-          <p role="status">En attente de la distribution des cartes…</p>
-        </main>
+        <RoundScreen
+          key={currentHub.id}
+          hubId={currentHub.id}
+          hostId={currentHub.hostId}
+          playerId={playerId ?? ""}
+          deadline={memorizationDeadline}
+          members={currentHub.players}
+          gameFinished={currentHub.gameFinished}
+          hostRound={hostRound?.hubId === currentHub.id ? hostRound.state : null}
+          peers={peers}
+          updateHostRound={updateHostRound}
+          onLeave={leaveHub}
+          hostManagement={manageHub(currentHub, "game-leave")}
+          settings={settings}
+          playSound={playSound}
+          clockVersion={currentHub.clockVersion}
+          pause={currentHub.hostPause
+            ? { reason: "host", deadline: currentHub.pauseDeadline }
+            : !networkReady ? { reason: "local" } : null}
+          canLeave={networkReady}
+        />
       );
     }
 
-    const localRound = hostRound?.hubId === currentHub.id ? hostRound.state : null;
-    return (
-      <RoundScreen
-        key={currentHub.id}
-        hubId={currentHub.id}
-        hostId={currentHub.hostId}
-        playerId={playerId ?? ""}
-        deadline={memorizationDeadline}
-        members={currentHub.players}
-        gameFinished={currentHub.gameFinished}
-        hostRound={localRound}
-        peers={peers}
-        updateHostRound={updateHostRound}
-        onLeave={leaveHub}
-        hostManagement={manageHub(currentHub, "game-leave")}
-        clockVersion={currentHub.clockVersion}
-        pause={currentHub.hostPause
-          ? { reason: "host", deadline: currentHub.pauseDeadline }
-          : !networkReady ? { reason: "local" } : null}
-        canLeave={networkReady}
-      />
-    );
-  }
-
-  if (currentHub) {
-    const isHost = currentHub.hostId === playerId;
-    const canStart = currentHub.players.length >= GAME_CONFIG.players.min;
-    const peersReady = currentHub.players.every(({ id }) =>
-      id === playerId || peers.connectedPeers.includes(id)
-    );
+    const isHost = currentHub?.hostId === playerId;
+    const previewHub = hubs.find(({ id }) => id === previewHubId);
     return (
       <main className="home-page">
         <header className="top-bar">
-          <div className="brand">
-            <Spade size={28} />
-            <span>FicoDutch</span>
+          <div className="brand"><Spade size={24} aria-hidden="true" /> <span>FicoDutch</span></div>
+          <div className="header-actions">
+            <span className="version">Version {GAME_CONFIG.version}</span>
+            {settings}
           </div>
-          <span className="version">
-            Version {GAME_CONFIG.version}
-          </span>
         </header>
-
-        <section className="hero">
-          <h1>{currentHub.name}</h1>
-          <p className="subtitle">Salle d'attente</p>
-
-          <div className="home-panel">
-            <h2>Joueurs présents</h2>
-
-            <p>
-              {currentHub.players.length}/{currentHub.maxPlayers} joueurs
-            </p>
-
-            
-<div className="hub-settings">
-  <h3>Paramètres de la partie</h3>
-
-  
-<div className="threshold-setting">
-  <h4>Fin de partie</h4>
-
-  <input
-    type="range"
-    min="0"
-    max="5"
-    step="1"
-    value={
-      [50, 100, 200, 500, 1000, null].indexOf(currentHub.endThreshold)
-    }
-    disabled={
-  currentHub.hostId !== playerId ||
-  currentHub.gameStarted
-}
-    onChange={(event) => {
-      const values = [50, 100, 200, 500, 1000, null];
-      const threshold = values[Number(event.target.value)];
-
-      socket.emit("hub:update-settings", {
-        variants: currentHub.variants,
-        endThreshold: threshold,
-      });
-    }}
-  />
-
-  <div className="threshold-labels">
-    <span>50</span>
-    <span>100</span>
-    <span>200</span>
-    <span>500</span>
-    <span>1000</span>
-    <span>No Limit</span>
-  </div>
-</div>
-
-
-  <h4>Variantes</h4>
-
-  
-<div className="variant-grid">
-  {(
-    [
-      ["sixCards", "6 cartes"],
-      ["infinitePose", "Pose infinie"],
-      ["plusMinusOne", "+1 / -1"],
-      ["jokerPlus", "Joker +"],
-    ] as const
-  ).map(([key, label]) => (
-    <button
-      key={key}
-      type="button"
-      className={`variant-button ${
-        currentHub.variants[key] ? "active" : ""
-      }`}
-      disabled={
-  currentHub.hostId !== playerId ||
-  currentHub.gameStarted
-}
-      onClick={() => {
-        socket.emit("hub:update-settings", {
-          variants: {
-            ...currentHub.variants,
-            [key]: !currentHub.variants[key],
-          },
-          endThreshold: currentHub.endThreshold,
-        });
-      }}
-    >
-      {label}
-
-    </button>
-  ))}
-</div>
-
-</div>
-
-
-            {currentHub.players.map((player) => (
-              <div className="hub-item" key={player.id}>
-                <div className="hub-info">
-                  <strong>{player.pseudo}</strong>
-                  <span>
-                    {player.isHost ? "Créateur du Hub" : "Joueur"}
-                  </span>
+        <div className="home-content">
+          {currentHub ? (
+            <HubLobby key={currentHub.id} hub={currentHub} connected={networkReady} awaitingPeers={awaitingPeers}
+              usingRelay={peers.relayedPeers.length > 0} isHost={isHost}
+              canStart={networkReady && !awaitingPeers && currentHub.players.length >= GAME_CONFIG.players.min &&
+                hostRound?.hubId !== currentHub.id}
+              onStart={() => startGame(currentHub)} onLeave={leaveHub}
+              management={manageHub(currentHub)} />
+          ) : (
+            <div className="home-panel home-entry">
+              {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
+                onClose={() => setPreviewHubId(null)} onJoin={() => joinHub(previewHub.id)} />}
+              <form className="home-create" onSubmit={(event) => {
+                event.preventDefault();
+                createHub();
+              }}>
+                {sessionNotice && <p className="home-notice" role="status">{sessionNotice}</p>}
+                <label htmlFor="pseudo">Choisis ton pseudo</label>
+                <input id="pseudo" type="text" value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
+                  onChange={(event) => savePseudo(event.target.value)} />
+                <button className="primary-button" type="submit">
+                  <Plus size={19} aria-hidden="true" /> Créer un Hub
+                </button>
+              </form>
+              <section className="home-join" aria-labelledby="join-title">
+                <h2 id="join-title">Rejoindre une partie</h2>
+                <div className="hub-list">
+                  {hubs.length === 0 ? (
+                    <p className="empty-hubs">Aucun Hub disponible.</p>
+                  ) : hubs.map((hub) => (
+                    <div className="hub-item" key={hub.id}>
+                      <div className="hub-info">
+                        <strong>{hub.name}</strong>
+                        <span>{hub.players.length}/{hub.maxPlayers} joueurs · <span>{hubStatusLabels[hub.status]}</span></span>
+                      </div>
+                      <div className="hub-actions">
+                        <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
+                          onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>
+                        <button type="button" className="join-button" disabled={!canJoinHub(hub)}
+                          onClick={() => joinHub(hub.id)}>Rejoindre</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <span>{player.connected ? "Connecté" : "Déconnecté"}</span>
-              </div>
-            ))}
-
-            <p>En attente du lancement de la partie...</p>
-            {awaitingPeers && <PlayerConnectionNotice key={`connexion-${currentHub.id}`} />}
-            {!awaitingPeers && peers.relayedPeers.length > 0 && <p role="status">Le relais chiffré est actif.</p>}
-            {isHost && (
-              <button
-                type="button"
-                className="start-game-button"
-                disabled={!canStart || !peersReady || hostRound?.hubId === currentHub.id}
-                onClick={() => startGame(currentHub)}
-              >
-                Lancer la partie
-              </button>
-            )}
-            {manageHub(currentHub, "rules-button")}
-            <button
-  className="rules-button"
-  onClick={leaveHub}
->
-  Quitter le Hub
-</button>
-            <LobbyChat key={currentHub.id} hubId={currentHub.id} connected={networkReady} />
-          </div>
-        </section>
+              </section>
+            </div>
+          )}
+        </div>
       </main>
     );
   }
 
-  const previewHub = hubs.find(({ id }) => id === previewHubId);
   return (
-    <main className="home-page">
-      {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
-        onClose={() => setPreviewHubId(null)} onJoin={() => joinHub(previewHub.id)} />}
-      <header className="top-bar">
-        <div className="brand">
-          <Spade size={28} />
-          <span>FicoDutch</span>
-        </div>
-
-        <span className="version">
-          Version {GAME_CONFIG.version}
-        </span>
-      </header>
-
-      <section className="hero">
-        <div className="hero-icon">🃏</div>
-
-        <h1>FicoDutch</h1>
-
-        <p className="subtitle">
-          Le jeu de cartes où mémoire, stratégie et audace font la différence.
-        </p>
-
-        <div className="home-panel">
-          {sessionNotice && <p role="status">{sessionNotice}</p>}
-          <label htmlFor="pseudo">Choisis ton pseudo</label>
-
-          <input
-            id="pseudo"
-            type="text"
-            placeholder="Ton pseudo..."
-            value={pseudo}
-            maxLength={GAME_CONFIG.player.pseudoMaxLength}
-            onChange={(event) => savePseudo(event.target.value)}
-          />
-
-          <button className="primary-button" onClick={createHub}>
-            <Plus size={20} />
-            Créer un Hub
-          </button>
-
-          <div className="separator">
-            <span>OU REJOINDRE UNE PARTIE</span>
-          </div>
-
-          <div className="hub-list">
-            {hubs.length === 0 ? (
-              <div className="empty-hubs">
-                <Users size={22} />
-                <p>Aucun Hub disponible pour le moment.</p>
-              </div>
-            ) : (
-              hubs.map((hub) => (
-                <div className="hub-item" key={hub.id}>
-                  <div className="hub-info">
-                    <strong>{hub.name}</strong>
-                    <span>Créé par {hub.hostPseudo}</span>
-                    <span>
-                      {hub.players.length}/{hub.maxPlayers} joueurs
-                    </span>
-                  </div>
-
-                  <div className="hub-actions">
-                    <div className="hub-status">
-                      {hubStatusLabels[hub.status]}
-                    </div>
-                    <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
-                      onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>
-
-                    <button
-                      className="join-button"
-                      disabled={!canJoinHub(hub)}
-                      onClick={() => joinHub(hub.id)}
-                    >
-                      Rejoindre
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <button
-          className="rules-button"
-          onClick={() => setShowRules(true)}
-        >
-          <BookOpen size={18} />
-          Consulter les règles
-        </button>
-      </section>
-
-      <footer>
-        FicoDutch · Jeu de cartes multijoueur · {GAME_CONFIG.version}
-      </footer>
-    </main>
+    <>
+      {renderScreen()}
+      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound}
+        hub={currentHub?.gameStarted ? null : currentHub} canEdit={networkReady && currentHub?.hostId === playerId}
+        onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })} />
+    </>
   );
 }
 

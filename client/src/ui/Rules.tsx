@@ -3,23 +3,23 @@ import { ArrowLeft, BookOpen } from "lucide-react";
 
 type RulesProps = {
   onBack: () => void;
+  titleId: string;
 };
 
-function Rules({ onBack }: RulesProps) {
+function Rules({ onBack, titleId }: RulesProps) {
   return (
     <main className="rules-page">
       <header className="rules-header">
-        <button className="back-button" onClick={onBack}>
+        <button className="back-button" onClick={onBack} autoFocus>
           <ArrowLeft size={18} />
           Retour
         </button>
 
-        <h1>
+        <h1 id={titleId}>
           <BookOpen size={25} />
           Règles du FicoDutch
         </h1>
 
-        <p>Le règlement complet du jeu</p>
       </header>
 
       <nav className="rules-content">

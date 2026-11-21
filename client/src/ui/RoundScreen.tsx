@@ -11,7 +11,7 @@ import type { useHubPeers } from "../network/useHubPeers";
 import { useTableEmojis } from "../network/useTableEmojis";
 import GameTable from "./GameTable";
 import { TableEmojiPicker } from "./EmojiButtons";
-import { useCardFeedback } from "./useCardFeedback";
+import { useCardFeedback, type useGameAudio } from "./useCardFeedback";
 import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
 
@@ -27,6 +27,8 @@ type RoundScreenProps = {
   updateHostRound: UpdateHostRound;
   onLeave: () => void;
   hostManagement: ReactNode;
+  settings: ReactNode;
+  playSound: ReturnType<typeof useGameAudio>["playSound"];
   canLeave: boolean;
   clockVersion: number;
   pause: { reason: "host" | "local"; deadline?: number } | null;
@@ -37,7 +39,7 @@ const emptySelection: Memorization = { roundNumber: 0, selected: [], revealed: [
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onLeave, hostManagement, canLeave, clockVersion, pause,
+  peers, updateHostRound, onLeave, hostManagement, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
@@ -59,8 +61,8 @@ export default function RoundScreen({
   const finished = !paused && (phase === "results" && deadline === null || phase === "waiting" && gameFinished);
   const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && canLeave &&
     (phase === "memorization" || phase === "playing");
-  const { feedback, sound, toggleSound } = useCardFeedback(
-    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion,
+  const feedback = useCardFeedback(
+    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playSound,
   );
   const { choose: chooseEmoji, receive: receiveEmoji, visible: tableEmojis } = useTableEmojis({
     playerId, hostId, roundNumber, clockVersion, enabled: emojisEnabled, now, hostRound, members, send,
@@ -147,6 +149,10 @@ export default function RoundScreen({
     else if (selected.length < limit) choose([...selected, position]);
   }
 
+  function gameActions(action?: ReactNode) {
+    return <div className="game-actions">{action}{settings}</div>;
+  }
+
   if (pause || !scene || turn.waitingForClock || !connectionReady) {
     const hostPaused = pause?.reason === "host";
     const seconds = pause?.deadline === undefined ? null : Math.min(
@@ -155,7 +161,7 @@ export default function RoundScreen({
     );
     return (
       <main className="game-screen">
-        {hostManagement}
+        {gameActions(hostManagement)}
         <section className="round-results" aria-labelledby="pause-title">
           <h1 id="pause-title">{hostPaused ? "Partie en pause" : "Reconnexion à la table"}</h1>
           <p role="status">{hostPaused ? "En attente du retour de l’hôte." : "Ta place est conservée."}</p>
@@ -169,6 +175,7 @@ export default function RoundScreen({
   if (scene.phase === "waiting") {
     return (
       <main className="game-screen">
+        {gameActions()}
         <section className="round-results" aria-labelledby="waiting-title">
           <h1 id="waiting-title">{gameFinished ? "La partie est terminée" : "En attente de la prochaine manche"}</h1>
           {!gameFinished && (
@@ -188,7 +195,7 @@ export default function RoundScreen({
       <RoundResults
         key={roundNumber}
         result={scene.result}
-        hostManagement={hostManagement}
+        hostManagement={gameActions(hostManagement)}
         roundNumber={roundNumber}
         remaining={turn.remaining}
         isHost={playerId === hostId}
@@ -205,7 +212,7 @@ export default function RoundScreen({
   if (scene.phase === "transition") {
     return (
       <main className="game-screen">
-        {hostManagement}
+        {gameActions(hostManagement)}
         <section className="round-results" aria-label="Transition">
           <h1>Manche {roundNumber}</h1>
           <p>Distribution dans <span role="timer">{Math.ceil(turn.remaining / 1_000)} s</span></p>
@@ -234,11 +241,9 @@ export default function RoundScreen({
 
   return (
     <main className="game-screen">
-      {hostManagement ?? (canLeave && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>)}
+      {gameActions(hostManagement ?? (canLeave && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>))}
       {emojisEnabled && <div className="table-options">
         <TableEmojiPicker onChoose={chooseEmoji} />
-        <button type="button" className="sound-toggle" aria-label="Sons de jeu" aria-pressed={sound}
-          onClick={toggleSound}>Son {sound ? "activé" : "coupé"}</button>
       </div>}
       <GameTable
         localPlayerId={playerId}

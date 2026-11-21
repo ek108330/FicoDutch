@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TurnView } from "../game/turn";
 
 type FeedbackKind = "draw" | "discard" | "power" | "reaction";
@@ -11,12 +11,9 @@ const tones: Record<FeedbackKind, [number, number]> = {
   reaction: [510, 410],
 };
 
-export function useCardFeedback(view: TurnView | null, roundNumber: number, clockVersion: number) {
+export function useGameAudio() {
   const [sound, setSound] = useState(() => localStorage.getItem(soundKey) === "on");
-  const [feedback, setFeedback] = useState<CardFeedback | null>(null);
   const audio = useRef<AudioContext | null>(null);
-  const previous = useRef<{ view: TurnView; roundNumber: number; clockVersion: number } | null>(null);
-  const nextId = useRef(0);
 
   function unlockSound() {
     if (!window.AudioContext) return;
@@ -45,6 +42,30 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
     audio.current = null;
   }, []);
 
+  const playSound = useCallback((kind: FeedbackKind) => {
+    const context = audio.current;
+    if (!sound || !context || context.state !== "running") return;
+    const start = context.currentTime;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.setValueAtTime(tones[kind][0], start);
+    oscillator.frequency.exponentialRampToValueAtTime(tones[kind][1], start + 0.09);
+    gain.gain.setValueAtTime(0.035, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(start + 0.14);
+  }, [sound]);
+
+  return { sound, toggleSound, playSound };
+}
+
+export function useCardFeedback(view: TurnView | null, roundNumber: number, clockVersion: number,
+  playSound: ReturnType<typeof useGameAudio>["playSound"]) {
+  const [feedback, setFeedback] = useState<CardFeedback | null>(null);
+  const previous = useRef<{ view: TurnView; roundNumber: number; clockVersion: number } | null>(null);
+  const nextId = useRef(0);
+
   useEffect(() => {
     const prior = previous.current;
     previous.current = view && { view, roundNumber, clockVersion };
@@ -66,19 +87,8 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
     else return;
 
     setFeedback({ kind, pile, id: ++nextId.current });
-    const context = audio.current;
-    if (!sound || !context || context.state !== "running") return;
-    const start = context.currentTime;
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.frequency.setValueAtTime(tones[kind][0], start);
-    oscillator.frequency.exponentialRampToValueAtTime(tones[kind][1], start + 0.09);
-    gain.gain.setValueAtTime(0.035, start);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start();
-    oscillator.stop(start + 0.14);
-  }, [clockVersion, roundNumber, sound, view]);
+    playSound(kind);
+  }, [clockVersion, playSound, roundNumber, view]);
 
-  return { feedback, sound, toggleSound };
+  return feedback;
 }

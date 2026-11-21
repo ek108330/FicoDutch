@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, closeSettings, drawDeck, fixDeckOrder, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const next = (page: Page) => page.getByRole("button", { name: "Lancer la manche suivante" });
 const showRanking = (page: Page) => page.getByRole("button", { name: "Classement cumulé", exact: true });
@@ -24,8 +24,11 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
   const guest = await browser.newPage({ baseURL });
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceManches", "BobManches");
-    await host.getByRole("slider").press("Home");
-    await expect(guest.getByRole("slider")).toHaveValue("0");
+    const hostSettings = await openSettings(host);
+    const guestSettings = await openSettings(guest);
+    await hostSettings.getByRole("slider").press("Home");
+    await expect(guestSettings.getByRole("slider")).toHaveValue("0");
+    await Promise.all([closeSettings(host), closeSettings(guest)]);
     await start.click();
     await finishWithDutch(guest, host);
 

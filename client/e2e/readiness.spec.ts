@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { io } from "socket.io-client";
-import { activeTurn, drawDeck, fixDeckOrder, openLobby } from "./tableFlow";
+import { activeTurn, closeSettings, drawDeck, fixDeckOrder, openLobby, openSettings } from "./tableFlow";
 
 test("la signalisation accepte l’origine autorisée et refuse une autre origine", async ({ request, baseURL }) => {
   const handshake = "http://127.0.0.1:15300/socket.io/?EIO=4&transport=polling";
@@ -47,8 +47,15 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
       };
     });
     await Promise.all([openLobby(host, "AliceApercu"), openLobby(guest, "BobApercu")]);
+    const guestSettings = await openSettings(guest);
+    const sound = guestSettings.getByRole("button", { name: "Sons de jeu" });
+    await expect(sound).toHaveAttribute("aria-pressed", "false");
+    await sound.click();
+    await closeSettings(guest);
     await host.getByRole("button", { name: "Créer un Hub" }).click();
-    await host.getByRole("button", { name: "6 cartes", exact: true }).click();
+    const hostSettings = await openSettings(host);
+    await hostSettings.getByRole("button", { name: "6 cartes", exact: true }).click();
+    await closeSettings(host);
     await guest.getByRole("button", { name: "Aperçu du Hub de AliceApercu" }).click();
     const preview = guest.getByRole("dialog", { name: "Hub de AliceApercu" });
     await expect(preview).toContainText("1/6 joueurs");
@@ -62,14 +69,15 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     const optionsBox = (await guest.locator(".table-options").boundingBox())!;
     const opponentName = (await guest.locator(".position-top .player-name").boundingBox())!;
     expect(optionsBox.y + optionsBox.height).toBeLessThan(opponentName.y);
-    const sound = guest.getByRole("button", { name: "Sons de jeu" });
-    await expect(sound).toHaveAttribute("aria-pressed", "false");
-    await sound.click();
+    await openSettings(guest);
     await expect(sound).toHaveAttribute("aria-pressed", "true");
+    await closeSettings(guest);
     await drawDeck(guest).click();
     await expect(guest.locator(".feedback-draw")).toHaveCount(1);
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", "1");
+    await openSettings(guest);
     await sound.click();
+    await closeSettings(guest);
     await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
     await expect(guest.locator(".card-feedback:not(.feedback-draw)")).toHaveCount(1);
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", "1");

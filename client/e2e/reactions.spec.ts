@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, drawDeck, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, closeSettings, discard, drawDeck, expectTableFits, fixDeckOrder, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const reactButton = (page: Page) => page.getByRole("button", { name: "Réagir", exact: true });
 const ownCards = (page: Page) => page.locator(".position-bottom .playing-card");
@@ -13,10 +13,13 @@ async function openReactionRound(host: Page, guest: Page, hostName: string, gues
   await fixDeckOrder(host);
   const start = await openTwoPlayerHub(host, guest, hostName, guestName);
   const variants = infinite ? ["+1 / -1", "Pose infinie"] : ["+1 / -1"];
+  const hostSettings = await openSettings(host);
+  const guestSettings = await openSettings(guest);
   for (const variant of variants) {
-    await host.getByRole("button", { name: variant, exact: true }).click();
-    await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveClass(/\bactive\b/);
+    await hostSettings.getByRole("button", { name: variant, exact: true }).click();
+    await expect(guestSettings.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
   }
+  await Promise.all([closeSettings(host), closeSettings(guest)]);
   await start.click();
   await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
   await expect(reactButton(guest)).toHaveCount(0);

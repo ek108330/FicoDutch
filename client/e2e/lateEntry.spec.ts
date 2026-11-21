@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, closeSettings, drawDeck, fixDeckOrder, openLobby, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
@@ -28,7 +28,9 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceEntree", "BobEntree");
     await Promise.all([openLobby(newcomer, "ChloeEntree"), openLobby(late, "DanaEntree")]);
-    await host.getByRole("slider").press("Home");
+    const settings = await openSettings(host);
+    await settings.getByRole("slider").press("Home");
+    await closeSettings(host);
     await start.click();
     await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 18_000 });
 

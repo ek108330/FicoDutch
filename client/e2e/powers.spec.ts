@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, closeSettings, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const faceUpHands = (page: Page) => page.locator(".player-cards .face-up");
 const targetCard = (page: Page, position: number, pseudo: string) =>
@@ -89,10 +89,13 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
 
   try {
     const start = await openTwoPlayerHub(host, guest, alice, bob);
+    const hostSettings = await openSettings(host);
+    const guestSettings = await openSettings(guest);
     for (const variant of ["6 cartes", "Joker +"]) {
-      await host.getByRole("button", { name: variant, exact: true }).click();
-      await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveClass(/\bactive\b/);
+      await hostSettings.getByRole("button", { name: variant, exact: true }).click();
+      await expect(guestSettings.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
     }
+    await Promise.all([closeSettings(host), closeSettings(guest)]);
     await start.click();
     await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
     await playSpecialCard(guest, 1, "Joker+");
