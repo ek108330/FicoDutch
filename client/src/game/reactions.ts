@@ -1,7 +1,8 @@
-import type { Card, CardRank } from "./cards";
+import { getCardFace, type Card, type CardRank } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
 import type { GameState, ReactionNotice } from "./gameTypes";
 import { appendCard, finishRound, recordCardMove, removeCard } from "./hands.ts";
+import { getHandLayout } from "./handLayout.ts";
 import { isExchangeTargetLocked, updatePowerAfterReaction } from "./powers.ts";
 
 export type ReactionAction = {
@@ -14,8 +15,8 @@ export type ReactionAction = {
 const circularRanks: CardRank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
 export function matchesDiscard(card: CardRank, reference: CardRank, plusMinusOne: boolean) {
-  if (card === reference) return true;
-  if (!plusMinusOne || card === "JOKER" || reference === "JOKER") return false;
+  if (!plusMinusOne) return card === reference;
+  if (card === "JOKER" || reference === "JOKER") return false;
   const distance = Math.abs(circularRanks.indexOf(card) - circularRanks.indexOf(reference));
   return distance === 1 || distance === circularRanks.length - 1;
 }
@@ -73,9 +74,11 @@ export function reactToDiscard(
     };
   }
 
+  const slot = getHandLayout(player.cards.length, player.handLayout).slots[position];
   const remaining = removeCard(player, position);
   const next = presentDiscard({
     ...state,
+    cardMotion: recordCardMove(state, { kind: "reaction", playerId, slot, face: getCardFace(card) }, now),
     players: state.players.map((entry) => entry === player ? remaining : entry),
     turn: state.turn ? { ...state.turn, power: updatePowerAfterReaction(state.turn.power, card.id) } : null,
   }, [...state.discardPile, card], { playerId, outcome: "played" });

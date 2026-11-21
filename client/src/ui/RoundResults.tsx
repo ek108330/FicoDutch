@@ -22,6 +22,7 @@ type Props = {
 
 const variantKeys = Object.keys(VARIANT_LABELS) as Array<keyof GameVariants>;
 const interactive = "button, a, input, select, textarea, summary, dialog";
+const signedScore = new Intl.NumberFormat("fr", { signDisplay: "always" });
 
 function RoundHands({ result }: { result: RoundResultView }) {
   const winners = result.players.filter(({ id }) => result.winnerIds.includes(id));
@@ -31,13 +32,17 @@ function RoundHands({ result }: { result: RoundResultView }) {
     <div role="region" aria-label="Résultat de la manche">
       <p className="result-sr-only">{winnerNames} {winners.length > 1 ? "remportent" : "remporte"} la manche.</p>
       <div className="result-hands">
-        {result.players.map(({ id, pseudo, cards, roundScore }) => (
+        {result.players.map(({ id, pseudo, cards, roundScore, penaltyPoints }) => (
           <section key={id} className="result-hand" data-winner={result.winnerIds.includes(id)} aria-label={`Main de ${pseudo}`}>
             <div className="result-player-heading">
               <h2>{pseudo}</h2>
               <PlayerBadges id={id} result={result} />
             </div>
-            <p className="result-points">{roundScore} {roundScore > 1 ? "points" : "point"}</p>
+            {penaltyPoints > 0 ? (
+              <p className="result-points">{roundScore - penaltyPoints} <span className="result-penalty">+{penaltyPoints}</span></p>
+            ) : (
+              <p className="result-points">{roundScore} {roundScore > 1 ? "points" : "point"}</p>
+            )}
             {cards.length ? (
               <div className="result-cards">
                 {cards.map((face, index) => <PlayingCard key={index} face={face} index={index} />)}
@@ -59,7 +64,7 @@ function PlayerBadges({ id, result }: { id: string; result: RoundResultView }) {
       {announced && (
         <span className="result-badge result-dutch" role="img" title={result.dutchPenalty ? "Dutch · pénalité de 10 points" : "Annonce Dutch"}
           aria-label={result.dutchPenalty ? "Annonce Dutch, pénalité de 10 points" : "Annonce Dutch"}>
-          <Megaphone size={13} />{result.dutchPenalty && <span>+10</span>}
+          <Megaphone size={13} />
         </span>
       )}
     </>
@@ -71,15 +76,14 @@ function Ranking({ result }: { result: RoundResultView }) {
   return (
     <table className="score-ranking" aria-label="Classement cumulé">
       <thead>
-        <tr><th>Rang</th><th>Joueur</th><th>Total</th><th>Progression</th></tr>
+        <tr><th>Rang</th><th>Joueur</th><th>Total</th></tr>
       </thead>
       <tbody>
-        {sorted.map(({ id, pseudo, totalScore, scoreHistory }) => (
+        {sorted.map(({ id, pseudo, totalScore, roundScore }) => (
           <tr key={id}>
             <td>{sorted.findIndex((player) => player.totalScore === totalScore) + 1}</td>
             <th scope="row"><span className="result-player-heading"><span>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
-            <td>{totalScore}</td>
-            <td>{scoreHistory.join(" → ")}</td>
+            <td>{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></td>
           </tr>
         ))}
       </tbody>

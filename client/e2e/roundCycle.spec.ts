@@ -48,7 +48,7 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
       await expect(page.getByRole("progressbar", { name: "Temps avant la manche suivante" })).toBeVisible();
       await expect(page.getByRole("timer")).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Main de AliceManches" }).getByText("27 points")).toBeVisible();
-      await expect(page.getByRole("region", { name: "Main de BobManches" }).getByText("46 points")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de BobManches" }).getByText("36 +10", { exact: true })).toBeVisible();
       await expect(next(page)).toHaveCount(0);
     }
     await guest.screenshot({ path: testInfo.outputPath("01-resultats-manche-1.png") });
@@ -92,8 +92,9 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
       await resultTitle(page).click();
       await expect(page.getByRole("group", { name: "Variantes de la partie" })).toHaveText(/6 cartes/);
       await expect(sixCards(page)).toHaveCount(0);
-      await expect(ranking(page).getByRole("row", { name: /AliceManches/ })).toContainText("27 → 62");
-      await expect(ranking(page).getByRole("row", { name: /BobManches/ })).toContainText("46 → 88");
+      await expect(ranking(page).getByRole("columnheader", { name: "Progression" })).toHaveCount(0);
+      await expect(ranking(page).getByRole("row", { name: /AliceManches/ })).toContainText("62 (+35)");
+      await expect(ranking(page).getByRole("row", { name: /BobManches/ })).toContainText("88 (+42)");
       await expect(next(page)).toHaveCount(0);
     }
     await guest.setViewportSize({ width: 390, height: 844 });

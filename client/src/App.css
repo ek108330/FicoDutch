@@ -1782,6 +1782,16 @@ input {
   font-size: clamp(16px, 3.8dvh, 34px);
 }
 
+.flying-card.face-up {
+  box-sizing: border-box;
+  background: #fff9e9;
+  border: 1px solid #ecd59b;
+  color: #252b26;
+}
+
+.flying-card .red-suit { color: #a42236; }
+.reaction-origin { visibility: hidden; }
+
 button.pile-slot:not(:disabled) {
   cursor: pointer;
 }
@@ -1792,14 +1802,24 @@ button.pile-slot:not(:disabled) .pile-card,
   border-color: #f3de9a;
 }
 
-.game-table .playing-card[data-selected="true"] {
-  box-shadow: 0 0 0 3px #f3de9a;
+.game-table .playing-card.face-down:is([data-selected="true"], [data-exchange-selected="true"]) {
+  background: #f2ce67;
+  border-color: #ffe6a3;
 }
 
-.game-table .playing-card[data-exchange-selected="true"] {
-  outline: 2px solid #f5d46b;
-  outline-offset: 1px;
-  box-shadow: 0 0 12px rgb(245 212 107 / 65%);
+.game-table .playing-card.face-down:is([data-selected="true"], [data-exchange-selected="true"]) .card-back-pattern {
+  background: repeating-linear-gradient(45deg, #efd27d 0 6px, #e7b957 6px 12px);
+  border-color: #946621;
+}
+
+.game-table .playing-card.face-down:is([data-selected="true"], [data-exchange-selected="true"]) .card-back-pattern span {
+  color: #483413;
+}
+
+.game-table .playing-card.face-up[data-selected="true"]:not([data-power-reveal]),
+.game-table .playing-card[data-selected="true"] .power-card-turn .drawn-card-front {
+  background: #ffe39a;
+  border-color: #f0c661;
 }
 
 .power-actions {
@@ -1981,6 +2001,10 @@ button.pile-slot:not(:disabled) .pile-card,
   line-height: 1.15;
 }
 
+.result-penalty,
+.ranking-round-score { color: #f3de9a; }
+.result-penalty { font-weight: 700; }
+
 .result-sr-only {
   position: absolute;
   width: 1px;
@@ -2009,10 +2033,12 @@ button.pile-slot:not(:disabled) .pile-card,
 }
 
 .round-results .card-face {
-  font-size: clamp(0.63rem, 2.8vw, 0.88rem);
+  gap: 0;
+  font-size: clamp(0.48rem, 2dvh, 0.7rem);
 }
 
-.round-results .card-face.joker-face { font-size: 0.6rem; }
+.round-results .card-face b { font-size: clamp(0.85rem, 4.25vw, 1.12rem); }
+.round-results .card-face.joker-face b { font-size: clamp(0.5rem, 2.55vw, 0.64rem); }
 
 .round-results .card-face.red-suit {
   color: #a42236;

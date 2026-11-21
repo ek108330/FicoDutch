@@ -77,7 +77,20 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await expect.poll(() => ownCards(guest).nth(3).evaluate((card) => card.getAnimations().length)).toBe(0);
     const fixedSlot = guest.locator('.position-bottom [data-hand-slot="2"]');
     const originalSlot = (await fixedSlot.boundingBox())!;
+    await host.setViewportSize({ width: 390, height: 844 });
+    const opponentCard = (await host.locator('.position-top [data-hand-slot="3"]').boundingBox())!;
     await dragCard(guest, 3, true, testInfo.outputPath("02-carte-glissee-portrait.png"));
+    const opponentFlight = host.locator('[data-card-animation="reaction-discard"]');
+    await expect(opponentFlight.locator(".card-face b")).toHaveText("6");
+    const startX = await opponentFlight.evaluate((card: HTMLElement) => Number.parseFloat(card.style.left));
+    expect(startX).toBeCloseTo(opponentCard.x, 1);
+    await opponentFlight.evaluate((card) => {
+      const animation = card.getAnimations()[0];
+      animation.pause();
+      animation.currentTime = 320;
+    });
+    await host.screenshot({ path: testInfo.outputPath("07-reaction-vue-adversaire.png") });
+    await opponentFlight.evaluate((card) => card.getAnimations()[0].play());
     await expect(ownCards(guest)).toHaveCount(3);
     const retainedSlot = (await fixedSlot.boundingBox())!;
     expect(retainedSlot.x).toBeCloseTo(originalSlot.x, 1);
@@ -104,6 +117,7 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await expect(discard(guest)).toHaveAccessibleName("Défausse, Valet de pique");
     const last = (await ownCards(guest).first().boundingBox())!;
     for (let i = 0; i < 3; i++) await guest.touchscreen.tap(last.x + last.width / 2, last.y + last.height / 2);
+    await expect(opponentFlight.locator(".card-face b").filter({ hasText: /^Q$/ })).toHaveCount(1);
 
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();

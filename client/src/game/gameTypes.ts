@@ -1,4 +1,4 @@
-import type { Card } from "./cards";
+import type { Card, CardFace } from "./cards";
 import type { HandLayout } from "./handLayout";
 import type { GameVariants } from "./variants";
 
@@ -15,6 +15,7 @@ export type GamePlayer = {
   cards: Card[];
   handVersion: number;
   handLayout?: HandLayout;
+  memorizedPositions?: number[];
   roundScore: number;
   totalScore: number;
   scoreHistory: number[];
@@ -23,7 +24,8 @@ export type GamePlayer = {
 
 export type CardTarget = { playerId: string; position: number };
 export type PublicCardMove = { kind: "swap"; targets: [CardTarget, CardTarget] } |
-  { kind: "gift" | "penalty"; target: CardTarget };
+  { kind: "gift" | "penalty"; target: CardTarget } |
+  { kind: "reaction"; playerId: string; slot: number; face: CardFace };
 export type PowerKind = "look-own" | "look-other" | "blind-swap" | "look-and-swap" | "give-card";
 export type SelectedCard = { playerId: string; cardId: string };
 export type Power = { kind: PowerKind; selected: SelectedCard[] };

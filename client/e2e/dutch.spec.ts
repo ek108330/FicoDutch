@@ -49,7 +49,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
       await expect(page.getByRole("region", { name: "Main de AliceDutch" }).getByRole("img", { name: "Manche remportée" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByRole("img", { name: "Annonce Dutch, pénalité de 10 points" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de AliceDutch" }).getByText("20 points")).toBeVisible();
-      await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByText("46 points")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByText("36 +10", { exact: true })).toBeVisible();
     }
     await guest.setViewportSize({ width: 844, height: 390 });
     await guest.screenshot({ path: testInfo.outputPath("04-resultats-dutch-paysage.png"), fullPage: true });

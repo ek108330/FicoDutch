@@ -47,6 +47,7 @@ for (const cardsPerPlayer of [4, 6]) {
           await expect(ownHand.locator(".face-up")).toHaveCount(i + 1);
         }
         await expect(cards.nth(limit)).toBeDisabled();
+        await expect(cards.first()).toHaveCSS("background-color", "rgb(255, 227, 154)");
         await expect(page.locator(".position-top .face-up")).toHaveCount(0);
         await expect(page.locator(".position-top").getByRole("button")).toHaveCount(0);
       }
@@ -66,14 +67,17 @@ for (const cardsPerPlayer of [4, 6]) {
 
       const guestHand = guest.locator(".position-bottom");
       const guestCards = guestHand.getByRole("button", { name: /^Carte / });
+      const firstFace = await guestCards.nth(0).getAttribute("aria-label");
       await guestCards.nth(0).click();
       await expect(guestHand.locator(".face-up")).toHaveCount(limit - 1);
-      await guestCards.nth(limit).click();
-      await expect(guestHand.locator(".face-up")).toHaveCount(limit);
+      await expect(guestCards.nth(limit)).toBeDisabled();
       await guest.getByRole("button", { name: "Masquer mes cartes" }).click();
       await expect(guestHand.locator(".face-up")).toHaveCount(0);
-      await guestCards.nth(0).click();
-      await expect(guestHand.locator(".face-up")).toHaveCount(1);
+      for (let i = limit; i < cardsPerPlayer; i++) await expect(guestCards.nth(i)).toBeDisabled();
+      for (let i = 0; i < limit; i++) await guestCards.nth(i).click();
+      await expect(guestHand.locator(".face-up")).toHaveCount(limit);
+      await expect(guestCards.nth(0)).toHaveAttribute("aria-label", firstFace!);
+      await guest.screenshot({ path: testInfo.outputPath("10-cartes-selectionnees-reaffichees.png") });
 
       await Promise.all([host, guest].map(async (page) => {
         await expect(page.getByRole("region", { name: "Tour de jeu" })).toBeVisible({ timeout: 17_000 });

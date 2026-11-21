@@ -44,7 +44,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
 
     await playTurn(guest, true);
     await playTurn(host);
-    await expect(host.getByRole("region", { name: "Main de BobEntree" })).toContainText("46 points");
+    await expect(host.getByRole("region", { name: "Main de BobEntree" })).toContainText("36 +10");
     await expect(host.getByText("En attente de la prochaine manche · ChloeEntree")).toBeVisible();
     await expect(waiting(newcomer)).toBeVisible();
     await expect(newcomer.getByRole("region", { name: "Main de BobEntree" })).toHaveCount(0);
@@ -82,8 +82,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await expect(newcomer.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
     await showRanking(newcomer).click();
     const newScore = newcomer.getByRole("row", { name: /ChloeEntree/ });
-    await expect(newScore.getByRole("cell", { name: "72", exact: true })).toBeVisible();
-    await expect(newScore.getByRole("cell", { name: "46 → 72", exact: true })).toBeVisible();
+    await expect(newScore.getByRole("cell", { name: "72 (+26)", exact: true })).toBeVisible();
     await expect(newcomer.getByRole("row", { name: /DanaEntree/ })).toHaveCount(0);
     await newcomer.screenshot({ path: testInfo.outputPath("05-score-herite-portrait.png") });
     await expect(late.getByRole("heading", { name: "La partie est terminée" })).toBeVisible();

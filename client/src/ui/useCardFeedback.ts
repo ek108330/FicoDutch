@@ -75,7 +75,7 @@ export function useGameAudio() {
   return { sound, toggleSound, playSound };
 }
 
-export function useCardFeedback(view: TurnView | null, roundNumber: number, clockVersion: number, playerId: string,
+export function useCardFeedback(view: TurnView | null, roundNumber: number, clockVersion: number,
   playSound: PlayGameSound) {
   const [feedback, setFeedback] = useState<CardFeedback | null>(null);
   const previous = useRef<{ view: TurnView; roundNumber: number; clockVersion: number } | null>(null);
@@ -110,8 +110,7 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
     setFeedback({ kind, pile, id: ++nextId.current });
     if (kind !== "reaction") playSound(kind);
     else if (view.reaction.notice?.outcome === "empty-pile") playSound("penalty");
-    else if (view.reaction.notice?.outcome === "played" && view.reaction.notice.playerId !== playerId) playSound("reaction");
-  }, [clockVersion, playSound, playerId, roundNumber, view]);
+  }, [clockVersion, playSound, roundNumber, view]);
 
   return feedback;
 }

@@ -24,11 +24,15 @@ export function recordCardMove(state: GameState, move: PublicCardMove, now: numb
   return { id: (state.cardMotion?.id ?? 0) + 1, at: now, move };
 }
 
+function handPoints(cards: Card[]) {
+  return cards.reduce((sum, card) => sum + getCardValue(card), 0);
+}
+
 export function finishRound(state: GameState, now: number, emptyHandPlayerId: string | null = null): GameState {
   if (state.phase !== "playing") return state;
   const baseScores = state.players.map(({ id, cards }) => ({
     id,
-    points: cards.reduce((sum, card) => sum + getCardValue(card), 0),
+    points: handPoints(cards),
   }));
   const dutchAnnouncerId = state.dutch?.announcerId ?? null;
   const announcerPoints = baseScores.find(({ id }) => id === dutchAnnouncerId)?.points;
@@ -86,8 +90,9 @@ export function getRoundResultView(state: GameState) {
   return {
     ...state.result,
     endThreshold: state.endThreshold,
-    players: state.players.map(({ id, pseudo, roundScore, totalScore, scoreHistory, cards, handLayout }) => ({
-      id, pseudo, roundScore, totalScore, scoreHistory, cards: cards.map(getCardFace), ...(handLayout && { handLayout }),
+    players: state.players.map(({ id, pseudo, roundScore, totalScore, cards, handLayout }) => ({
+      id, pseudo, roundScore, totalScore, penaltyPoints: roundScore - handPoints(cards),
+      cards: cards.map(getCardFace), ...(handLayout && { handLayout }),
     })),
   };
 }

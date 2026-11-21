@@ -43,6 +43,9 @@ test("la variante +1/-1 gère As et Roi et garde le Joker hors de la suite", () 
   assert.equal(matchesDiscard("K", "A", true), true);
   assert.equal(matchesDiscard("Q", "K", true), true);
   assert.equal(matchesDiscard("J", "K", true), false);
+  assert.equal(matchesDiscard("8", "8", true), false);
+  assert.equal(matchesDiscard("8", "8", false), true);
+  assert.equal(matchesDiscard("JOKER", "JOKER", true), false);
   assert.equal(matchesDiscard("JOKER", "A", true), false);
   assert.equal(matchesDiscard("JOKER", "JOKER", false), true);
 });
@@ -60,6 +63,20 @@ test("la première réaction valide remplace la référence et bloque les tentat
   assert.equal(attempt(winner, "charlie", 0, start.reaction.reference), winner);
   assert.equal(attempt(winner, "alice", 0, start.reaction.reference), winner);
   assert.equal(winner.drawPile.length, 1);
+  assert.deepEqual(getTurnView(winner, "alice", 1_001)?.cardMotion?.move, {
+    kind: "reaction", playerId: "bob", slot: 0, face: { rank: "8", suit: "spades" },
+  });
+});
+
+test("le même rang avec +1/-1 conserve la défausse et ajoute une pénalité", () => {
+  const start = setup(
+    [[card("a-a", "A")], [card("b-8", "8", "hearts")], [card("c-3", "3")]],
+    card("top", "8"), [card("penalty", "7")], { plusMinusOne: true }
+  );
+  const penalized = attempt(start, "bob", 0);
+  assert.equal(penalized.discardPile, start.discardPile);
+  assert.deepEqual(penalized.players[1].cards.map(({ id }) => id), ["b-8", "penalty"]);
+  assert.equal(penalized.reaction.notice?.outcome, "penalty");
 });
 
 test("la carte de référence reste visible après un recyclage de la défausse", () => {
@@ -69,7 +86,8 @@ test("la carte de référence reste visible après un recyclage de la défausse"
   );
   const attempt = { kind: "reaction", position: 0, reference: start.reaction.reference, handVersion: 0 };
   const changed = playTurn(start, "bob", 1, attempt, 1_000);
-  assert.deepEqual(playTurn(start, "bob", 1, attempt, 61_000), changed);
+  assert.deepEqual(playTurn(start, "bob", 1, attempt, 61_000),
+    { ...changed, cardMotion: { ...changed.cardMotion!, at: 61_000 } });
   assert.equal(changed.discardPile.at(-1)?.id, "b-8");
   assert.equal(playTurn(changed, "alice", 1,
     { kind: "draw", source: "discard", reference: start.reaction.reference }, 1_001), changed);
@@ -171,4 +189,6 @@ test("la dernière carte met fin à la manche et un autre score nul gagne", () =
   assert.deepEqual(result.players.map(({ roundScore, totalScore }) => [roundScore, totalScore]),
     [[0, 0], [10, 10], [12, 12]]);
   assert.deepEqual(getRoundResultView(result)?.winnerIds, ["alice"]);
+  assert.deepEqual(getRoundResultView(result)?.players.map(({ penaltyPoints }) => penaltyPoints), [0, 10, 0]);
+  assert.equal(result.cardMotion?.move.kind, "reaction");
 });

@@ -4,6 +4,7 @@ import { GAME_CONFIG } from "../config/gameConfig";
 import type { useHubPeers } from "../network/useHubPeers";
 import type { GameState } from "./gameTypes";
 import { getRoundResultView, type RoundResultView } from "./hands";
+import { getMemorizedCards, memorizeCard, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
   beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn, TURN_DURATION_MS,
@@ -14,7 +15,8 @@ import type { GameVariants } from "./variants";
 type SetupPlayers = Array<{ id: string; pseudo: string; cardCount: number }>;
 type RoundView = { roundNumber: number; clockVersion: number; remainingMs: number | null } & (
   | { phase: "waiting" }
-  | { phase: "transition" | "dealing" | "memorization"; players: SetupPlayers; sixCards: boolean }
+  | { phase: "transition" | "dealing"; players: SetupPlayers; sixCards: boolean }
+  | { phase: "memorization"; players: SetupPlayers; sixCards: boolean; memorized: MemorizedCard[] }
   | { phase: "playing"; turn: TurnView }
   | { phase: "results"; result: RoundResultView; cardMotion: CardMotionView | null }
 );
@@ -72,12 +74,14 @@ function projectRound(
     const result = getRoundResultView(state);
     return result && { ...base, phase: "results", result, cardMotion: getCardMotionView(state, now) };
   }
-  return {
+  const setup = {
     ...base,
-    phase: state.phase,
     sixCards: state.variants.sixCards,
     players: state.players.map(({ id, pseudo, cards }) => ({ id, pseudo, cardCount: cards.length })),
   };
+  return state.phase === "memorization"
+    ? { ...setup, phase: state.phase, memorized: getMemorizedCards(state, viewer) }
+    : { ...setup, phase: state.phase };
 }
 
 function readRoundView(value: unknown): RoundView | null {
@@ -90,7 +94,8 @@ function readRoundView(value: unknown): RoundView | null {
   if (view.phase === "results") {
     return Array.isArray(view.result?.players) && Array.isArray(view.result.gameWinnerIds) ? view : null;
   }
-  return Array.isArray(view.players) && typeof view.sixCards === "boolean" ? view : null;
+  return Array.isArray(view.players) && typeof view.sixCards === "boolean" &&
+    (view.phase !== "memorization" || Array.isArray(view.memorized)) ? view : null;
 }
 
 function acceptRoundView(current: ReceivedView | null, view: RoundView, receivedAt: number): ReceivedView {
@@ -163,6 +168,13 @@ export function useRoundTurn({
   const receive = useCallback((senderId: string, message: { type: unknown }) => {
     if (isHost && message.type === "round-sync") {
       if (members.some(({ id, connected }) => id === senderId && connected)) sendView(senderId);
+    } else if (!paused && isHost && message.type === "memorize") {
+      const request = message as Partial<MemorizeRequest>;
+      if (request.clockVersion !== clockVersion) return;
+      updateHostRound(hubId, (state, currentMembers) => state.roundNumber === request.roundNumber &&
+        currentMembers.some(({ id, connected }) => id === senderId && connected)
+        ? memorizeCard(state, senderId, request.position, performance.now(), state.phaseDeadline ?? firstDeadline) : state
+      );
     } else if (!paused && isHost && message.type === "turn-action") {
       const request = message as Partial<TurnRequest>;
       if (request.clockVersion !== clockVersion) return;
@@ -176,7 +188,7 @@ export function useRoundTurn({
       const receivedAt = performance.now();
       setReceived((current) => acceptRoundView(current, view, receivedAt));
     }
-  }, [clockVersion, hostId, hubId, isHost, members, paused, sendView, updateHostRound]);
+  }, [clockVersion, firstDeadline, hostId, hubId, isHost, members, paused, sendView, updateHostRound]);
 
   const scene = isHost
     ? hostRound && projectRound(hostRound, playerId, now, firstDeadline, clockVersion)
@@ -192,6 +204,19 @@ export function useRoundTurn({
   const roundNumber = scene?.roundNumber ?? 0;
   const finalMotion = scene?.phase === "results" && scene.cardMotion &&
     (isHost || (received?.receivedAt ?? 0) + scene.cardMotion.remainingMs > now) ? scene.cardMotion : null;
+
+  function memorize(position: number) {
+    const time = performance.now();
+    if (paused || waitingForClock || scene?.phase !== "memorization" || deadline === null || time >= deadline) return false;
+    if (!isHost) {
+      const request: MemorizeRequest = { type: "memorize", roundNumber, clockVersion, position };
+      return send(hostId, request);
+    }
+    updateHostRound(hubId, (state) => state.roundNumber === roundNumber
+      ? memorizeCard(state, playerId, position, time, state.phaseDeadline ?? firstDeadline) : state
+    );
+    return true;
+  }
 
   function dispatch(action: TurnAction) {
     if (!view) return;
@@ -225,6 +250,6 @@ export function useRoundTurn({
       startNextRound(state, roundNumber, currentMembers, performance.now()));
   }
 
-  return { scene, deadline, view, finalMotion, remaining, canPlay, canReact, receive, act, react,
+  return { scene, deadline, view, finalMotion, remaining, canPlay, canReact, receive, memorize, act, react,
     canStartNext, toggleVariant, startNext, waitingForClock };
 }

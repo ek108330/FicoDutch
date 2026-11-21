@@ -36,6 +36,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await targetCard(guest, 1, bob).click();
     await expect(guest.locator(".position-bottom .playing-card[data-selected=true]")).toHaveCount(1);
     await expect(host.locator(".position-top .playing-card[data-exchange-selected=true]")).toHaveCount(1);
+    await expect(host.locator(".position-top .playing-card[data-exchange-selected=true]")).toHaveCSS("background-color", "rgb(242, 206, 103)");
     await expect(faceUpHands(guest)).toHaveCount(0);
     await expect(faceUpHands(host)).toHaveCount(0);
     await expectTableFits(guest);

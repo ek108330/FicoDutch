@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { HubPlayer } from "../../../shared/hubTypes";
-import {
-  memorizationLimit, revealMemorizedCards,
-  type MemorizedCard, type MemorizeRequest, type MemorizeResponse,
-} from "../game/memorization";
+import { memorizationLimit } from "../game/memorization";
 import type { CardTarget, GameState } from "../game/gameTypes";
 import { useRoundTurn, type UpdateHostRound } from "../game/useRoundTurn";
 import type { useHubPeers } from "../network/useHubPeers";
@@ -34,8 +31,8 @@ type RoundScreenProps = {
   pause: { reason: "host" | "local"; deadline?: number } | null;
 };
 
-type Memorization = { roundNumber: number; selected: number[]; revealed: MemorizedCard[] };
-const emptySelection: Memorization = { roundNumber: 0, selected: [], revealed: [] };
+type Memorization = { roundNumber: number; chosen: number[]; visible: number[] };
+const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] };
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
@@ -44,7 +41,6 @@ export default function RoundScreen({
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
   const [memory, setMemory] = useState<Memorization>(emptySelection);
-  const requestId = useRef(0);
   const dealtRound = useRef(0);
   const visibleMemory = useRef(0);
   const paused = pause !== null;
@@ -53,8 +49,10 @@ export default function RoundScreen({
   const { scene, deadline, receive: receiveTurn } = turn;
   const phase = scene?.phase;
   const roundNumber = scene?.roundNumber ?? 0;
-  const selected = memory.roundNumber === roundNumber ? memory.selected : emptySelection.selected;
-  const revealed = memory.roundNumber === roundNumber ? memory.revealed : emptySelection.revealed;
+  const localMemory = memory.roundNumber === roundNumber ? memory : emptySelection;
+  const memorized = scene?.phase === "memorization" ? scene.memorized : [];
+  const chosen = [...new Set([...memorized.map(({ position }) => position), ...localMemory.chosen])];
+  const revealed = memorized.filter(({ position }) => localMemory.visible.includes(position));
   const limit = memorizationLimit(scene?.phase === "memorization" && scene.sixCards);
   const memorizing = phase === "memorization" && turn.remaining > 0;
   const connectionReady = playerId === hostId ? !!hostRound : hostConnected;
@@ -64,7 +62,7 @@ export default function RoundScreen({
   const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && canLeave &&
     (phase === "memorization" || phase === "playing");
   const feedback = useCardFeedback(
-    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playerId, playSound,
+    !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playSound,
   );
   const soundEmoji = useCallback(() => playSound("emoji"), [playSound]);
   const { choose: chooseEmoji, receive: receiveEmoji, visible: tableEmojis } = useTableEmojis({
@@ -90,79 +88,29 @@ export default function RoundScreen({
     return () => window.clearInterval(interval);
   }, [ticking]);
 
-  useEffect(() => {
-    if (paused || turn.waitingForClock || phase !== "memorization" || deadline === null) return;
-    const timer = window.setTimeout(() => setMemory(emptySelection), Math.max(0, Math.ceil(deadline - performance.now())));
-    return () => window.clearTimeout(timer);
-  }, [deadline, paused, phase, roundNumber, turn.waitingForClock]);
-
   useEffect(() => subscribe((senderId, data) => {
     if (!data || typeof data !== "object" || !("type" in data)) return;
-    if (data.type === "turn-action" || data.type === "round-view" || data.type === "round-sync") {
-      receiveTurn(senderId, data);
-      return;
-    }
     if (data.type === "table-emoji" || data.type === "table-emoji-request") {
       receiveEmoji(senderId, data);
-      return;
+    } else {
+      receiveTurn(senderId, data);
     }
-    const time = performance.now();
-    if (paused || turn.waitingForClock || phase !== "memorization" || deadline === null || time >= deadline ||
-        !("roundNumber" in data) || data.roundNumber !== roundNumber ||
-        !("clockVersion" in data) || data.clockVersion !== clockVersion) return;
-
-    if (hostRound && data.type === "memorize" && hostRound.players.some(({ id, hasLeft }) => id === senderId && !hasLeft) &&
-        members.some(({ id, connected }) => id === senderId && connected)) {
-      const request = data as Partial<MemorizeRequest>;
-      if (typeof request.requestId !== "number" || !Number.isSafeInteger(request.requestId)) return;
-      const response: MemorizeResponse = {
-        type: "memorized",
-        roundNumber,
-        clockVersion,
-        requestId: request.requestId,
-        cards: revealMemorizedCards(hostRound, senderId, request.positions, time, deadline),
-      };
-      send(senderId, response);
-    } else if (!hostRound && senderId === hostId && data.type === "memorized") {
-      const response = data as Partial<MemorizeResponse>;
-      const cards = response.cards;
-      if (response.requestId === requestId.current && Array.isArray(cards)) {
-        setMemory((current) => current.roundNumber === roundNumber ? { ...current, revealed: cards } : current);
-      }
-    }
-  }), [clockVersion, deadline, hostId, hostRound, members, paused, phase, receiveEmoji, receiveTurn, roundNumber,
-    send, subscribe, turn.waitingForClock]);
+  }), [receiveEmoji, receiveTurn, subscribe]);
 
   useEffect(() => {
     if (!paused && playerId !== hostId && hostConnected) send(hostId, { type: "round-sync" });
   }, [hostConnected, hostId, paused, playerId, send]);
 
-  function choose(positions: number[]) {
-    const time = performance.now();
-    if (deadline === null || time >= deadline) return;
-    const id = ++requestId.current;
-
-    if (positions.length && !hostRound) {
-      const request: MemorizeRequest = { type: "memorize", roundNumber, clockVersion, requestId: id, positions };
-      if (!send(hostId, request)) {
-        setMemory(emptySelection);
-        return;
-      }
-    }
-
-    setMemory({
-      roundNumber,
-      selected: positions,
-      revealed: hostRound
-        ? revealMemorizedCards(hostRound, playerId, positions, time, deadline)
-        : revealed.filter(({ position }) => positions.includes(position)),
-    });
-  }
-
   function toggle(position: number) {
-    if (!canSelect) return;
-    if (selected.includes(position)) choose(selected.filter((card) => card !== position));
-    else if (selected.length < limit) choose([...selected, position]);
+    if (!canSelect || deadline === null || performance.now() >= deadline) return;
+    const { visible } = localMemory;
+    if (visible.includes(position)) {
+      setMemory({ roundNumber, chosen, visible: visible.filter((card) => card !== position) });
+      return;
+    }
+    if (!chosen.includes(position) && chosen.length >= limit) return;
+    if (!memorized.some((card) => card.position === position) && !turn.memorize(position)) return;
+    setMemory({ roundNumber, chosen: chosen.includes(position) ? chosen : [...chosen, position], visible: [...visible, position] });
   }
 
   function gameActions(action?: ReactNode) {
@@ -248,7 +196,7 @@ export default function RoundScreen({
     );
   }
 
-  const memorization = canSelect ? { revealed, selected, limit, toggle } : undefined;
+  const memorization = canSelect ? { revealed, chosen, limit, toggle } : undefined;
   const turnControls = turn.view ? { view: turn.view, canPlay: turn.canPlay, act: turn.act } : null;
   const power = turnControls?.view.power;
   const localHand = turnControls?.view.players.find(({ id }) => id === playerId);
@@ -314,7 +262,8 @@ export default function RoundScreen({
                   </div>
                   <p>{canSelect ? `Consulte jusqu’à ${limit} de tes cartes.` : "Connexion à l’hôte en cours…"}</p>
                   {canSelect && (
-                    <button type="button" onClick={() => choose([])} disabled={selected.length === 0}>
+                    <button type="button" onClick={() => setMemory({ roundNumber, chosen, visible: [] })}
+                      disabled={localMemory.visible.length === 0}>
                       Masquer mes cartes
                     </button>
                   )}

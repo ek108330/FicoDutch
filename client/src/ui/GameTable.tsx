@@ -7,7 +7,7 @@ import { getHandLayout, type HandLayout } from "../game/handLayout";
 import type { MemorizedCard } from "../game/memorization";
 import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
 import type { TurnView } from "../game/turn";
-import PlayingCard from "./PlayingCard";
+import PlayingCard, { CardFaceMark } from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
 import { animatePublicMove, flyCard } from "./cardAnimations";
 import type { PlayGameSound } from "./useCardFeedback";
@@ -42,7 +42,7 @@ type GameTableProps = {
   };
   memorization?: {
     revealed: MemorizedCard[];
-    selected: number[];
+    chosen: number[];
     limit: number;
     toggle: (position: number) => void;
   };
@@ -77,12 +77,13 @@ export default function GameTable({
   const center = useRef<HTMLDivElement>(null);
   const table = useRef<HTMLDivElement>(null);
   const lastMotion = useRef(0);
+  const publicMove = cardMotion?.move.kind === "reaction" && cardMotion.move.playerId === localPlayerId ? undefined : cardMotion;
   useLayoutEffect(() => {
-    if (!cardMotion || !table.current || cardMotion.id <= lastMotion.current) return;
-    lastMotion.current = cardMotion.id;
-    animatePublicMove(table.current, cardMotion.move);
-    playSound(cardMotion.move.kind);
-  }, [cardMotion, playSound]);
+    if (!publicMove || !table.current || publicMove.id <= lastMotion.current) return;
+    lastMotion.current = publicMove.id;
+    animatePublicMove(table.current, publicMove.move);
+    playSound(publicMove.move.kind);
+  }, [publicMove, playSound]);
 
   function replaceCard(position: number) {
     const target = center.current?.querySelector(".discard-slot");
@@ -124,6 +125,7 @@ export default function GameTable({
         const emoji = tableEmojis?.get(player.id);
         const layout = getHandLayout(player.cardCount, player.handLayout);
         const handStyle = { "--hand-columns": layout.columns } as CSSProperties;
+        const played = publicMove?.move.kind === "reaction" && publicMove.move.playerId === player.id ? publicMove.move : undefined;
         return (
           <div className={`table-player position-${position}${active}`} key={player.id} data-hand-player={player.id}>
             {emoji && <span className="table-emoji" role="status"
@@ -160,13 +162,19 @@ export default function GameTable({
                       onToggle={cardAction}
                       reaction={react && { scope: react.scope, center, play: () => react.play(index), playSound }}
                       actionLabel={actionLabel}
-                      selected={selected}
+                      selected={selected || !!(ownSelection && revealed)}
                       exchangeSelected={exchangeSelected}
-                      disabled={ownSelection && ownSelection.selected.length >= ownSelection.limit
-                        && !ownSelection.selected.includes(index)}
+                      disabled={ownSelection && ownSelection.chosen.length >= ownSelection.limit
+                        && !ownSelection.chosen.includes(index)}
                     />
                   );
                 })}
+                {played && (
+                  <span className="reaction-origin" aria-hidden="true"
+                    style={{ gridColumn: Math.floor(played.slot / 2) + 1, gridRow: played.slot % 2 + 1 }}>
+                    <CardFaceMark face={played.face} />
+                  </span>
+                )}
               </div>
               {position === "bottom" && drawnCard && <DrawnCard face={drawnCard} center={center} />}
             </div>

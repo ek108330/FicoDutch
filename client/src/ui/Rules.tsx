@@ -70,9 +70,8 @@ function Rules({ onBack, titleId }: RulesProps) {
             commence ensuite.
           </p>
           <ul>
-            <li>Chaque joueur peut regarder 2 de ses cartes à la fois.</li>
-            <li>Avec 6 cartes, il peut en regarder 3 à la fois.</li>
-            <li>Il peut changer les cartes regardées pendant les 15 secondes.</li>
+            <li>Chaque joueur peut choisir 2 cartes à regarder, ou 3 avec la variante 6 cartes.</li>
+            <li>Il peut masquer et revoir les cartes choisies pendant les 15 secondes.</li>
             <li>Les cartes se cachent automatiquement à la fin du délai.</li>
             <li>Ne pas regarder toutes les cartes autorisées n'entraîne aucune pénalité.</li>
             <li>Chaque joueur ne peut voir que ses propres cartes pendant cette phase.</li>
@@ -161,8 +160,9 @@ function Rules({ onBack, titleId }: RulesProps) {
             elles restent réservées jusqu'à la décision du joueur.
           </p>
           <p>
-            La variante +1 / -1 autorise également une réaction avec
-            une carte de valeur immédiatement supérieure ou inférieure.
+            La règle de base demande une carte du même rang.
+            Avec la variante +1 / -1, seules les cartes de rang
+            immédiatement supérieur ou inférieur peuvent réagir.
             La suite numérique est circulaire :
             As, 2, 3, 4, 5, 6, 7, 8, 9, 10, Valet, Dame, Roi, As.
             Les deux rois ont la valeur numérique 13 pour cette variante.
@@ -254,7 +254,7 @@ function Rules({ onBack, titleId }: RulesProps) {
           <ul>
             <li><strong>6 cartes :</strong> chaque joueur reçoit 6 cartes et peut en regarder 3 pendant la mémorisation.</li>
             <li><strong>Pose infinie :</strong> les réactions peuvent s'enchaîner sans limite.</li>
-            <li><strong>+1 / -1 :</strong> les cartes de valeur immédiatement supérieure ou inférieure peuvent également réagir.</li>
+            <li><strong>+1 / -1 :</strong> seules les cartes de rang immédiatement supérieur ou inférieur peuvent réagir.</li>
             <li><strong>Joker+ :</strong> deux Jokers sont ajoutés au paquet.</li>
           </ul>
           <p>

@@ -111,6 +111,12 @@ for (const count of [4, 5, 6]) {
           await expect(hands).toHaveCount(6);
           for (const hand of await hands.all()) await expect(hand).toBeInViewport({ ratio: 1 });
           await expectScreenFits(host);
+          const facesFit = await host.locator(".result-cards .card-face").evaluateAll((faces) => faces.every((face) => {
+            const text = face.getBoundingClientRect();
+            const card = face.parentElement!.getBoundingClientRect();
+            return text.top >= card.top && text.bottom <= card.bottom && text.left >= card.left && text.right <= card.right;
+          }));
+          expect(facesFit).toBe(true);
           await expect(host.getByRole("region", { name: "Main de Invite5" }).getByRole("img", { name: /Annonce Dutch/ })).toBeVisible();
           const variants = host.getByRole("group", { name: "Variantes", exact: true }).getByRole("button");
           const rows = await variants.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
