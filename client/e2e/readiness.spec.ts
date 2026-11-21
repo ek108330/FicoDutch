@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { io } from "socket.io-client";
-import { closeSettings, drawDeck, fixDeckOrder, openLobby, openSettings, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, closeSettings, drawDeck, fixDeckOrder, openLobby, openSettings, expectLocalTurn } from "./tableFlow";
 
 test("la signalisation accepte l’origine autorisée et refuse une autre origine", async ({ request, baseURL }) => {
   const handshake = "http://127.0.0.1:15300/socket.io/?EIO=4&transport=polling";
@@ -77,7 +77,7 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await openSettings(guest);
     await sound.click();
     await closeSettings(guest);
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(guest);
     await expect(guest.locator(".card-feedback:not(.feedback-draw)")).toHaveCount(1);
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", String(tones + 1));
   } finally {

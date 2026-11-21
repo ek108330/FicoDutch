@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { activeTurn, discard, discardDrawn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const announce = (page: Page) => page.getByRole("button", { name: "Annoncer Dutch en fin de tour" });
 
@@ -15,13 +15,13 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await announce(guest).click();
     await expect(announce(guest)).toHaveAttribute("aria-pressed", "true");
-    await expect(host.getByText(/a annoncé Dutch/)).toHaveCount(0);
+    await expect(host.getByRole("img", { name: "BobDutch a annoncé Dutch" })).toHaveCount(0);
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("01-annonce-preparee.png") });
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(guest);
 
     for (const page of [host, guest]) {
-      await expect(page.getByText("BobDutch a annoncé Dutch. Dernier tour.")).toBeVisible();
+      await expect(page.locator(".player-name").getByRole("img", { name: "BobDutch a annoncé Dutch" })).toBeVisible();
       await expect(announce(page)).toHaveCount(0);
     }
     await expectLocalTurn(host);
@@ -53,6 +53,87 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     }
     await guest.setViewportSize({ width: 844, height: 390 });
     await guest.screenshot({ path: testInfo.outputPath("04-resultats-dutch-paysage.png"), fullPage: true });
+  } finally {
+    await guest.close();
+  }
+});
+
+test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(45_000);
+  await fixDeckOrder(host);
+  await host.setViewportSize({ width: 390, height: 844 });
+  await host.addInitScript(() => {
+    localStorage.setItem("ficodutch-game-sound", "on");
+    const ramp = AudioParam.prototype.exponentialRampToValueAtTime;
+    AudioParam.prototype.exponentialRampToValueAtTime = function (value, time) {
+      if (value === 1_045) document.documentElement.dataset.dutchSound = "heard";
+      return ramp.call(this, value, time);
+    };
+  });
+  const guest = await browser.newPage({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } });
+  try {
+    const start = await openTwoPlayerHub(host, guest, "AliceGeste", "BobGeste");
+    await host.getByRole("button", { name: "+1 / -1", exact: true }).click();
+    await expect(guest.getByRole("button", { name: "+1 / -1", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await start.click();
+    await expectLocalTurn(guest, 17_000);
+    const dutch = guest.locator(".position-bottom .player-name").getByRole("button", { name: "Annoncer Dutch en fin de tour" });
+    await dutch.tap();
+    await expect(dutch).toHaveAttribute("aria-pressed", "true");
+    await drawDeck(guest).click();
+    const cdp = await guest.context().newCDPSession(guest);
+    try {
+      const card = drawnCard(guest);
+      await card.evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      });
+      const from = (await card.boundingBox())!;
+      const to = (await guest.locator(".discard-slot").boundingBox())!;
+      const origin = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+      const target = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [origin] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 35, y: 150 }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect(card).toBeVisible();
+      await expect(discard(guest)).toHaveAccessibleName("Défausse vide");
+      await card.evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      });
+      await expect(guest.getByRole("button", { name: "Défausser la carte tirée" })).toHaveCount(0);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [origin] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [target] });
+      await expect(guest.locator(".discard-slot")).toHaveAttribute("data-drop-target", "true");
+      await guest.screenshot({ path: testInfo.outputPath("01-glisser-vers-defausse.png") });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    } finally {
+      await cdp.detach();
+    }
+    const announced = host.getByRole("img", { name: "BobGeste a annoncé Dutch" });
+    await expect(announced).toBeVisible();
+    await expect(announced).toHaveCSS("animation-name", "dutch-announcement");
+    await expect(host.locator("html")).toHaveAttribute("data-dutch-sound", "heard");
+    await host.screenshot({ path: testInfo.outputPath("02-annonce-dutch.png") });
+    await expectLocalTurn(host);
+    await drawDeck(host).click();
+    const drawn = drawnCard(host);
+    await drawn.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const from = (await drawn.boundingBox())!;
+    const to = (await host.getByRole("button", { name: "Remplacer la carte 4", exact: true }).boundingBox())!;
+    await host.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await host.mouse.down();
+    await host.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+    await expect(host.getByRole("button", { name: "Remplacer la carte 4", exact: true })).toHaveAttribute("data-drop-target", "true");
+    await host.mouse.up();
+    await expect(activeTurn(guest)).toHaveText("Dernières réactions");
+    await expect(guest.getByRole("progressbar", { name: "Temps pour réagir" })).toHaveAttribute("aria-valuemax", "3");
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");
+    await guest.locator('.position-bottom [data-hand-slot="3"]').click({ clickCount: 3 });
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");
+    await expect(guest.locator(".position-bottom .playing-card")).toHaveCount(3);
+    await guest.screenshot({ path: testInfo.outputPath("03-derniere-reaction.png") });
+    await expect(guest.getByRole("region", { name: "Main de BobGeste" })).toContainText("30 +10");
   } finally {
     await guest.close();
   }

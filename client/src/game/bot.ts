@@ -1,7 +1,7 @@
 import { getCardValue } from "./cards.ts";
 import type { BotObservation, GamePlayer, GameState, Power, PowerKind } from "./gameTypes";
 import { getHandLayout } from "./handLayout.ts";
-import { canTargetCard, getPowerView, isExchangeTargetLocked } from "./powers.ts";
+import { canTargetCard, getPowerView, isPowerTargetLocked } from "./powers.ts";
 import { canReactToDiscard, matchesDiscard } from "./reactions.ts";
 import { playTurn, type TurnAction } from "./turn.ts";
 
@@ -45,8 +45,8 @@ function playPower(state: GameState, bot: GamePlayer, opponents: GamePlayer[], w
   if (kind === "give-card") {
     return opponents.length ? { kind: "power-player", playerId: opponents[0].id } : pass;
   }
-  if (kind === "look-own") return !selected.length && bot.cards.length ? chooseCard(bot, worst) : pass;
-  if (kind === "look-other" && selected.length) return pass;
+  if (kind === "look-own") return selected.length ? { kind: "power-hide" } : bot.cards.length ? chooseCard(bot, worst) : pass;
+  if (kind === "look-other" && selected.length) return { kind: "power-hide" };
   if (kind === "look-and-swap" && selected.length === 2) {
     const view = getPowerView(state, power, true).selection;
     const [own, other] = view?.revealed ?? [];
@@ -72,7 +72,7 @@ export function getBotStep(state: GameState): BotStep | null {
     for (const bot of bots) {
       if (!canReactToDiscard(state, bot.id)) continue;
       const position = bot.cards.findIndex((card) => matchesDiscard(card.rank, discard.rank, state.variants.plusMinusOne) &&
-        !isExchangeTargetLocked(turn.power, card.id, state.dutch?.announcerId));
+        !isPowerTargetLocked(turn.power, card.id, state.dutch?.announcerId));
       if (position >= 0) return {
         playerId: bot.id, delay: 1_050,
         action: { kind: "reaction", reference: state.reaction.reference, position, handVersion: bot.handVersion },
@@ -80,7 +80,7 @@ export function getBotStep(state: GameState): BotStep | null {
     }
   }
 
-  const bot = bots.find(({ id }) => id === state.currentPlayerId);
+  const bot = turn.finalReaction ? undefined : bots.find(({ id }) => id === state.currentPlayerId);
   if (!bot) return null;
   const playerId = bot.id;
   const opponents = state.players.filter(({ id, hasLeft }) => id !== playerId && !hasLeft)

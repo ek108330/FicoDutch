@@ -59,9 +59,23 @@ export async function expectTableFits(page: Page) {
 
 export const drawDeck = (page: Page) => page.getByRole("button", { name: "Piocher dans la pioche" });
 export const drawnCard = (page: Page) => page.getByRole("img", { name: /^Carte tirée, / });
-export const discard = (page: Page) => page.getByRole("img", { name: /^Défausse, / });
+export const discard = (page: Page) => page.locator(".pile-slot").filter({ has: page.locator(".discard-slot") });
 export const activeTurn = (page: Page) => page.getByRole("region", { name: "Tour de jeu" }).getByRole("status");
 export const turnClock = (page: Page) => page.getByRole("progressbar", { name: "Temps restant" });
+
+export async function discardDrawn(page: Page) {
+  const card = drawnCard(page);
+  await card.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const from = (await card.boundingBox())!;
+  const to = (await page.locator(".discard-slot").boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await expect(card).toHaveCount(0);
+}
 
 export async function expectLocalTurn(page: Page, timeout?: number) {
   const pseudo = (await page.locator(".position-bottom .player-name").innerText()).replace(/ \(Moi\)$/, "");

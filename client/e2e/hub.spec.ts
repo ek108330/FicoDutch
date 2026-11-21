@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 for (const cardsPerPlayer of [4, 6]) {
   test(`mémorisation à ${cardsPerPlayer} cartes pour l’hôte et l’invité`, async ({
@@ -82,7 +82,7 @@ for (const cardsPerPlayer of [4, 6]) {
       await Promise.all([host, guest].map(async (page) => {
         await expect(page.getByRole("region", { name: "Tour de jeu" })).toBeVisible({ timeout: 17_000 });
         await expect(page.locator(".playing-card.face-up")).toHaveCount(0);
-        await expect(page.locator(".position-bottom").getByRole("button")).toHaveCount(0);
+        await expect(page.locator(".position-bottom .player-cards").getByRole("button")).toHaveCount(0);
       }));
       if (cardsPerPlayer === 6) {
         await host.screenshot({ path: testInfo.outputPath("04-cartes-masquees.png") });
@@ -101,7 +101,7 @@ for (const cardsPerPlayer of [4, 6]) {
         await expectTableFits(first);
         await first.screenshot({ path: testInfo.outputPath("05-pioche-ordinateur.png") });
 
-        await first.getByRole("button", { name: "Défausser la carte tirée" }).click();
+        await discardDrawn(first);
         await expectLocalTurn(second);
         for (const page of [first, second]) {
           await expect(discard(page)).toHaveAccessibleName(`Défausse, ${firstFace}`);

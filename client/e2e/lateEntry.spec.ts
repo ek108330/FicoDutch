@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
@@ -14,7 +14,7 @@ async function playTurn(page: Page, announceDutch = false) {
     await announce.click();
     await expect(announce).toHaveAttribute("aria-pressed", "true");
   }
-  await page.getByRole("button", { name: "Défausser la carte tirée" }).click();
+  await discardDrawn(page);
 }
 
 test("un nouvel invité attend, rejoint la manche suivante et hérite du plus haut total", async ({

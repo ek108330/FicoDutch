@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { drawDeck, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, drawDeck, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const next = (page: Page) => page.getByRole("button", { name: "Lancer la manche suivante" });
 const resultTitle = (page: Page) => page.locator(".result-screen").getByRole("heading", { level: 1 });
@@ -26,10 +26,10 @@ async function finishWithDutch(first: Page, last: Page) {
   const announce = first.getByRole("button", { name: "Annoncer Dutch en fin de tour" });
   await announce.click();
   await expect(announce).toHaveAttribute("aria-pressed", "true");
-  await first.getByRole("button", { name: "Défausser la carte tirée" }).click();
+  await discardDrawn(first);
   await expectLocalTurn(last);
   await drawDeck(last).click();
-  await last.getByRole("button", { name: "Défausser la carte tirée" }).click();
+  await discardDrawn(last);
 }
 
 test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, browser, baseURL }, testInfo) => {

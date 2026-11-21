@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
@@ -84,7 +84,7 @@ for (const count of [4, 5, 6]) {
 
         await drawDeck(last).click();
         await last.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
-        await last.getByRole("button", { name: "Défausser la carte tirée" }).click();
+        await discardDrawn(last);
         await expectLocalTurn(host);
         await drawDeck(host).click();
         await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
@@ -98,7 +98,7 @@ for (const count of [4, 5, 6]) {
           await expectLocalTurn(guest);
           const label = await activeTurn(guest).textContent();
           await drawDeck(guest).click();
-          await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+          await discardDrawn(guest);
           const pass = guest.getByRole("button", { name: "Passer le pouvoir" });
           await expect.poll(async () => (await activeTurn(guest).allTextContents())[0] !== label || await pass.isVisible()).toBe(true);
           if (await pass.isVisible()) await pass.click();

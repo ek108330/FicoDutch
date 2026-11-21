@@ -75,19 +75,32 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await playSpecialCard(guest, 3, "8");
     await expect(targetCard(guest, 1, alice)).toHaveCount(0);
     await targetCard(guest, 1, bob).click();
-    await expect(guest.locator(".position-bottom .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
+    const hideOwn = guest.getByRole("button", { name: "Retourner la carte 1 de BobPouvoir, Dame de pique" });
+    await expect(hideOwn).toBeVisible();
     await expect(faceUpHands(host)).toHaveCount(0);
-    await guest.getByRole("button", { name: "Terminer le pouvoir" }).click();
+    const lookClock = (page: Page) => page.getByRole("progressbar", { name: "Temps de consultation de la carte" });
+    await expect(lookClock(host)).toHaveAttribute("aria-valuemax", "10");
+    await expect(guest.getByRole("button", { name: /Terminer le pouvoir|Passer le pouvoir/ })).toHaveCount(0);
+    await hideOwn.locator(".power-card-turn").evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    await guest.screenshot({ path: testInfo.outputPath("07-huit-carte-retournee.png") });
+    await hideOwn.click();
+    await expect(lookClock(host)).toHaveCount(0);
 
     await playSpecialCard(host, 3, "9");
     await expect(targetCard(host, 1, alice)).toHaveCount(0);
     await targetCard(host, 1, bob).click();
-    await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
+    await expect(host.getByRole("button", { name: "Retourner la carte 1 de BobPouvoir, Dame de pique" })).toBeVisible();
     await expect(faceUpHands(guest)).toHaveCount(0);
+    await expect(lookClock(guest)).toBeVisible();
+    await expect.poll(async () => Number(await lookClock(guest).getAttribute("aria-valuenow"))).toBeLessThan(10);
+    await guest.screenshot({ path: testInfo.outputPath("08-neuf-carte-cachee-observateur.png") });
     await host.setViewportSize({ width: 844, height: 390 });
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("04-neuf-paysage.png") });
-    await expectLocalTurn(guest, 65_000);
+    await expectLocalTurn(guest, 11_000);
+    await expect(lookClock(guest)).toHaveCount(0);
     await expect(faceUpHands(host)).toHaveCount(0);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 9 de pique");
     await guest.screenshot({ path: testInfo.outputPath("05-apres-expiration.png") });

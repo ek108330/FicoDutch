@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { discard, drawDeck, drawnCard, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 test("la partie démarre avec le relais quand la liaison directe ne répond pas", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(60_000);
@@ -44,7 +44,7 @@ test("la partie démarre avec le relais quand la liaison directe ne répond pas"
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     await guest.screenshot({ path: testInfo.outputPath("03-carte-tiree-a-droite.png") });
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(guest);
     await expectLocalTurn(host);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
     await discard(host).click();

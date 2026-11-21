@@ -3,7 +3,7 @@ import test from "node:test";
 import type { Card, CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import { getRoundResultView } from "../src/game/hands.ts";
-import { beginPlay, expireTurn, getTurnView, playTurn } from "../src/game/turn.ts";
+import { beginPlay, expireTurn, FINAL_REACTION_MS, getTurnView, playTurn } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 import type { GameState, PowerKind } from "../src/game/gameTypes.ts";
 
@@ -66,11 +66,30 @@ test("une égalité au plus bas donne dix points à l’annonceur", () => {
   const start = setup([["4"], ["4"], ["7"]]);
   const announced = discardFromDeck(armDutch(start), "alice", 600);
   const bob = discardFromDeck(announced, "bob", 800);
-  const result = discardFromDeck(bob, "charlie", 1_000);
+  const pending = discardFromDeck(bob, "charlie", 1_000);
+  const result = expireTurn(pending, pending.turn!.number, 1_001 + FINAL_REACTION_MS);
   assert.equal(result.result?.dutchPenalty, true);
   assert.deepEqual(result.players.map(({ roundScore, totalScore }) => [roundScore, totalScore]),
     [[14, 14], [4, 4], [7, 7]]);
   assert.deepEqual(result.result?.winnerIds, ["bob"]);
+});
+
+test("la dernière défausse laisse une fenêtre de réaction fixe de trois secondes avant les scores", () => {
+  const start = setup([["A", "3"], ["4"], ["7"]]);
+  const announced = discardFromDeck(armDutch(start), "alice", 600);
+  const bob = discardFromDeck(announced, "bob", 800);
+  const closing = discardFromDeck(bob, "charlie", 1_000);
+  const deadline = 1_001 + FINAL_REACTION_MS;
+  assert.equal(closing.turn?.deadline, deadline);
+  assert.equal(getTurnView(closing, "charlie", 1_001)?.finalReaction, true);
+  assert.equal(act(closing, "charlie", { kind: "draw", source: "deck" }, 2_000), closing);
+  assert.equal(expireTurn(closing, closing.turn!.number, deadline - 1), closing);
+  const action = { kind: "reaction", position: 1, reference: closing.reaction.reference, handVersion: 0 };
+  assert.equal(act(closing, "alice", action, deadline), closing);
+  const reacted = act(closing, "alice", action, deadline - 1);
+  assert.equal(reacted.players[0].cards.length, 1);
+  assert.equal(reacted.turn?.deadline, deadline);
+  assert.equal(expireTurn(reacted, reacted.turn!.number, deadline).players[0].roundScore, 1);
 });
 
 test("l’annonce attend la résolution du pouvoir du joueur", () => {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const ownCards = (page: Page) => page.locator(".position-bottom .playing-card");
 const reactiveCards = (page: Page) => ownCards(page).and(page.locator("[data-reactable]"));
@@ -45,7 +45,7 @@ async function openReactionRound(host: Page, guest: Page, hostName: string, gues
   await expectLocalTurn(guest, 17_000);
   await expect(reactiveCards(guest)).toHaveCount(0);
   await drawDeck(guest).click();
-  await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+  await discardDrawn(guest);
   await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
 }
 

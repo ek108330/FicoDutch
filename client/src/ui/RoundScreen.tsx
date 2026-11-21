@@ -214,6 +214,7 @@ export default function RoundScreen({
           if (hand) turn.act({ kind: "power-card", target, handVersion: hand.handVersion });
         },
         choosePlayer: (id: string) => turn.act({ kind: "power-player", playerId: id }),
+        hideCard: () => turn.act({ kind: "power-hide" }),
       }
     : undefined;
 
@@ -231,12 +232,18 @@ export default function RoundScreen({
         dealing={phase === "dealing"}
         activePlayerId={turnControls?.view.playerId}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
+        dutchControl={turnControls?.canPlay && turnControls.view.canAnnounceDutch ? {
+          armed: turnControls.view.dutchArmed,
+          toggle: () => turn.act({ kind: "dutch-intent", enabled: !turnControls.view.dutchArmed }),
+        } : undefined}
+        look={power?.lookTarget && turn.remaining > 0 ? { target: power.lookTarget, remaining: turn.remaining } : undefined}
         power={powerControls}
         exchangeTargets={power?.exchangeTargets}
         tableEmojis={emojisEnabled ? tableEmojis : undefined}
         reaction={reaction}
         cardMotion={turn.view?.cardMotion}
         drawnCard={turnControls?.canPlay ? turnControls.view.drawnCard ?? undefined : undefined}
+        onDiscardDrawn={turnControls?.canPlay && turnControls.view.hasDrawn ? () => turn.act({ kind: "discard" }) : undefined}
         botDrawingId={turn.view?.hasDrawn && turn.view.players.some(({ id, isBot }) => id === turn.view?.playerId && isBot)
           ? turn.view.playerId : undefined}
         onReplace={turnControls?.canPlay && !power && turnControls.view.hasDrawn && localHand

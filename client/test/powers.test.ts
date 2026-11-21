@@ -3,7 +3,7 @@ import test from "node:test";
 import { getCardFace, type Card, type CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import type { CardTarget, GameState } from "../src/game/gameTypes.ts";
-import { POWER_DURATION_MS } from "../src/game/powers.ts";
+import { LOOK_DURATION_MS, POWER_DURATION_MS } from "../src/game/powers.ts";
 import { beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 
@@ -38,11 +38,17 @@ for (const [rank, valid, invalid, ownerIndex] of [["8", own, other, 0], ["9", ot
     assert.equal(playTurn(power, "bob", 1, { kind: "power-card", target: valid, handVersion: 0 }, 1_100), power);
 
     const selected = choose(power, valid);
+    const deadline = 1_100 + LOOK_DURATION_MS;
+    assert.equal(selected.turn?.deadline, deadline);
     assert.deepEqual(getTurnView(selected, "alice", 1_200)?.power?.selection?.revealed,
       [{ target: valid, face: getCardFace(power.players[ownerIndex].cards[valid.position]) }]);
     assert.equal(getTurnView(selected, "bob", 1_200)?.power?.selection, null);
+    assert.deepEqual(getTurnView(selected, "bob", 1_200)?.power?.lookTarget, valid);
+    assert.equal(getTurnView(selected, "alice", deadline)?.power?.selection, null);
     assert.equal(choose(selected, { ...valid, position: 2 }), selected);
-    assert.equal(playTurn(selected, "alice", 1, { kind: "power-pass" }, 1_200).currentPlayerId, "bob");
+    assert.equal(playTurn(selected, "alice", 1, { kind: "power-pass" }, 1_200), selected);
+    assert.equal(playTurn(selected, "alice", 1, { kind: "power-hide" }, 1_200).currentPlayerId, "bob");
+    assert.equal(expireTurn(selected, 1, deadline).currentPlayerId, "bob");
   });
 }
 
@@ -95,7 +101,8 @@ test("l’échange du dernier tour est publié même quand la manche se termine"
   const playing = startWithCard("10");
   const finalTurn = { ...playing, dutch: { announcerId: "charlie", remainingPlayerIds: ["alice"] } };
   const state = choose(choose(activate(finalTurn), own), other);
-  assert.equal(state.phase, "results");
+  assert.equal(state.turn?.finalReaction, true);
+  assert.equal(expireTurn(state, 1, state.turn!.deadline).phase, "results");
   assert.deepEqual(getCardMotionView(state, 1_150)?.move, { kind: "swap", targets: [own, other] });
   assert.equal(getCardMotionView(state, 3_000), null);
 });

@@ -4,16 +4,19 @@ import { appendCard, changeHand, recordCardMove } from "./hands.ts";
 import type { CardTarget, GameState, Power, PowerKind, SelectedCard, Turn } from "./gameTypes";
 
 export const POWER_DURATION_MS = 60_000;
+export const LOOK_DURATION_MS = 10_000;
 
 export type PowerAction =
   | { kind: "power-card"; target: CardTarget; handVersion: number }
   | { kind: "power-player"; playerId: string }
   | { kind: "power-swap" }
+  | { kind: "power-hide" }
   | { kind: "power-pass" };
 
 export type PowerView = {
   kind: PowerKind;
   exchangeTargets?: CardTarget[];
+  lookTarget?: CardTarget;
   selection: {
     targets: CardTarget[];
     remaining: number;
@@ -21,6 +24,10 @@ export type PowerView = {
     canSwap: boolean;
   } | null;
 };
+
+export function isLookPower(kind: PowerKind) {
+  return kind === "look-own" || kind === "look-other";
+}
 
 const powersByRank: Partial<Record<CardRank, PowerKind>> = {
   "8": "look-own",
@@ -132,7 +139,9 @@ export function applyPowerAction(
   const { power } = turn;
   if (!power) return null;
 
-  if (action.kind === "power-pass") return { state, complete: true };
+  const looking = isLookPower(power.kind) && power.selected.length === 1;
+  if (action.kind === "power-pass") return looking ? null : { state, complete: true };
+  if (action.kind === "power-hide") return looking ? { state, complete: true } : null;
 
   if (action.kind === "power-player" && power.kind === "give-card" && "playerId" in action) {
     const next = giveCard(state, actorId, action.playerId, now);
@@ -160,12 +169,13 @@ export function applyPowerAction(
     const next = swapCards(state, selected[0], selected[1], now);
     return next && { state: next, complete: true };
   }
-  return { state: { ...state, turn: { ...turn, power: { ...power, selected } } }, complete: false };
+  const deadline = isLookPower(power.kind) ? Math.min(turn.deadline, now + LOOK_DURATION_MS) : turn.deadline;
+  return { state: { ...state, turn: { ...turn, deadline, power: { ...power, selected } } }, complete: false };
 }
 
-export function isExchangeTargetLocked(power: Power | null, cardId: string, protectedId?: string) {
-  return power?.kind === "look-and-swap" && power.selected.length === 2 &&
-    power.selected.every(({ playerId }) => playerId !== protectedId) &&
+export function isPowerTargetLocked(power: Power | null, cardId: string, protectedId?: string) {
+  return power !== null && (isLookPower(power.kind) || (power.kind === "look-and-swap" && power.selected.length === 2 &&
+    power.selected.every(({ playerId }) => playerId !== protectedId))) &&
     power.selected.some((selected) => selected.cardId === cardId);
 }
 
@@ -182,7 +192,8 @@ export function getPowerView(state: GameState, power: Power, canSee: boolean): P
   });
   const targets = available.map(({ target }) => target);
   const exchangeTargets = power.kind === "blind-swap" || power.kind === "look-and-swap" ? targets : undefined;
-  if (!canSee) return { kind: power.kind, exchangeTargets, selection: null };
+  const lookTarget = isLookPower(power.kind) ? targets[0] : undefined;
+  if (!canSee) return { kind: power.kind, exchangeTargets, lookTarget, selection: null };
 
   const remaining = powerCardCount(power.kind) - power.selected.length;
   const revealed = power.kind !== "blind-swap" && remaining === 0
@@ -191,6 +202,7 @@ export function getPowerView(state: GameState, power: Power, canSee: boolean): P
   return {
     kind: power.kind,
     exchangeTargets,
+    lookTarget,
     selection: {
       targets,
       remaining,

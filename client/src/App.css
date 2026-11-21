@@ -1520,6 +1520,20 @@ input {
   stroke-linecap: round;
 }
 
+.game-table .player-cards .playing-card[data-look-card] {
+  position: relative;
+  overflow: visible;
+}
+
+[data-look-card] > .perimeter-clock {
+  z-index: 1;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+}
+
+[data-look-card] > .perimeter-clock .perimeter-clock-progress { stroke: #ffe39a; }
+
 @media (prefers-reduced-motion: no-preference) {
   .perimeter-clock-progress { transition: stroke-dashoffset 130ms linear; }
 }
@@ -1693,6 +1707,22 @@ input {
   perspective: 450px;
 }
 
+.drawn-card[data-draggable] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.drawn-card[data-dragging="true"] {
+  z-index: 4;
+  cursor: grabbing;
+}
+
+.game-table :is(.playing-card, .pile-card)[data-drop-target="true"] {
+  outline: 3px solid #ffe39a;
+  outline-offset: 2px;
+}
+
 .drawn-card-turn,
 .power-card-turn {
   position: relative;
@@ -1826,6 +1856,8 @@ button.pile-slot:not(:disabled) {
   cursor: pointer;
 }
 
+button.pile-slot.discard-target { cursor: default; }
+
 button.pile-slot:not(:disabled) .pile-card,
 .game-table button.playing-card:not([aria-pressed], [data-react-only]) {
   border-style: solid;
@@ -1871,6 +1903,44 @@ button.pile-slot:not(:disabled) .pile-card,
 
 .table-player.is-active-player .player-name {
   color: #f3de9a;
+}
+
+.game-table .player-name:has(.dutch-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.dutch-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #c9b57c;
+  border-radius: 50%;
+  background: #123b2a;
+  color: #f3de9a;
+}
+
+button.dutch-icon { cursor: pointer; touch-action: manipulation; }
+.dutch-icon[aria-pressed="true"],
+.dutch-icon.dutch-announced {
+  background: #ffe39a;
+  border-color: #ffe39a;
+  color: #303629;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dutch-announced { animation: dutch-announcement 900ms ease-out both; }
+}
+
+@keyframes dutch-announcement {
+  0% { scale: 0.8; box-shadow: 0 0 0 0 rgb(255 227 154 / 80%); }
+  33% { scale: 1.23; }
+  100% { scale: 1; box-shadow: 0 0 0 12px rgb(255 227 154 / 0%); }
 }
 
 .round-panel button[aria-pressed="true"] {

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { Megaphone } from "lucide-react";
 import { emojis } from "../../../shared/hubSocial.json";
 import type { HubEmoji } from "../../../shared/hubTypes";
 import type { CardFace } from "../game/cards";
@@ -11,6 +12,7 @@ import PlayingCard, { CardFaceMark } from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
 import { animatePublicMove, flyCard } from "./cardAnimations";
 import type { PlayGameSound } from "./useCardFeedback";
+import { describeCardFace } from "./cardLabels";
 
 export type TablePlayer = {
   id: string;
@@ -29,6 +31,9 @@ type GameTableProps = {
   protectedPlayerId?: string;
   tableEmojis?: ReadonlyMap<string, HubEmoji>;
   onReplace?: (position: number) => void;
+  onDiscardDrawn?: () => void;
+  dutchControl?: { armed: boolean; toggle: () => void };
+  look?: { target: CardTarget; remaining: number };
   reaction?: { scope: string; play: (position: number) => void };
   drawnCard?: CardFace;
   botDrawingId?: string;
@@ -40,6 +45,7 @@ type GameTableProps = {
     selection: NonNullable<PowerView["selection"]>;
     chooseCard: (target: CardTarget) => void;
     choosePlayer: (playerId: string) => void;
+    hideCard: () => void;
   };
   memorization?: {
     revealed: MemorizedCard[];
@@ -67,6 +73,9 @@ export default function GameTable({
   protectedPlayerId,
   tableEmojis,
   onReplace,
+  onDiscardDrawn,
+  dutchControl,
+  look,
   reaction,
   drawnCard,
   botDrawingId,
@@ -125,6 +134,7 @@ export default function GameTable({
         const canChooseFromHand = power && power.selection.remaining > 0 &&
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
         const name = player.pseudo + (position === "bottom" ? " (Moi)" : "");
+        const announce = position === "bottom" ? dutchControl : undefined;
         const emoji = tableEmojis?.get(player.id);
         const layout = getHandLayout(player.cardCount, player.handLayout);
         const handStyle = { "--hand-columns": layout.columns } as CSSProperties;
@@ -139,21 +149,38 @@ export default function GameTable({
                 Donner à {player.pseudo}
               </button>
             ) : (
-              <div className="player-name">{name}</div>
+              <div className="player-name">
+                <span>{name}</span>
+                {announce && (
+                  <button type="button" className="dutch-icon" aria-label="Annoncer Dutch en fin de tour"
+                    title="Annoncer Dutch en fin de tour" aria-pressed={announce.armed} onClick={announce.toggle}>
+                    <Megaphone size={15} aria-hidden="true" />
+                  </button>
+                )}
+                {player.id === protectedPlayerId && (
+                  <span className="dutch-icon dutch-announced" role="img" aria-label={`${player.pseudo} a annoncé Dutch`}
+                    title={`${player.pseudo} a annoncé Dutch`}>
+                    <Megaphone size={15} aria-hidden="true" />
+                  </span>
+                )}
+              </div>
             )}
             <div className="hand-line">
               <div className="player-cards" style={handStyle}>
                 {Array.from({ length: player.cardCount }, (_, index) => {
                   const target = { playerId: player.id, position: index };
+                  const viewed = look && sameTarget(look.target, target);
                   const selected = power?.selection.targets.some((card) => sameTarget(card, target));
                   const exchangeSelected = exchangeTargets?.some((card) => sameTarget(card, target));
                   const canChoose = canChooseFromHand && !selected;
                   const powerFace = power?.selection.revealed.find(({ target: card }) => sameTarget(card, target))?.face;
                   const revealed = powerFace ?? ownSelection?.revealed.find(({ position }) => position === index)?.face;
-                  const cardAction = canChoose ? () => power.chooseCard(target)
+                  const cardAction = viewed && powerFace && power ? power.hideCard
+                    : canChoose ? () => power.chooseCard(target)
                     : ownSelection ? () => ownSelection.toggle(index)
                     : replace && (() => replaceCard(index));
-                  const actionLabel = canChoose ? `Choisir la carte ${index + 1} de ${player.pseudo}`
+                  const actionLabel = viewed && powerFace ? `Retourner la carte ${index + 1} de ${player.pseudo}, ${describeCardFace(powerFace)}`
+                    : canChoose ? `Choisir la carte ${index + 1} de ${player.pseudo}`
                     : replace ? `Remplacer la carte ${index + 1}` : undefined;
                   return (
                     <PlayingCard
@@ -164,10 +191,11 @@ export default function GameTable({
                       face={revealed}
                       powerReveal={!!powerFace}
                       onToggle={cardAction}
-                      reaction={react && { scope: react.scope, center, play: () => react.play(index), playSound }}
+                      reaction={react && !viewed ? { scope: react.scope, center, play: () => react.play(index), playSound } : undefined}
                       actionLabel={actionLabel}
                       selected={selected || !!(ownSelection && revealed)}
                       exchangeSelected={exchangeSelected}
+                      lookRemaining={viewed ? look.remaining : undefined}
                       disabled={ownSelection && ownSelection.chosen.length >= ownSelection.limit
                         && !ownSelection.chosen.includes(index)}
                     />
@@ -180,7 +208,10 @@ export default function GameTable({
                   </span>
                 )}
               </div>
-              {position === "bottom" && drawnCard && <DrawnCard face={drawnCard} center={center} />}
+              {position === "bottom" && drawnCard && (
+                <DrawnCard face={drawnCard} center={center} onSlide={() => playSound("slide")}
+                  onDrop={onDiscardDrawn && ((target) => target === null ? onDiscardDrawn() : replaceCard(target))} />
+              )}
               {botDrawingId === player.id && <DrawnCard center={center} botName={player.pseudo} />}
               {played && slot === undefined && (
                 <span className="drawn-card bot-drawn-card discard-origin" aria-hidden="true">

@@ -3,7 +3,7 @@ import { takeFromPile } from "./deck.ts";
 import type { GameState, ReactionNotice } from "./gameTypes";
 import { appendCard, finishRound, recordCardMove, removeCard } from "./hands.ts";
 import { getHandLayout } from "./handLayout.ts";
-import { isExchangeTargetLocked, updatePowerAfterReaction } from "./powers.ts";
+import { isPowerTargetLocked, updatePowerAfterReaction } from "./powers.ts";
 
 export type ReactionAction = {
   kind: "reaction";
@@ -51,14 +51,15 @@ export function reactToDiscard(
   handVersion: unknown,
   now: number
 ): GameState {
-  if (reference !== state.reaction.reference || !canReactToDiscard(state, playerId) ||
+  if ((state.turn?.finalReaction && now >= state.turn.deadline) ||
+      reference !== state.reaction.reference || !canReactToDiscard(state, playerId) ||
       typeof position !== "number" || !Number.isInteger(position) || position < 0) return state;
 
   const player = state.players.find(({ id }) => id === playerId);
   const card = player?.cards[position];
   const top = state.discardPile.at(-1);
   if (!player || !card || !top || player.handVersion !== handVersion ||
-      isExchangeTargetLocked(state.turn?.power ?? null, card.id, state.dutch?.announcerId)) return state;
+      isPowerTargetLocked(state.turn?.power ?? null, card.id, state.dutch?.announcerId)) return state;
 
   if (!matchesDiscard(card.rank, top.rank, state.variants.plusMinusOne)) {
     const drawn = takeFromPile(state.drawPile, state.discardPile);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
 
 async function setConnection(page: Page, online: boolean) {
   if (!online) await page.evaluate(() => window.dispatchEvent(new Event("offline")));
@@ -48,7 +48,7 @@ test("reconnexion de l’invité après une coupure et un rechargement", async (
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("02-invite-revenu.png") });
 
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(guest);
     await expectLocalTurn(host);
   } finally {
     await guest.close();
@@ -68,7 +68,7 @@ test("pause de la table et reprise du chronomètre après le retour de l’hôte
     await setConnection(host, false);
     await expect(guest.getByRole("heading", { name: "Partie en pause" })).toBeVisible();
     await expect(guest.getByText("En attente du retour de l’hôte.")).toBeVisible();
-    await expect(guest.getByRole("button", { name: "Défausser la carte tirée" })).toHaveCount(0);
+    await expect(guest.locator(".drawn-card[data-draggable]")).toHaveCount(0);
     const delay = await secondsLeft(guest);
     expect(delay).toBeGreaterThan(110);
     expect(delay).toBeLessThanOrEqual(120);
@@ -84,7 +84,7 @@ test("pause de la table et reprise du chronomètre après le retour de l’hôte
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("04-table-reprise-paysage.png") });
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(guest);
     await expectLocalTurn(host);
   } finally {
     await guest.close();

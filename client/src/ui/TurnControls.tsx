@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { PowerKind } from "../game/gameTypes";
 import { powerCardCount, type PowerView } from "../game/powers";
-import { TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
+import { FINAL_REACTION_MS, TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
 import { CardBackMark, CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
 import type { CardFeedback } from "./useCardFeedback";
@@ -22,22 +22,23 @@ const powerLabels: Record<PowerKind, { title: string; instruction: string }> = {
 };
 
 function PowerControls({
-  power, act, message, extraActions,
+  power, act, message,
 }: {
   power: PowerView;
   act: TurnControlsProps["act"];
   message: string | null;
-  extraActions: ReactNode;
 }) {
   const selected = power.selection?.targets.length ?? 0;
   const revealed = !!power.selection?.revealed.length;
   const canSwap = power.selection?.canSwap === true;
   const viewedPair = revealed && power.kind === "look-and-swap";
   const completedSelection = powerCardCount(power.kind) > 0 && power.selection?.remaining === 0;
-  const passLabel = viewedPair ? "Garder en place" : completedSelection ? "Terminer le pouvoir" : "Passer le pouvoir";
+  const passLabel = viewedPair ? "Garder en place" : "Passer le pouvoir";
   const instruction = selected === 1 && powerCardCount(power.kind) === 2
     ? "Choisis la deuxième carte."
     : powerLabels[power.kind].instruction;
+
+  if (power.lookTarget) return message ? <p aria-live="polite">{message}</p> : null;
 
   return (
     <>
@@ -49,7 +50,6 @@ function PowerControls({
           <button type="button" onClick={() => act({ kind: "power-swap" })}>Échanger les cartes</button>
         )}
         <button type="button" onClick={() => act({ kind: "power-pass" })}>{passLabel}</button>
-        {extraActions}
       </div>
     </>
   );
@@ -69,42 +69,20 @@ export function TurnPanel({
     penalty: `${reactor} reçoit une carte de pénalité.`,
     "empty-pile": "Réaction incorrecte. Aucune carte de pénalité disponible.",
   }[notice.outcome] : null;
-  const announcer = view.dutch && view.players.find(({ id }) => id === view.dutch?.announcerId)?.pseudo;
-  const dutchNotice = view.dutch && announcer
-    ? `${announcer} a annoncé Dutch. ${view.dutch.lastTurns === 1 ? "Dernier tour." : `${view.dutch.lastTurns} tours restants.`}`
-    : null;
-  const pending = view.dutchArmed && !power ? "Dutch sera annoncé en fin de tour." : null;
-  const message = feedback ?? (power && canPlay ? null : dutchNotice) ?? pending;
-  const dutchButton = canPlay && view.canAnnounceDutch && (
-    <button type="button" aria-label="Annoncer Dutch en fin de tour" aria-pressed={view.dutchArmed}
-      onClick={() => act({ kind: "dutch-intent", enabled: !view.dutchArmed })}>
-      Dutch
-    </button>
-  );
-  const discarding = canPlay && view.hasDrawn;
   return (
     <section className="turn-layout" aria-label="Tour de jeu">
       <div className="round-panel turn-panel">
-        <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}`} remaining={remaining}
-          duration={TURN_DURATION_MS} label="Temps restant" />
-        <strong className="turn-player" role="status">{view.playerName} joue</strong>
+        {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}`}
+          remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : TURN_DURATION_MS}
+          label={view.finalReaction ? "Temps pour réagir" : "Temps restant"} />}
+        <strong className="turn-player" role="status">{view.finalReaction ? "Dernières réactions" : `${view.playerName} joue`}</strong>
       </div>
-      {(power || message || dutchButton || discarding) && (
+      {(power || feedback) && (
         <div className="round-panel turn-choices">
           {power && <h2 className="power-title">{powerLabels[power.kind].title}</h2>}
           {power && canPlay ? (
-            <PowerControls power={power} act={act} message={message} extraActions={dutchButton} />
-          ) : (
-            <>
-              {message && <p aria-live="polite">{message}</p>}
-              {(dutchButton || discarding) && (
-                <div className="power-actions">
-                  {discarding && <button type="button" onClick={() => act({ kind: "discard" })}>Défausser la carte tirée</button>}
-                  {dutchButton}
-                </div>
-              )}
-            </>
-          )}
+            <PowerControls power={power} act={act} message={feedback} />
+          ) : feedback && <p aria-live="polite">{feedback}</p>}
         </div>
       )}
       {piles}
@@ -114,6 +92,19 @@ export function TurnPanel({
 
 export function TurnPiles({ view, canPlay, act, feedback }: TurnControlsProps & { feedback: CardFeedback | null }) {
   const canDraw = canPlay && !view.hasDrawn && !view.power;
+  const canDiscard = canPlay && view.hasDrawn && !view.power;
+  const discardLabel = view.topDiscard ? `Défausse, ${describeCardFace(view.topDiscard)}` : "Défausse vide";
+  const discardPile = (
+    <>
+      <span>Défausse</span>
+      <span className={`pile-card discard-slot${view.topDiscard ? " face-up" : ""}`}
+        data-stacked={view.discardCount > 1 || undefined}>
+        {feedback?.pile === "discard" && <span key={feedback.id}
+          className={`card-feedback feedback-${feedback.kind}`} aria-hidden="true" />}
+        {view.topDiscard ? <CardFaceMark face={view.topDiscard} /> : "Vide"}
+      </span>
+    </>
+  );
 
   return (
     <div className="table-piles">
@@ -131,16 +122,13 @@ export function TurnPiles({ view, canPlay, act, feedback }: TurnControlsProps & 
           {view.deckCount > 0 ? <CardBackMark /> : view.discardCount > 1 ? "À refaire" : "Vide"}
         </span>
       </button>
-      <div className="pile-slot" role="img"
-        aria-label={view.topDiscard ? `Défausse, ${describeCardFace(view.topDiscard)}` : "Défausse vide"}>
-        <span>Défausse</span>
-        <span className={`pile-card discard-slot${view.topDiscard ? " face-up" : ""}`}
-          data-stacked={view.discardCount > 1 || undefined}>
-          {feedback?.pile === "discard" && <span key={feedback.id}
-            className={`card-feedback feedback-${feedback.kind}`} aria-hidden="true" />}
-          {view.topDiscard ? <CardFaceMark face={view.topDiscard} /> : "Vide"}
-        </span>
-      </div>
+      {canDiscard ? (
+        <button className="pile-slot discard-target" type="button" aria-label={discardLabel}
+          aria-description="Au clavier, Entrée ou Espace défausse la carte tirée."
+          onClick={(event) => { if (event.detail === 0) act({ kind: "discard" }); }}>
+          {discardPile}
+        </button>
+      ) : <div className="pile-slot" role="img" aria-label={discardLabel}>{discardPile}</div>}
     </div>
   );
 }

@@ -51,6 +51,7 @@ export type Turn = {
   drawnCard: Card | null;
   power: Power | null;
   dutchArmed: boolean;
+  finalReaction?: true;
 };
 
 export type GameState = {

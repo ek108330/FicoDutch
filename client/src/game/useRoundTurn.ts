@@ -110,7 +110,8 @@ function acceptRoundView(current: ReceivedView | null, view: RoundView, received
     let sameStage = previous.phase === view.phase;
     if (previous.phase === "playing" && view.phase === "playing") {
       if (view.turn.number < previous.turn.number) return current;
-      sameStage = view.turn.number === previous.turn.number && view.turn.power?.kind === previous.turn.power?.kind;
+      sameStage = view.turn.number === previous.turn.number && view.turn.power?.kind === previous.turn.power?.kind &&
+        view.turn.finalReaction === previous.turn.finalReaction;
     }
     if (sameStage && previous.clockVersion === view.clockVersion && current.deadline !== null && deadline !== null) {
       return { view, deadline: Math.min(current.deadline, deadline), receivedAt };
@@ -210,8 +211,9 @@ export function useRoundTurn({
   const remaining = scene ? Math.max(0, Math.min(phaseLength[scene.phase], (deadline ?? now) - now)) : 0;
   const view = scene?.phase === "playing" ? scene.turn : null;
   const waitingForClock = !isHost && (!received || clockVersion > received.view.clockVersion);
-  const canPlay = !paused && !waitingForClock && view?.playerId === playerId && remaining > 0 && (isHost || hostConnected);
-  const canReact = !paused && !waitingForClock && !!view?.reaction.canAttempt && (isHost || hostConnected);
+  const canPlay = !paused && !waitingForClock && view?.playerId === playerId && !view.finalReaction && remaining > 0 && (isHost || hostConnected);
+  const canReact = !paused && !waitingForClock && !!view?.reaction.canAttempt &&
+    (!view.finalReaction || remaining > 0) && (isHost || hostConnected);
   const canStartNext = !paused && isHost && members.filter(({ connected }) => connected).length >= GAME_CONFIG.players.min &&
     scene?.phase === "results" && !scene.result.gameWinnerIds.length;
   const roundNumber = scene?.roundNumber ?? 0;

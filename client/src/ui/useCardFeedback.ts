@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TurnView } from "../game/turn";
 
 type FeedbackKind = "draw" | "discard" | "power" | "reaction";
-export type GameSound = FeedbackKind | "tap" | "slide" | "flip" | "select" | "swap" | "gift" | "penalty" | "deal" | "emoji";
+export type GameSound = FeedbackKind | "tap" | "slide" | "flip" | "select" | "swap" | "gift" | "penalty" | "deal" | "emoji" | "dutch";
 export type PlayGameSound = (sound: GameSound) => void;
 export type CardFeedback = { kind: FeedbackKind; pile: "deck" | "discard"; id: number };
 const soundKey = "ficodutch-game-sound";
@@ -20,6 +20,7 @@ const tones: Record<GameSound, readonly [start: number, end: number, seconds: nu
   penalty: [260, 115, 0.32, 0.21],
   deal: [220, 400, 0.25, 0.17],
   emoji: [720, 900, 0.12, 0.12],
+  dutch: [392, 1_045, 0.52, 0.2],
 };
 
 export function useGameAudio() {
@@ -89,10 +90,11 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
       return;
     }
     const before = prior.view;
+    if (view.dutch && !before.dutch) playSound("dutch");
     const faces = view.power?.selection?.revealed.length ?? 0;
     const previousFaces = before.power?.selection?.revealed.length ?? 0;
     const newMove = view.cardMotion && view.cardMotion.id !== before.cardMotion?.id;
-    if (faces !== previousFaces && !newMove) playSound("flip");
+    if ((faces !== previousFaces || !!view.power?.lookTarget !== !!before.power?.lookTarget) && !newMove) playSound("flip");
     else if ((view.power?.exchangeTargets?.length ?? 0) > (before.power?.exchangeTargets?.length ?? 0)) playSound("select");
 
     let kind: FeedbackKind;

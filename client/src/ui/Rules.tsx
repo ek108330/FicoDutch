@@ -87,8 +87,8 @@ function Rules({ onBack, titleId }: RulesProps) {
           </p>
           <ol>
             <li>Il prend la carte du dessus de la pioche.</li>
-            <li>Il peut l'échanger avec une de ses cartes. La carte remplacée est alors révélée sur la défausse.</li>
-            <li>Ou il peut défausser directement la carte piochée, sans la conserver.</li>
+            <li>Il peut la glisser sur une de ses cartes. La carte remplacée rejoint alors la défausse.</li>
+            <li>Il peut aussi glisser la carte piochée directement sur la défausse.</li>
           </ol>
           <p>
             Une carte spéciale déclenche son pouvoir lorsqu'elle est
@@ -119,6 +119,7 @@ function Rules({ onBack, titleId }: RulesProps) {
               <strong>Joker — Carte supplémentaire :</strong> choisir un autre joueur et lui ajouter une carte aléatoire de la pioche, face cachée. Il ne peut pas la regarder immédiatement.
             </li>
           </ul>
+          <p>Avec le 8 ou le 9, la carte reste visible au plus 10 secondes. Touche-la pour la retourner plus tôt et terminer ton tour. Le compte à rebours est visible de tous.</p>
           <p>
             La carte ajoutée par le Joker compte dans le score final.
             Un joueur ayant quitté volontairement la partie peut
@@ -148,7 +149,7 @@ function Rules({ onBack, titleId }: RulesProps) {
             <li>Une tentative reçue après le changement de la défausse laisse la main intacte.</li>
             <li>Une réaction invalide entraîne la récupération de la carte tentée et l'ajout d'une carte de pénalité aléatoire face cachée.</li>
             <li>La chaîne de réactions continue à partir de la dernière défausse valide.</li>
-            <li>Les réactions ne disposent pas de minuterie.</li>
+            <li>Après la fin du dernier tour, la dernière défausse ouvre une fenêtre de réaction de 3 secondes avant le calcul des scores.</li>
           </ul>
           <p>
             La variante Pose infinie permet de poursuivre les réactions
@@ -202,7 +203,7 @@ function Rules({ onBack, titleId }: RulesProps) {
             À la fin de son tour, un joueur qui pense avoir le score
             le plus faible peut annoncer Dutch.
           </p>
-          <p>Le bouton Dutch prépare l’annonce. Elle prend effet quand le tour se termine.</p>
+          <p>L’icône près du nom prépare l’annonce. À la fin du tour, elle s’affiche pour tous les joueurs et déclenche un son.</p>
           <ul>
             <li>Les autres joueurs disposent d'un dernier tour.</li>
             <li>Le joueur ayant annoncé Dutch ne rejoue pas.</li>

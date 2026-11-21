@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 async function manageTable(host: Page) {
   await host.getByRole("button", { name: "Gérer la table" }).click();
@@ -74,10 +74,10 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
 
     await drawDeck(host).click();
     await host.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
-    await host.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(host);
     await expectLocalTurn(guest);
     await drawDeck(guest).click();
-    await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
+    await discardDrawn(guest);
     await expect(host.getByRole("region", { name: "Main de ChloeGestion" })).toBeVisible();
     await host.getByRole("heading", { name: "Manche 1", exact: true }).click();
     await host.getByRole("button", { name: "Lancer la manche suivante" }).click();

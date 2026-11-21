@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 import type { CardFace } from "../game/cards";
+import { LOOK_DURATION_MS } from "../game/powers";
 import { describeCardFace, suits } from "./cardLabels";
 import { useCardGestures, type CardReaction } from "./useCardGestures";
 import { reducedMotion } from "./cardAnimations";
+import PerimeterClock from "./PerimeterClock";
 
 type PlayingCardProps = {
   index: number;
@@ -16,6 +18,7 @@ type PlayingCardProps = {
   dealOrder?: number;
   reaction?: CardReaction;
   powerReveal?: boolean;
+  lookRemaining?: number;
 };
 
 export function CardFaceMark({ face }: { face: CardFace }) {
@@ -34,7 +37,7 @@ export function CardBackMark({ backRef }: { backRef?: RefObject<HTMLSpanElement 
 }
 
 export default function PlayingCard({ index, slot, face, onToggle, disabled, actionLabel, selected, exchangeSelected, dealOrder, reaction,
-  powerReveal = false }: PlayingCardProps) {
+  powerReveal = false, lookRemaining }: PlayingCardProps) {
   const card = useRef<HTMLButtonElement>(null);
   const back = useRef<HTMLSpanElement>(null);
   const previouslyRevealed = useRef(false);
@@ -53,6 +56,7 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
     "data-card-position": index,
     "data-hand-slot": slot,
     "data-power-reveal": powerReveal || undefined,
+    "data-look-card": lookRemaining !== undefined || undefined,
     style: {
       animationDelay: dealOrder === undefined ? undefined : `${dealOrder * 45}ms`,
       gridColumn: slot === undefined ? undefined : Math.floor(slot / 2) + 1,
@@ -65,6 +69,9 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
       <span className="drawn-card-back"><CardBackMark /></span>
     </span>
   ) : face ? <CardFaceMark face={face} /> : <CardBackMark backRef={back} />;
+  const clock = lookRemaining !== undefined && (
+    <PerimeterClock remaining={lookRemaining} duration={LOOK_DURATION_MS} label="Temps de consultation de la carte" />
+  );
 
   if (reaction) {
     return (
@@ -84,6 +91,7 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
           gestures.playReaction(event.currentTarget);
         }}>
         {content}
+        {clock}
       </button>
     );
   }
@@ -93,8 +101,9 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
       <button {...shared} type="button" disabled={disabled}
         aria-pressed={actionLabel ? undefined : !!face} onClick={onToggle}>
         {content}
+        {clock}
       </button>
     );
   }
-  return <div {...shared}>{content}</div>;
+  return <div {...shared}>{content}{clock}</div>;
 }

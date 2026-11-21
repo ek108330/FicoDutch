@@ -8,6 +8,7 @@ import { applyPowerAction, getPowerView, POWER_DURATION_MS, startPower, type Pow
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
 
 export const TURN_DURATION_MS = 60_000;
+export const FINAL_REACTION_MS = 3_000;
 const CARD_MOTION_WINDOW_MS = 1_350;
 
 export type TurnAction =
@@ -24,6 +25,7 @@ export type TurnView = {
   playerId: string;
   playerName: string;
   remainingMs: number;
+  finalReaction: boolean;
   hasDrawn: boolean;
   drawnCard: CardFace | null;
   deckCount: number;
@@ -74,7 +76,7 @@ export function beginPlay(state: GameState, now: number, random = Math.random) {
   } satisfies GameState;
 }
 
-function moveToNextPlayer(state: GameState, turn: Turn, now: number): GameState {
+function moveToNextPlayer(state: GameState, turn: Turn, now: number, discarded: boolean): GameState {
   const currentId = state.currentPlayerId;
   const current = state.players.findIndex(({ id }) => id === currentId);
   const activeOrder = [...state.players.slice(current + 1), ...state.players.slice(0, current + 1)]
@@ -86,7 +88,12 @@ function moveToNextPlayer(state: GameState, turn: Turn, now: number): GameState 
   if (dutch) {
     const remainingPlayerIds = dutch.remainingPlayerIds.filter((id) => id !== currentId && activeOrder.includes(id));
     const nextState = { ...state, dutch: { ...dutch, remainingPlayerIds } };
-    if (!remainingPlayerIds.length) return finishRound(nextState, now);
+    if (!remainingPlayerIds.length) {
+      return discarded ? {
+        ...nextState,
+        turn: { ...turn, drawnCard: null, power: null, deadline: now + FINAL_REACTION_MS, finalReaction: true },
+      } : finishRound(nextState, now);
+    }
     return {
       ...nextState,
       currentPlayerId: remainingPlayerIds[0],
@@ -120,7 +127,7 @@ function finishDiscard(state: GameState, player: GamePlayer, turn: Turn, discard
   } : state;
   const next = presentDiscard(prepared, [...state.discardPile, discarded]);
   const power = startPower(next, player.id, discarded);
-  if (!power) return moveToNextPlayer(next, turn, now);
+  if (!power) return moveToNextPlayer(next, turn, now, true);
 
   return {
     ...next,
@@ -156,7 +163,7 @@ export function playTurn(
   }
   const { turn } = state;
   if (state.phase !== "playing" || actorId !== state.currentPlayerId ||
-      !turn || turn.number !== turnNumber || now >= turn.deadline) return state;
+      !turn || turn.finalReaction || turn.number !== turnNumber || now >= turn.deadline) return state;
 
   const player = state.players.find(({ id, hasLeft }) => id === actorId && !hasLeft);
   if (!player) return state;
@@ -170,7 +177,7 @@ export function playTurn(
   if (turn.power) {
     const result = applyPowerAction(state, turn, actorId, action, now);
     if (!result) return state;
-    return result.complete ? moveToNextPlayer(result.state, turn, now) : result.state;
+    return result.complete ? moveToNextPlayer(result.state, turn, now, true) : result.state;
   }
 
   switch (action.kind) {
@@ -198,6 +205,7 @@ export function expireTurn(state: GameState, turnNumber: number, now: number): G
   if (state.phase !== "playing" || !turn || turn.number !== turnNumber || now < turn.deadline) {
     return state;
   }
+  if (turn.finalReaction) return finishRound(state, now);
   return skipTurn(state, turn, now);
 }
 
@@ -205,7 +213,7 @@ function skipTurn(state: GameState, turn: Turn, now: number): GameState {
   const next = turn.drawnCard
     ? presentDiscard(state, [...state.discardPile, turn.drawnCard])
     : state;
-  return moveToNextPlayer(next, turn, now);
+  return moveToNextPlayer(next, turn, now, !!(turn.drawnCard || turn.power));
 }
 
 export function applyDepartures(state: GameState, presentIds: ReadonlySet<string>, now: number): GameState {
@@ -220,7 +228,8 @@ export function applyDepartures(state: GameState, presentIds: ReadonlySet<string
       remainingPlayerIds: state.dutch.remainingPlayerIds.filter((id) => !departed.has(id)),
     },
   };
-  if (state.phase === "playing" && state.turn && state.currentPlayerId && departed.has(state.currentPlayerId)) {
+  if (state.phase === "playing" && state.turn && !state.turn.finalReaction && state.currentPlayerId &&
+      departed.has(state.currentPlayerId)) {
     return skipTurn(next, { ...state.turn, dutchArmed: false }, now);
   }
   return next;
@@ -232,12 +241,13 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
   if (state.phase !== "playing" || !turn || !player) return null;
 
   const topDiscard = state.discardPile.at(-1);
-  const canSeePrivateCards = player.id === viewerId && now < turn.deadline;
+  const canSeePrivateCards = !turn.finalReaction && player.id === viewerId && now < turn.deadline;
   return {
     number: turn.number,
     playerId: player.id,
     playerName: player.pseudo,
     remainingMs: Math.max(0, turn.deadline - now),
+    finalReaction: !!turn.finalReaction,
     hasDrawn: !!turn.drawnCard,
     drawnCard: turn.drawnCard && canSeePrivateCards ? getCardFace(turn.drawnCard) : null,
     deckCount: state.drawPile.length,
@@ -250,7 +260,7 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     })),
     reaction: {
       reference: state.reaction.reference,
-      canAttempt: canReactToDiscard(state, viewerId),
+      canAttempt: (!turn.finalReaction || now < turn.deadline) && canReactToDiscard(state, viewerId),
       notice: state.reaction.notice,
     },
     dutch: state.dutch ? { announcerId: state.dutch.announcerId, lastTurns: state.dutch.remainingPlayerIds.length } : null,
