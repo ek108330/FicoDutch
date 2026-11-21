@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { io } from "socket.io-client";
-import { activeTurn, closeSettings, drawDeck, fixDeckOrder, openLobby, openSettings } from "./tableFlow";
+import { closeSettings, drawDeck, fixDeckOrder, openLobby, openSettings, expectLocalTurn } from "./tableFlow";
 
 test("la signalisation accepte l’origine autorisée et refuse une autre origine", async ({ request, baseURL }) => {
   const handshake = "http://127.0.0.1:15300/socket.io/?EIO=4&transport=polling";
@@ -62,7 +62,7 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await preview.getByRole("button", { name: "Rejoindre" }).click();
     await host.getByRole("button", { name: "Lancer la partie" }).click();
 
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 20_000 });
+    await expectLocalTurn(guest, 20_000);
     await guest.setViewportSize({ width: 390, height: 844 });
     const optionsBox = (await guest.locator(".table-options").boundingBox())!;
     const opponentName = (await guest.locator(".position-top .player-name").boundingBox())!;

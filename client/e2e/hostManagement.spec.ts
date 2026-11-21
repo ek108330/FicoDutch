@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 async function manageTable(host: Page) {
   await host.getByRole("button", { name: "Gérer la table" }).click();
@@ -43,7 +43,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await expect(removed.getByText("Salle d'attente")).toBeVisible();
     await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
     await start.click();
-    await expect(activeTurn(removed)).toHaveText("À toi de jouer", { timeout: 18_000 });
+    await expectLocalTurn(removed, 18_000);
     await drawDeck(removed).click();
     await expect(drawnCard(removed)).toHaveAccessibleName("Carte tirée, As de pique");
     await expect(guest.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
@@ -54,7 +54,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await host.screenshot({ path: testInfo.outputPath("01-confirmation-retrait-portrait.png") });
     await dialog.getByRole("button", { name: "Annuler" }).click();
     await dialog.getByRole("button", { name: "Fermer" }).click();
-    await expect(activeTurn(removed)).toHaveText("À toi de jouer");
+    await expectLocalTurn(removed);
     await expect(drawnCard(removed)).toHaveAccessibleName("Carte tirée, As de pique");
 
     dialog = await manageTable(host);
@@ -66,7 +66,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await removed.screenshot({ path: testInfo.outputPath("02-joueuse-retiree.png") });
     await removed.reload();
     await expect(removed.getByRole("textbox", { name: "Choisis ton pseudo" })).toBeVisible();
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
+    await expectLocalTurn(host);
     await expect(discard(host)).toHaveAccessibleName("Défausse, As de pique");
     const formerHand = host.locator(".table-player").filter({ hasText: "ChloeGestion" });
     await expect(formerHand.locator(".playing-card.face-down")).toHaveCount(4);
@@ -75,7 +75,7 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await drawDeck(host).click();
     await host.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
     await host.getByRole("button", { name: "Défausser la carte tirée" }).click();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer");
+    await expectLocalTurn(guest);
     await drawDeck(guest).click();
     await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
     await expect(host.getByRole("region", { name: "Main de ChloeGestion" })).toBeVisible();

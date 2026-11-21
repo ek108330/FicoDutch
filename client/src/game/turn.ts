@@ -1,11 +1,12 @@
 import { getCardFace, type Card, type CardFace } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
-import type { GameState, GamePlayer, ReactionNotice, Turn } from "./gameTypes";
+import type { GameState, GamePlayer, PublicCardMove, ReactionNotice, Turn } from "./gameTypes";
 import { changeHand, finishRound } from "./hands.ts";
 import { applyPowerAction, getPowerView, POWER_DURATION_MS, startPower, type PowerAction, type PowerView } from "./powers.ts";
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
 
 export const TURN_DURATION_MS = 60_000;
+const CARD_MOTION_WINDOW_MS = 950;
 
 export type TurnAction =
   | { kind: "draw"; source: "deck" }
@@ -26,12 +27,21 @@ export type TurnView = {
   discardCount: number;
   topDiscard: CardFace | null;
   power: PowerView | null;
+  cardMotion: CardMotionView | null;
   players: Array<{ id: string; pseudo: string; cardCount: number; handVersion: number }>;
   reaction: { reference: number; canAttempt: boolean; notice: ReactionNotice | null };
   dutch: { announcerId: string; lastTurns: number } | null;
   canAnnounceDutch: boolean;
   dutchArmed: boolean;
 };
+
+export type CardMotionView = { id: number; move: PublicCardMove; remainingMs: number };
+
+export function getCardMotionView(state: GameState, now: number): CardMotionView | null {
+  const motion = state.cardMotion;
+  const remainingMs = motion ? CARD_MOTION_WINDOW_MS - (now - motion.at) : 0;
+  return motion && remainingMs > 0 ? { id: motion.id, move: motion.move, remainingMs } : null;
+}
 
 export type TurnRequest = {
   type: "turn-action";
@@ -152,7 +162,7 @@ export function playTurn(
   }
 
   if (turn.power) {
-    const result = applyPowerAction(state, turn, actorId, action);
+    const result = applyPowerAction(state, turn, actorId, action, now);
     if (!result) return state;
     return result.complete ? moveToNextPlayer(result.state, turn, now) : result.state;
   }
@@ -225,6 +235,7 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     discardCount: state.discardPile.length,
     topDiscard: topDiscard ? getCardFace(topDiscard) : null,
     power: turn.power ? getPowerView(state, turn.power, canSeePrivateCards) : null,
+    cardMotion: getCardMotionView(state, now),
     players: state.players.map(({ id, pseudo, cards, handVersion }) => ({ id, pseudo, cardCount: cards.length, handVersion })),
     reaction: {
       reference: state.reaction.reference,

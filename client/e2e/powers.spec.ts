@@ -1,15 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
 
 const faceUpHands = (page: Page) => page.locator(".player-cards .face-up");
 const targetCard = (page: Page, position: number, pseudo: string) =>
   page.getByRole("button", { name: `Choisir la carte ${position} de ${pseudo}`, exact: true });
 
 async function playSpecialCard(page: Page, position: number, power: string) {
-  await expect(activeTurn(page)).toHaveText("À toi de jouer");
+  await expectLocalTurn(page);
   await drawDeck(page).click();
   await page.getByRole("button", { name: `Remplacer la carte ${position}`, exact: true }).click();
-  await expect(activeTurn(page)).toHaveText(`Pouvoir du ${power}`);
+  await expect(page.getByRole("heading", { name: `Pouvoir du ${power}` })).toBeVisible();
   await expect(drawDeck(page)).toBeDisabled();
   await expect(drawnCard(page)).toHaveCount(0);
 }
@@ -24,11 +24,15 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
   try {
     const start = await openTwoPlayerHub(host, guest, alice, bob);
     await start.click();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
-    await expect(guest.getByRole("timer")).toHaveText("58 s");
+    await expectLocalTurn(guest, 17_000);
+    await expect(guest.getByRole("timer")).toHaveCount(0);
+    const progress = turnClock(guest).locator(".turn-clock-progress");
+    const originalOffset = Number(await progress.getAttribute("stroke-dashoffset"));
+    await expect.poll(async () => Number(await progress.getAttribute("stroke-dashoffset"))).toBeGreaterThan(originalOffset);
+    await expect(turnClock(guest)).toHaveAttribute("aria-valuenow", "58");
 
     await playSpecialCard(guest, 2, "10");
-    await expect(guest.getByRole("timer")).toHaveText(/^(59|60) s$/);
+    await expect(turnClock(guest)).toHaveAttribute("aria-valuenow", /^(59|60)$/);
     await targetCard(guest, 1, bob).click();
     await expect(guest.locator(".position-bottom .playing-card[data-selected=true]")).toHaveCount(1);
     await expect(faceUpHands(guest)).toHaveCount(0);
@@ -36,24 +40,32 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("01-dix-echange-aveugle.png") });
     await targetCard(guest, 1, alice).click();
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
+    await expect(host.locator('[data-card-animation="swap"]')).toHaveCount(2);
+    await expect(host.locator(".flying-card .card-face")).toHaveCount(0);
+    await expectLocalTurn(host);
 
     await playSpecialCard(host, 2, "Valet");
     await targetCard(host, 1, alice).click();
     await expect(faceUpHands(host)).toHaveCount(0);
     await targetCard(host, 1, bob).click();
     await expect(faceUpHands(host)).toHaveCount(2);
+    await expect(host.locator(".power-card-turn")).toHaveCount(2);
     await expect(host.locator(".position-bottom .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
     await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Roi de pique");
-    await expect(activeTurn(guest)).toHaveText("Pouvoir du Valet");
+    await expect(guest.getByRole("heading", { name: "Pouvoir du Valet" })).toBeVisible();
     await expect(faceUpHands(guest)).toHaveCount(0);
+    await expect(guest.locator(".power-card-turn")).toHaveCount(0);
 
     await host.setViewportSize({ width: 390, height: 844 });
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("02-valet-portrait.png") });
     await guest.screenshot({ path: testInfo.outputPath("03-valet-vue-adversaire.png") });
+    await guest.setViewportSize({ width: 390, height: 844 });
     await host.getByRole("button", { name: "Échanger les cartes" }).click();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer");
+    await expect(guest.locator('[data-card-animation="swap"]')).toHaveCount(2);
+    await expect(guest.locator(".flying-card .card-face")).toHaveCount(0);
+    await guest.screenshot({ path: testInfo.outputPath("06-echange-face-cachee.png") });
+    await expectLocalTurn(guest);
     await expect(faceUpHands(host)).toHaveCount(0);
 
     await playSpecialCard(guest, 3, "8");
@@ -71,7 +83,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await host.setViewportSize({ width: 844, height: 390 });
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("04-neuf-paysage.png") });
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 65_000 });
+    await expectLocalTurn(guest, 65_000);
     await expect(faceUpHands(host)).toHaveCount(0);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 9 de pique");
     await guest.screenshot({ path: testInfo.outputPath("05-apres-expiration.png") });
@@ -94,7 +106,7 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
       await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
     }
     await start.click();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
+    await expectLocalTurn(guest, 17_000);
     await playSpecialCard(guest, 1, "Joker+");
 
     const give = guest.getByRole("button", { name: `Donner à ${alice}`, exact: true });
@@ -104,7 +116,7 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await guest.screenshot({ path: testInfo.outputPath("01-joker-adversaire.png") });
     await give.click();
 
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
+    await expectLocalTurn(host);
     const received = host.locator(".position-bottom .playing-card");
     const visibleToGuest = guest.locator(".position-top .playing-card");
     for (const hand of [received, visibleToGuest]) {

@@ -10,7 +10,7 @@ import { useRoundTurn, type UpdateHostRound } from "../game/useRoundTurn";
 import type { useHubPeers } from "../network/useHubPeers";
 import { useTableEmojis } from "../network/useTableEmojis";
 import GameTable from "./GameTable";
-import { TableEmojiPicker } from "./EmojiButtons";
+import EmojiButtons from "./EmojiButtons";
 import { useCardFeedback, type useGameAudio } from "./useCardFeedback";
 import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
@@ -58,6 +58,7 @@ export default function RoundScreen({
   const connectionReady = playerId === hostId ? !!hostRound : hostConnected;
   const canSelect = !paused && !turn.waitingForClock && memorizing && connectionReady;
   const finished = !paused && (phase === "results" && deadline === null || phase === "waiting" && gameFinished);
+  const ticking = !finished || !!turn.finalMotion;
   const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && canLeave &&
     (phase === "memorization" || phase === "playing");
   const feedback = useCardFeedback(
@@ -68,10 +69,10 @@ export default function RoundScreen({
   });
 
   useEffect(() => {
-    if (finished) return;
+    if (!ticking) return;
     const interval = window.setInterval(() => setNow(performance.now()), 125);
     return () => window.clearInterval(interval);
-  }, [finished]);
+  }, [ticking]);
 
   useEffect(() => {
     if (paused || turn.waitingForClock || phase !== "memorization" || deadline === null) return;
@@ -190,6 +191,16 @@ export default function RoundScreen({
   }
 
   if (scene.phase === "results") {
+    if (turn.finalMotion) {
+      return (
+        <main className="game-screen">
+          {gameActions()}
+          <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion}
+            players={scene.result.players.map(({ id, pseudo, cards }) => ({ id, pseudo, cardCount: cards.length }))}
+            controls={<section className="round-panel"><strong>Fin de la manche</strong></section>} />
+        </main>
+      );
+    }
     return (
       <RoundResults
         key={roundNumber}
@@ -245,7 +256,7 @@ export default function RoundScreen({
     <main className="game-screen">
       {gameActions(hostManagement ?? (canLeave && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>))}
       {emojisEnabled && <div className="table-options">
-        <TableEmojiPicker onChoose={chooseEmoji} />
+        <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />
       </div>}
       <GameTable
         localPlayerId={playerId}
@@ -257,18 +268,18 @@ export default function RoundScreen({
         power={powerControls}
         tableEmojis={emojisEnabled ? tableEmojis : undefined}
         reaction={reaction}
+        cardMotion={turn.view?.cardMotion}
         drawnCard={turnControls?.canPlay ? turnControls.view.drawnCard ?? undefined : undefined}
         onReplace={turnControls?.canPlay && !power && turnControls.view.hasDrawn && localHand
           ? (position) => turn.act({ kind: "replace", position, handVersion: localHand.handVersion })
           : undefined}
-        piles={turnControls && <TurnPiles {...turnControls} feedback={feedback} />}
+        piles={turnControls ? null : undefined}
         controls={
           turnControls ? (
             <TurnPanel
               {...turnControls}
-              playerId={playerId}
               remaining={turn.remaining}
-              canReact={!!reaction}
+              piles={<TurnPiles {...turnControls} feedback={feedback} />}
             />
           ) : phase === "dealing" ? (
             <section className="round-panel" aria-label="Distribution">

@@ -1,7 +1,7 @@
 import { getCardFace, type Card, type CardFace, type CardRank } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
 import { changeHand } from "./hands.ts";
-import type { CardTarget, GameState, Power, PowerKind, SelectedCard, Turn } from "./gameTypes";
+import type { CardTarget, GameState, Power, PowerKind, PublicCardMove, SelectedCard, Turn } from "./gameTypes";
 
 export const POWER_DURATION_MS = 60_000;
 
@@ -86,13 +86,18 @@ function resolveCard(state: GameState, selected: SelectedCard) {
     : null;
 }
 
-function swapCards(state: GameState, first: SelectedCard, second: SelectedCard): GameState | null {
+function recordMove(state: GameState, move: PublicCardMove, now: number): GameState["cardMotion"] {
+  return { id: (state.cardMotion?.id ?? 0) + 1, at: now, move };
+}
+
+function swapCards(state: GameState, first: SelectedCard, second: SelectedCard, now: number): GameState | null {
   const a = resolveCard(state, first);
   const b = resolveCard(state, second);
   if (!a || !b) return null;
 
   return {
     ...state,
+    cardMotion: recordMove(state, { kind: "swap", targets: [a.target, b.target] }, now),
     players: state.players.map((player) => {
       if (player.id !== first.playerId && player.id !== second.playerId) return player;
       const cards = player.cards.slice();
@@ -103,9 +108,9 @@ function swapCards(state: GameState, first: SelectedCard, second: SelectedCard):
   };
 }
 
-function giveCard(state: GameState, actorId: string, recipient: unknown): GameState | null {
-  if (typeof recipient !== "string" || recipient === actorId ||
-      !state.players.some(({ id }) => id === recipient)) return null;
+function giveCard(state: GameState, actorId: string, recipient: unknown, now: number): GameState | null {
+  const target = state.players.find(({ id }) => id === recipient);
+  if (!target || target.id === actorId) return null;
   const drawn = takeFromPile(state.drawPile, state.discardPile);
   if (!drawn) return null;
 
@@ -113,7 +118,8 @@ function giveCard(state: GameState, actorId: string, recipient: unknown): GameSt
   return {
     ...state,
     ...piles,
-    players: state.players.map((player) => player.id === recipient
+    cardMotion: recordMove(state, { kind: "gift", target: { playerId: target.id, position: target.cards.length } }, now),
+    players: state.players.map((player) => player.id === target.id
       ? changeHand(player, [...player.cards, card])
       : player),
   };
@@ -123,7 +129,8 @@ export function applyPowerAction(
   state: GameState,
   turn: Turn,
   actorId: string,
-  action: { kind: unknown }
+  action: { kind: unknown },
+  now: number
 ): { state: GameState; complete: boolean } | null {
   const { power } = turn;
   if (!power) return null;
@@ -131,14 +138,14 @@ export function applyPowerAction(
   if (action.kind === "power-pass") return { state, complete: true };
 
   if (action.kind === "power-player" && power.kind === "give-card" && "playerId" in action) {
-    const next = giveCard(state, actorId, action.playerId);
+    const next = giveCard(state, actorId, action.playerId, now);
     return next && { state: next, complete: true };
   }
   if (action.kind === "power-swap" && power.kind === "look-and-swap" && power.selected.length === 2) {
     if (power.selected.some(({ playerId }) => playerId === state.dutch?.announcerId && playerId !== actorId)) {
       return null;
     }
-    const next = swapCards(state, power.selected[0], power.selected[1]);
+    const next = swapCards(state, power.selected[0], power.selected[1], now);
     return next && { state: next, complete: true };
   }
 
@@ -153,7 +160,7 @@ export function applyPowerAction(
 
   const selected = [...power.selected, { playerId: player.id, cardId: card.id }];
   if (power.kind === "blind-swap" && selected.length === 2) {
-    const next = swapCards(state, selected[0], selected[1]);
+    const next = swapCards(state, selected[0], selected[1], now);
     return next && { state: next, complete: true };
   }
   return { state: { ...state, turn: { ...turn, power: { ...power, selected } } }, complete: false };

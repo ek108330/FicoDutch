@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
 
 async function setConnection(page: Page, online: boolean) {
   if (!online) await page.evaluate(() => window.dispatchEvent(new Event("offline")));
@@ -8,11 +8,13 @@ async function setConnection(page: Page, online: boolean) {
 }
 
 async function secondsLeft(page: Page) {
-  return Number.parseInt(await page.getByRole("timer").innerText(), 10);
+  const clock = turnClock(page);
+  return await clock.isVisible() ? Number(await clock.getAttribute("aria-valuenow"))
+    : Number.parseInt(await page.getByRole("timer").innerText(), 10);
 }
 
 async function drawFirstCard(guest: Page) {
-  await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 18_000 });
+  await expectLocalTurn(guest, 18_000);
   await drawDeck(guest).click();
   await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
 }
@@ -31,15 +33,15 @@ test("reconnexion de l’invité après une coupure et un rechargement", async (
     await expect(guest.getByRole("heading", { name: "Reconnexion à la table" })).toBeVisible();
     await expect(guest.getByText("Ta place est conservée.")).toBeVisible();
     await guest.screenshot({ path: testInfo.outputPath("01-invite-hors-ligne.png") });
-    await expect(activeTurn(host)).toHaveText("Au tour de BobReprise");
+    await expect(activeTurn(host)).toHaveText("BobReprise joue");
     const before = await secondsLeft(host);
     await expect.poll(() => secondsLeft(host)).toBeLessThan(before);
 
     await setConnection(guest, true);
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer");
+    await expectLocalTurn(guest);
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await guest.reload();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer");
+    await expectLocalTurn(guest);
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await expect(drawnCard(host)).toHaveCount(0);
     await expect(guest.locator(".position-bottom .playing-card.face-down")).toHaveCount(4);
@@ -47,7 +49,7 @@ test("reconnexion de l’invité après une coupure et un rechargement", async (
     await guest.screenshot({ path: testInfo.outputPath("02-invite-revenu.png") });
 
     await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
+    await expectLocalTurn(host);
   } finally {
     await guest.close();
   }
@@ -76,14 +78,14 @@ test("pause de la table et reprise du chronomètre après le retour de l’hôte
 
     await guest.setViewportSize({ width: 844, height: 390 });
     await setConnection(host, true);
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer");
-    await expect(activeTurn(host)).toHaveText("Au tour de BobPause");
+    await expectLocalTurn(guest);
+    await expect(activeTurn(host)).toHaveText("BobPause joue");
     expect(await secondsLeft(guest)).toBeGreaterThanOrEqual(before - 2);
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("04-table-reprise-paysage.png") });
     await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
+    await expectLocalTurn(host);
   } finally {
     await guest.close();
   }

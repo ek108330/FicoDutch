@@ -6,8 +6,8 @@ import type { GameState } from "./gameTypes";
 import { getRoundResultView, type RoundResultView } from "./hands";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
-  beginPlay, expireTurn, getTurnView, playTurn, TURN_DURATION_MS,
-  type TurnAction, type TurnRequest, type TurnView,
+  beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn, TURN_DURATION_MS,
+  type CardMotionView, type TurnAction, type TurnRequest, type TurnView,
 } from "./turn";
 import type { GameVariants } from "./variants";
 
@@ -16,9 +16,9 @@ type RoundView = { roundNumber: number; clockVersion: number; remainingMs: numbe
   | { phase: "waiting" }
   | { phase: "transition" | "dealing" | "memorization"; players: SetupPlayers; sixCards: boolean }
   | { phase: "playing"; turn: TurnView }
-  | { phase: "results"; result: RoundResultView }
+  | { phase: "results"; result: RoundResultView; cardMotion: CardMotionView | null }
 );
-type ReceivedView = { view: RoundView; deadline: number | null };
+type ReceivedView = { view: RoundView; deadline: number | null; receivedAt: number };
 export type UpdateHostRound = (hubId: string, update: (state: GameState, members: HubPlayer[]) => GameState) => void;
 
 type Options = {
@@ -70,7 +70,7 @@ function projectRound(
   }
   if (state.phase === "results") {
     const result = getRoundResultView(state);
-    return result && { ...base, phase: "results", result };
+    return result && { ...base, phase: "results", result, cardMotion: getCardMotionView(state, now) };
   }
   return {
     ...base,
@@ -107,10 +107,10 @@ function acceptRoundView(current: ReceivedView | null, view: RoundView, received
       sameStage = view.turn.number === previous.turn.number && view.turn.power?.kind === previous.turn.power?.kind;
     }
     if (sameStage && previous.clockVersion === view.clockVersion && current.deadline !== null && deadline !== null) {
-      return { view, deadline: Math.min(current.deadline, deadline) };
+      return { view, deadline: Math.min(current.deadline, deadline), receivedAt };
     }
   } else if (current && view.roundNumber < current.view.roundNumber) return current;
-  return { view, deadline };
+  return { view, deadline, receivedAt };
 }
 
 export function useRoundTurn({
@@ -190,6 +190,8 @@ export function useRoundTurn({
   const canStartNext = !paused && isHost && members.filter(({ connected }) => connected).length >= GAME_CONFIG.players.min &&
     scene?.phase === "results" && !scene.result.gameWinnerIds.length;
   const roundNumber = scene?.roundNumber ?? 0;
+  const finalMotion = scene?.phase === "results" && scene.cardMotion &&
+    (isHost || (received?.receivedAt ?? 0) + scene.cardMotion.remainingMs > now) ? scene.cardMotion : null;
 
   function dispatch(action: TurnAction) {
     if (!view) return;
@@ -223,6 +225,6 @@ export function useRoundTurn({
       startNextRound(state, roundNumber, currentMembers, performance.now()));
   }
 
-  return { scene, deadline, view, remaining, canPlay, canReact, receive, act, react,
+  return { scene, deadline, view, finalMotion, remaining, canPlay, canReact, receive, act, react,
     canStartNext, toggleVariant, startNext, waitingForClock };
 }

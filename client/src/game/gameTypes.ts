@@ -20,6 +20,7 @@ export type GamePlayer = {
 };
 
 export type CardTarget = { playerId: string; position: number };
+export type PublicCardMove = { kind: "swap"; targets: [CardTarget, CardTarget] } | { kind: "gift"; target: CardTarget };
 export type PowerKind = "look-own" | "look-other" | "blind-swap" | "look-and-swap" | "give-card";
 export type SelectedCard = { playerId: string; cardId: string };
 export type Power = { kind: PowerKind; selected: SelectedCard[] };
@@ -53,6 +54,7 @@ export type GameState = {
   discardPile: Card[];
   currentPlayerId: string | null;
   turn: Turn | null;
+  cardMotion?: { id: number; at: number; move: PublicCardMove };
   reaction: ReactionState;
   dutch: Dutch | null;
   result: RoundResult | null;

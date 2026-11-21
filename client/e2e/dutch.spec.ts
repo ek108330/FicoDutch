@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const announce = (page: Page) => page.getByRole("button", { name: "Annoncer Dutch en fin de tour" });
 
@@ -10,7 +10,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceDutch", "BobDutch");
     await start.click();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
+    await expectLocalTurn(guest, 17_000);
     await drawDeck(guest).click();
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await announce(guest).click();
@@ -24,7 +24,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
       await expect(page.getByText("BobDutch a annoncé Dutch. Dernier tour.")).toBeVisible();
       await expect(announce(page)).toHaveCount(0);
     }
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
+    await expectLocalTurn(host);
     await expect(drawDeck(guest)).toBeDisabled();
     await expect(guest.locator(".position-bottom [data-reactable]")).toHaveCount(4);
 
@@ -33,7 +33,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await host.screenshot({ path: testInfo.outputPath("02-dernier-tour-portrait.png") });
     await drawDeck(host).click();
     await host.getByRole("button", { name: "Remplacer la carte 2", exact: true }).click();
-    await expect(activeTurn(host)).toHaveText("Pouvoir du Valet");
+    await expect(host.getByRole("heading", { name: "Pouvoir du Valet" })).toBeVisible();
     await host.getByRole("button", { name: "Choisir la carte 1 de BobDutch" }).click();
     await host.getByRole("button", { name: "Choisir la carte 1 de AliceDutch" }).click();
     await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");

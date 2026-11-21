@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
@@ -73,7 +73,7 @@ for (const count of [4, 5, 6]) {
         }
         await start.click();
         const last = guests.at(-1)!;
-        await expect(activeTurn(last)).toHaveText("À toi de jouer", { timeout: 21_000 });
+        await expectLocalTurn(last, 21_000);
         for (const { name, width, height } of viewports) {
           await last.setViewportSize({ width, height });
           await checkSeats(last, count, cards);
@@ -84,7 +84,7 @@ for (const count of [4, 5, 6]) {
 
         await drawDeck(last).click();
         await last.getByRole("button", { name: "Défausser la carte tirée" }).click();
-        await expect(activeTurn(host)).toHaveText("À toi de jouer");
+        await expectLocalTurn(host);
         await drawDeck(host).click();
         await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
         await host.getByRole("button", { name: "Donner à Invite5", exact: true }).click();

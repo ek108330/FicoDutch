@@ -61,3 +61,9 @@ export const drawDeck = (page: Page) => page.getByRole("button", { name: "Pioche
 export const drawnCard = (page: Page) => page.getByRole("img", { name: /^Carte tirée, / });
 export const discard = (page: Page) => page.getByRole("img", { name: /^Défausse, / });
 export const activeTurn = (page: Page) => page.getByRole("region", { name: "Tour de jeu" }).getByRole("status");
+export const turnClock = (page: Page) => page.getByRole("progressbar", { name: "Temps restant" });
+
+export async function expectLocalTurn(page: Page, timeout?: number) {
+  const pseudo = (await page.locator(".position-bottom .player-name").innerText()).replace(/ \(Moi\)$/, "");
+  await expect(activeTurn(page)).toHaveText(`${pseudo} joue`, { timeout });
+}

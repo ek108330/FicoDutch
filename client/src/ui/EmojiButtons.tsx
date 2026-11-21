@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { emojis } from "../../../shared/hubSocial.json";
 import type { HubEmoji } from "../../../shared/hubTypes";
 
@@ -18,21 +17,5 @@ export default function EmojiButtons({ label, disabled, onChoose }: Props) {
         </button>
       ))}
     </div>
-  );
-}
-
-export function TableEmojiPicker({ onChoose }: Pick<Props, "onChoose">) {
-  const menu = useRef<HTMLDetailsElement>(null);
-  return (
-    <details className="table-emoji-picker" ref={menu}>
-      <summary>Emojis</summary>
-      <EmojiButtons label="Emojis de la table" onChoose={(emoji) => {
-        if (menu.current) {
-          menu.current.open = false;
-          menu.current.querySelector("summary")?.focus();
-        }
-        onChoose(emoji);
-      }} />
-    </details>
   );
 }

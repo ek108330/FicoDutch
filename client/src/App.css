@@ -1021,38 +1021,24 @@ input {
 .table-options {
   position: absolute;
   z-index: 3;
-  top: max(18px, 4dvh);
-  left: max(18px, 4vw);
+  top: 8px;
+  left: 8px;
   display: flex;
-  align-items: flex-start;
-  gap: 5px;
+  align-items: center;
+  min-height: 44px;
   font: 600 0.75rem/1.25 var(--sans);
-  text-align: left;
 }
 
-.table-emoji-picker {
-  position: relative;
+.table-options .emoji-buttons {
+  flex-wrap: nowrap;
+  gap: clamp(3px, 0.8vw, 6px);
 }
 
-.table-emoji-picker summary {
-  width: max-content;
-  padding: 4px 8px;
-  border: 1px solid #91bca6;
-  border-radius: 6px;
+.table-options .emoji-buttons button {
+  width: clamp(26px, 8vw, 36px);
+  height: clamp(30px, 9vw, 36px);
   background: #123b2a;
-  color: #fff;
-  cursor: pointer;
-}
-
-.table-emoji-picker .emoji-buttons {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 0;
-  width: max-content;
-  padding: 6px;
-  border: 1px solid #91bca6;
-  border-radius: 8px;
-  background: #123b2a;
+  font-size: clamp(0.95rem, 4.3vw, 1.2rem);
 }
 
 .table-emoji {
@@ -1467,6 +1453,70 @@ input {
   line-height: 1.3;
 }
 
+.turn-layout {
+  display: grid;
+  grid-template-areas: "banner" "choices" "piles";
+  align-items: center;
+  justify-items: center;
+  gap: 5px;
+  max-width: 100%;
+}
+
+.turn-panel {
+  grid-area: banner;
+  position: relative;
+  min-width: min(150px, 58vw);
+  padding-block: 6px;
+  border-color: transparent;
+}
+
+.turn-choices {
+  grid-area: choices;
+  padding-block: 4px;
+}
+
+.turn-layout .table-piles { grid-area: piles; }
+
+.turn-player {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.turn-choices .power-title {
+  margin: 0;
+  color: #f3de9a;
+  font: inherit;
+  font-weight: 700;
+}
+
+.turn-clock {
+  position: absolute;
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.turn-clock rect {
+  width: calc(100% - 3px);
+  height: calc(100% - 3px);
+  fill: none;
+  stroke-width: 2;
+}
+
+.turn-clock-track { stroke: #537866; }
+
+.turn-clock-progress {
+  stroke: #f3de9a;
+  stroke-dasharray: 100;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .turn-clock-progress { transition: stroke-dashoffset 130ms linear; }
+}
+
 .round-heading {
   display: flex;
   align-items: center;
@@ -1644,7 +1694,8 @@ input {
   perspective: 450px;
 }
 
-.drawn-card-turn {
+.drawn-card-turn,
+.power-card-turn {
   position: relative;
   display: block;
   width: 100%;
@@ -1674,6 +1725,19 @@ input {
   transform: rotateY(180deg);
 }
 
+.game-table .playing-card[data-power-reveal="true"] {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  perspective: 450px;
+  overflow: visible;
+}
+
+.power-card-turn .drawn-card-front {
+  border-color: #dacbff;
+  box-shadow: 0 2px 12px rgb(185 162 247 / 35%);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .drawn-card[data-animated="true"] {
     animation: draw-travel 360ms ease-out both;
@@ -1681,6 +1745,10 @@ input {
 
   .drawn-card[data-animated="true"] .drawn-card-turn {
     animation: draw-flip 360ms ease-in-out both;
+  }
+
+  .power-card-turn {
+    animation: draw-flip 420ms ease-in-out both;
   }
 }
 
@@ -1705,7 +1773,7 @@ input {
   cursor: grabbing;
 }
 
-.projected-card {
+.flying-card {
   position: fixed;
   z-index: 5;
   margin: 0;
@@ -1713,9 +1781,9 @@ input {
   pointer-events: none;
 }
 
-.projected-card.face-up {
-  background: #fff9e9;
-  color: #252b26;
+.flying-card .card-back-pattern span {
+  color: #fff;
+  font-size: clamp(16px, 3.8dvh, 34px);
 }
 
 button.pile-slot:not(:disabled) {
@@ -2062,6 +2130,30 @@ button.pile-slot:not(:disabled) .pile-card,
     top: 45%;
   }
 
+  .game-screen .game-table:not(.is-large-table) .table-center:has(.turn-layout) {
+    top: 46%;
+  }
+
+  .turn-layout {
+    width: min(66vw, 545px);
+    gap: 3px;
+    grid-template: ". banner ." auto ". piles choices" auto / minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .is-large-table .turn-layout {
+    width: min(48vw, 425px);
+  }
+
+  .turn-choices {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .turn-layout .pile-slot {
+    gap: 2px;
+    font-size: 0.69rem;
+  }
+
   .table-piles .deck-placeholder,
   .table-piles .discard-placeholder,
   .table-piles .pile-card {
@@ -2069,13 +2161,30 @@ button.pile-slot:not(:disabled) .pile-card,
     height: 52px;
   }
 
+  .turn-layout .pile-card {
+    height: 38px;
+  }
+
   .round-panel {
     padding: 6px 9px;
     font-size: 0.75rem;
   }
 
-  .round-panel:has(.power-actions > button + button) {
-    min-width: min(300px, 54vw);
+  .turn-layout .round-panel {
+    padding-block: 4px;
+  }
+
+  .turn-layout .round-panel p {
+    margin: 3px 0;
+  }
+
+  .turn-layout .power-actions {
+    gap: 3px;
+    margin-top: 2px;
+  }
+
+  .turn-layout .power-actions button {
+    padding: 3px 6px;
   }
 
   .game-table .player-name {

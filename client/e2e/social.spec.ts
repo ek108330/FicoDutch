@@ -1,11 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const chat = (page: Page) => page.getByRole("region", { name: "Chat du Hub" });
 const messages = (page: Page) => page.getByRole("log", { name: "Messages du Hub" });
 const emoji = (page: Page, label: string) => page.getByRole("button", { name: `Envoyer l’emoji ${label}` });
 const bubble = (page: Page, label: string) => page.getByRole("status", { name: label });
-const menu = (page: Page) => page.locator(".table-emoji-picker summary");
+const tableEmojis = (page: Page) => page.getByRole("group", { name: "Emojis de la table" });
 
 test("le chat reste dans le lobby de son Hub et les emojis de table disparaissent", async ({
   page: host, browser, baseURL,
@@ -42,12 +42,12 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
 
     await start.click();
-    await expect(activeTurn(newcomer)).toHaveText("À toi de jouer", { timeout: 19_000 });
+    await expectLocalTurn(newcomer, 19_000);
     for (const page of [host, guest, newcomer]) {
       await expect(chat(page)).toHaveCount(0);
       await expect(page.getByRole("textbox", { name: "Message du Hub" })).toHaveCount(0);
     }
-    await menu(host).click();
+    await expect(tableEmojis(host).getByRole("button")).toHaveCount(5);
     await emoji(host, "Bravo").click();
     await expect(guest.locator(".table-player").filter({ hasText: "AliceChat" })
       .getByRole("status", { name: "AliceChat · Bravo" })).toBeVisible();
@@ -56,7 +56,7 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await expect(bubble(guest, "AliceChat · Bravo")).toHaveCount(0);
 
     await guest.setViewportSize({ width: 844, height: 390 });
-    await menu(guest).click();
+    await expect(tableEmojis(guest).getByRole("button", { name: "Envoyer l’emoji Cœur" })).toBeInViewport();
     await guest.screenshot({ path: testInfo.outputPath("03-choix-emojis-paysage.png") });
     await emoji(guest, "Cœur").click();
     await expect(bubble(host, "BobChat · Cœur")).toBeVisible();

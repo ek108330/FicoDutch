@@ -47,6 +47,7 @@ export function finishRound(state: GameState, now: number, emptyHandPlayerId: st
   return {
     ...state,
     phase: "results",
+    cardMotion: state.cardMotion?.at === now ? state.cardMotion : undefined,
     phaseDeadline: gameEnded ? null : now + GAME_CONFIG.round.resultsMs,
     currentPlayerId: null,
     turn: null,

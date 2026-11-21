@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 import type { CardFace } from "../game/cards";
 import { describeCardFace, suits } from "./cardLabels";
 import { useCardGestures, type CardReaction } from "./useCardGestures";
+import { reducedMotion } from "./cardAnimations";
 
 type PlayingCardProps = {
   index: number;
@@ -12,6 +13,7 @@ type PlayingCardProps = {
   selected?: boolean;
   dealOrder?: number;
   reaction?: CardReaction;
+  powerReveal?: boolean;
 };
 
 export function CardFaceMark({ face }: { face: CardFace }) {
@@ -25,32 +27,53 @@ export function CardFaceMark({ face }: { face: CardFace }) {
   );
 }
 
-export function CardBackMark() {
-  return <span className="card-back-pattern" aria-hidden="true"><span>F</span></span>;
+export function CardBackMark({ backRef }: { backRef?: RefObject<HTMLSpanElement | null> } = {}) {
+  return <span ref={backRef} className="card-back-pattern" aria-hidden="true"><span>F</span></span>;
 }
 
-export default function PlayingCard({ index, face, onToggle, disabled, actionLabel, selected, dealOrder, reaction }: PlayingCardProps) {
+export default function PlayingCard({ index, face, onToggle, disabled, actionLabel, selected, dealOrder, reaction,
+  powerReveal = false }: PlayingCardProps) {
   const card = useRef<HTMLButtonElement>(null);
+  const back = useRef<HTMLSpanElement>(null);
+  const previouslyRevealed = useRef(false);
   const gestures = useCardGestures(card, reaction, onToggle, actionLabel);
+  useLayoutEffect(() => {
+    if (previouslyRevealed.current && !powerReveal && !reducedMotion()) {
+      back.current?.animate([{ transform: "rotateY(90deg)" }, { transform: "rotateY(0deg)" }], { duration: 200 });
+    }
+    previouslyRevealed.current = powerReveal;
+  }, [powerReveal]);
   const shared = {
     className: `playing-card ${face ? "face-up" : "face-down"}`,
     "aria-label": actionLabel ?? `Carte ${index + 1} ${face ? describeCardFace(face) : "face cachée"}`,
     "data-selected": selected || undefined,
+    "data-card-position": index,
+    "data-power-reveal": powerReveal || undefined,
     style: dealOrder === undefined ? undefined : { animationDelay: `${dealOrder * 45}ms` },
   };
-  const content = face ? <CardFaceMark face={face} /> : <CardBackMark />;
+  const content = face && powerReveal ? (
+    <span className="power-card-turn" aria-hidden="true">
+      <span className="drawn-card-front"><CardFaceMark face={face} /></span>
+      <span className="drawn-card-back"><CardBackMark /></span>
+    </span>
+  ) : face ? <CardFaceMark face={face} /> : <CardBackMark backRef={back} />;
 
   if (reaction) {
     return (
       <button {...shared} ref={card} type="button" data-reactable="true" data-react-only={onToggle ? undefined : "true"} aria-keyshortcuts="R"
-        aria-description="Touchez trois fois ou glissez vers le centre pour réagir. Au clavier, appuyez sur R."
+        aria-description="Au clavier, appuyez sur R pour réagir."
         onPointerDown={gestures.pointerDown} onPointerMove={gestures.pointerMove} onPointerUp={gestures.pointerUp}
         onPointerCancel={gestures.cancelPointer} onLostPointerCapture={gestures.cancelPointer}
-        onClick={(event) => { if (event.detail === 0) (onToggle ?? reaction.play)(); }}
+        onClick={(event) => {
+          if (event.detail === 0) {
+            if (onToggle) onToggle();
+            else gestures.playReaction(event.currentTarget);
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key.toLowerCase() !== "r" || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
           event.preventDefault();
-          reaction.play();
+          gestures.playReaction(event.currentTarget);
         }}>
         {content}
       </button>

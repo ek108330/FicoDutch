@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const ownCards = (page: Page) => page.locator(".position-bottom .playing-card");
 const reactiveCards = (page: Page) => ownCards(page).and(page.locator("[data-reactable]"));
@@ -42,7 +42,7 @@ async function openReactionRound(host: Page, guest: Page, hostName: string, gues
     await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
   }
   await start.click();
-  await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 17_000 });
+  await expectLocalTurn(guest, 17_000);
   await expect(reactiveCards(guest)).toHaveCount(0);
   await drawDeck(guest).click();
   await guest.getByRole("button", { name: "Défausser la carte tirée" }).click();
@@ -56,6 +56,8 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await openReactionRound(host, guest, "AliceReflexe", "BobReflexe");
 
     await react(host, 1);
+    await expect(host.locator('[data-card-animation="reaction"]')).toHaveCount(1);
+    await host.screenshot({ path: testInfo.outputPath("06-reaction-triple-appui.png") });
     await expect(host.getByText("AliceReflexe reçoit une carte de pénalité.")).toBeVisible();
     await expect(ownCards(host)).toHaveCount(5);
     await expect(ownCards(host).nth(4)).toHaveAttribute("aria-label", "Carte 5 face cachée");
@@ -80,8 +82,8 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");
     await react(guest, 3);
     await expect(discard(host)).toHaveAccessibleName("Défausse, 8 de pique");
-    await expect(activeTurn(host)).toHaveText("À toi de jouer");
-    await expect(activeTurn(guest)).toHaveText("Au tour de AliceReflexe");
+    await expectLocalTurn(host);
+    await expect(activeTurn(guest)).toHaveText("AliceReflexe joue");
     await guest.setViewportSize({ width: 844, height: 390 });
     await expectTableFits(guest);
     await guest.screenshot({ path: testInfo.outputPath("03-chaine-paysage.png") });

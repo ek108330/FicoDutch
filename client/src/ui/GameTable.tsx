@@ -1,12 +1,14 @@
-import { useRef, type CSSProperties, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { emojis } from "../../../shared/hubSocial.json";
 import type { HubEmoji } from "../../../shared/hubTypes";
 import type { CardFace } from "../game/cards";
 import type { CardTarget, PowerKind } from "../game/gameTypes";
 import type { MemorizedCard } from "../game/memorization";
 import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
+import type { TurnView } from "../game/turn";
 import PlayingCard from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
+import { animatePublicMove, flyCard } from "./cardAnimations";
 
 export type TablePlayer = {
   id: string;
@@ -26,6 +28,7 @@ type GameTableProps = {
   onReplace?: (position: number) => void;
   reaction?: { scope: string; play: (position: number) => void };
   drawnCard?: CardFace;
+  cardMotion?: TurnView["cardMotion"];
   power?: {
     kind: PowerKind;
     selection: NonNullable<PowerView["selection"]>;
@@ -60,10 +63,25 @@ export default function GameTable({
   onReplace,
   reaction,
   drawnCard,
+  cardMotion,
   memorization,
   power,
 }: GameTableProps) {
   const center = useRef<HTMLDivElement>(null);
+  const table = useRef<HTMLDivElement>(null);
+  const lastMotion = useRef(0);
+  useLayoutEffect(() => {
+    if (!cardMotion || !table.current || cardMotion.id <= lastMotion.current) return;
+    lastMotion.current = cardMotion.id;
+    animatePublicMove(table.current, cardMotion.move);
+  }, [cardMotion]);
+
+  function replaceCard(position: number) {
+    const target = center.current?.querySelector(".discard-slot");
+    const source = table.current?.querySelector(`.position-bottom [data-card-position="${position}"]`);
+    if (source && target) flyCard(source.getBoundingClientRect(), target.getBoundingClientRect(), "discard");
+    onReplace?.(position);
+  }
   const localPlayer = players.find((player) => player.id === localPlayerId);
   const opponents = players.filter((player) => player.id !== localPlayerId);
   const positions = positionLayouts[players.length] || [];
@@ -75,15 +93,15 @@ export default function GameTable({
 
   return (
     <div className={`game-table${dealing ? " is-dealing" : ""}${players.length >= 4 ? " is-large-table" : ""}`}
-      data-player-count={players.length}>
+      ref={table} data-player-count={players.length}>
       <div className="table-center" ref={center}>
         {controls}
-        {piles ?? (
+        {piles === undefined ? (
           <div className="table-piles">
             <div className="deck-placeholder">Pioche</div>
             <div className="discard-placeholder">Défausse</div>
           </div>
-        )}
+        ) : piles}
       </div>
 
       {positionedPlayers.map(({ player, position }) => {
@@ -98,7 +116,7 @@ export default function GameTable({
         const emoji = tableEmojis?.get(player.id);
         const handStyle = { "--hand-columns": Math.max(1, Math.ceil(player.cardCount / 2)) } as CSSProperties;
         return (
-          <div className={`table-player position-${position}${active}`} key={player.id}>
+          <div className={`table-player position-${position}${active}`} key={player.id} data-hand-player={player.id}>
             {emoji && <span className="table-emoji" role="status"
               aria-label={`${player.pseudo} · ${emojis[emoji].label}`}>{emojis[emoji].symbol}</span>}
             {giveToPlayer ? (
@@ -114,11 +132,11 @@ export default function GameTable({
                   const target = { playerId: player.id, position: index };
                   const selected = power?.selection.targets.some((card) => sameTarget(card, target));
                   const canChoose = canChooseFromHand && !selected;
-                  const revealed = power?.selection.revealed.find(({ target: card }) => sameTarget(card, target))?.face ??
-                    ownSelection?.revealed.find(({ position }) => position === index)?.face;
+                  const powerFace = power?.selection.revealed.find(({ target: card }) => sameTarget(card, target))?.face;
+                  const revealed = powerFace ?? ownSelection?.revealed.find(({ position }) => position === index)?.face;
                   const cardAction = canChoose ? () => power.chooseCard(target)
                     : ownSelection ? () => ownSelection.toggle(index)
-                    : replace && (() => replace(index));
+                    : replace && (() => replaceCard(index));
                   const actionLabel = canChoose ? `Choisir la carte ${index + 1} de ${player.pseudo}`
                     : replace ? `Remplacer la carte ${index + 1}` : undefined;
                   return (
@@ -127,6 +145,7 @@ export default function GameTable({
                       index={index}
                       dealOrder={dealing ? index : undefined}
                       face={revealed}
+                      powerReveal={!!powerFace}
                       onToggle={cardAction}
                       reaction={react && { scope: react.scope, center, play: () => react.play(index) }}
                       actionLabel={actionLabel}

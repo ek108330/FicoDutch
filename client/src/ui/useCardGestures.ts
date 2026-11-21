@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type PointerEvent, type RefObject } from "react";
+import { flyCard, reducedMotion } from "./cardAnimations";
 
 type Point = { x: number; y: number };
 type Drag = { pointerId: number; origin: Point; target: Point; distance: number; moved: boolean };
@@ -12,31 +13,12 @@ export type CardReaction = {
 const tapWindow = 280;
 const dragThreshold = 9;
 const translate = ({ x, y }: Point) => `${x}px ${y}px`;
-const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-function projectCard(card: HTMLButtonElement, offset: Point, target: Point) {
-  if (reducedMotion()) return;
-  const bounds = card.getBoundingClientRect();
-  const copy = card.cloneNode(true) as HTMLButtonElement;
-  copy.disabled = true;
-  copy.classList.remove("is-dragging");
-  copy.classList.add("projected-card");
-  copy.setAttribute("aria-hidden", "true");
-  Object.assign(copy.style, {
-    left: `${bounds.left}px`, top: `${bounds.top}px`, width: `${bounds.width}px`, height: `${bounds.height}px`, translate: "none",
-  });
-  document.body.append(copy);
-  const animation = copy.animate([
-    { translate: "0px 0px", opacity: 1 },
-    { translate: translate({ x: target.x - offset.x, y: target.y - offset.y }), opacity: 0 },
-  ], { duration: 160, easing: "ease-out", fill: "forwards" });
-  void animation.finished.then(() => copy.remove(), () => copy.remove());
-}
 
 export function useCardGestures(card: RefObject<HTMLButtonElement | null>, reaction: CardReaction | undefined,
   action: (() => void) | undefined, actionLabel: string | undefined) {
   const drag = useRef<Drag | null>(null);
   const returning = useRef<Animation | null>(null);
+  const tapFeedback = useRef<Animation | null>(null);
   const taps = useRef({ count: 0, last: 0, timer: 0 });
 
   function resetTaps() {
@@ -60,14 +42,23 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
       resetTaps();
       if (element && drag.current) resetDrag(element);
       returning.current?.cancel();
+      tapFeedback.current?.cancel();
     };
   }, [card, reaction?.scope, actionLabel]);
+
+  function playReaction(element: HTMLButtonElement) {
+    if (!reaction) return;
+    const target = reaction.center.current?.querySelector(".discard-slot");
+    if (target) flyCard(element.getBoundingClientRect(), target.getBoundingClientRect(), "reaction");
+    reaction.play();
+  }
 
   function pointerDown(event: PointerEvent<HTMLButtonElement>) {
     const center = reaction?.center.current?.querySelector(".discard-slot");
     if (!event.isPrimary || event.button !== 0 || !center) return;
     window.clearTimeout(taps.current.timer);
     returning.current?.cancel();
+    tapFeedback.current?.cancel();
     const element = event.currentTarget;
     const from = element.getBoundingClientRect();
     const to = center.getBoundingClientRect();
@@ -99,11 +90,10 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
       const releaseTowardCenter = progress >= Math.min(52, current.distance * 0.55) && progress >= movement * 0.7;
       if (releaseTowardCenter) {
         element.style.translate = translate(offset);
-        projectCard(element, offset, current.target);
+        playReaction(element);
       }
       resetDrag(element, !releaseTowardCenter);
       resetTaps();
-      if (releaseTowardCenter) reaction.play();
       return;
     }
 
@@ -112,8 +102,13 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
     const count = now - taps.current.last <= tapWindow ? taps.current.count + 1 : 1;
     resetTaps();
     if (count === 3) {
-      reaction.play();
+      playReaction(element);
       return;
+    }
+    if (!reducedMotion()) {
+      tapFeedback.current = element.animate([
+        { scale: 1 }, { scale: count === 1 ? 1.045 : 1.08, boxShadow: "0 0 0 2px #f3de9a" }, { scale: 1 },
+      ], { duration: 140, easing: "ease-out" });
     }
     taps.current = { count, last: now, timer: window.setTimeout(() => {
       resetTaps();
@@ -128,5 +123,5 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
     }
   }
 
-  return { pointerDown, pointerMove, pointerUp, cancelPointer };
+  return { pointerDown, pointerMove, pointerUp, cancelPointer, playReaction };
 }

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub } from "./tableFlow";
+import { activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 for (const cardsPerPlayer of [4, 6]) {
   test(`mémorisation à ${cardsPerPlayer} cartes pour l’hôte et l’invité`, async ({
@@ -82,7 +82,7 @@ for (const cardsPerPlayer of [4, 6]) {
       }));
       if (cardsPerPlayer === 6) {
         await host.screenshot({ path: testInfo.outputPath("04-cartes-masquees.png") });
-        const first = (await activeTurn(host).textContent()) === "À toi de jouer" ? host : guest;
+        const first = (await activeTurn(host).textContent()) === `${hostPseudo} joue` ? host : guest;
         const second = first === host ? guest : host;
 
         await first.setViewportSize({ width: 1280, height: 720 });
@@ -98,7 +98,7 @@ for (const cardsPerPlayer of [4, 6]) {
         await first.screenshot({ path: testInfo.outputPath("05-pioche-ordinateur.png") });
 
         await first.getByRole("button", { name: "Défausser la carte tirée" }).click();
-        await expect(activeTurn(second)).toHaveText("À toi de jouer");
+        await expectLocalTurn(second);
         for (const page of [first, second]) {
           await expect(discard(page)).toHaveAccessibleName(`Défausse, ${firstFace}`);
         }
@@ -114,7 +114,7 @@ for (const cardsPerPlayer of [4, 6]) {
         await expectTableFits(second);
         await second.screenshot({ path: testInfo.outputPath("06-remplacement-portrait.png") });
         await second.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
-        await expect(activeTurn(first)).toHaveText("À toi de jouer");
+        await expectLocalTurn(first);
         await expect(discard(first)).toBeVisible();
         await expect(discard(second)).toHaveAccessibleName((await discard(first).getAttribute("aria-label"))!);
         for (const page of [first, second]) {
@@ -131,7 +131,7 @@ for (const cardsPerPlayer of [4, 6]) {
         await expectTableFits(first);
         await first.screenshot({ path: testInfo.outputPath("09-tour-reaction-paysage.png") });
         const expiredFace = (await drawnCard(first).getAttribute("aria-label"))?.replace("Carte tirée, ", "");
-        await expect(activeTurn(second)).toHaveText("À toi de jouer", { timeout: 65_000 });
+        await expectLocalTurn(second, 65_000);
         await expect(discard(second)).toHaveAccessibleName(`Défausse, ${expiredFace}`);
         await expect(drawnCard(first)).toHaveCount(0);
         await second.screenshot({ path: testInfo.outputPath("08-tour-apres-expiration.png") });

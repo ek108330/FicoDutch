@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub } from "./tableFlow";
+import { drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
@@ -7,7 +7,7 @@ const waiting = (page: Page) => page.getByRole("heading", { name: "En attente de
 const showRanking = (page: Page) => page.getByRole("heading", { name: /^Fin de la (manche|partie)$/ });
 
 async function playTurn(page: Page, announceDutch = false) {
-  await expect(activeTurn(page)).toHaveText("À toi de jouer", { timeout: 18_000 });
+  await expectLocalTurn(page, 18_000);
   await drawDeck(page).click();
   if (announceDutch) {
     const announce = page.getByRole("button", { name: "Annoncer Dutch en fin de tour" });
@@ -30,7 +30,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await Promise.all([openLobby(newcomer, "ChloeEntree"), openLobby(late, "DanaEntree")]);
     await host.getByRole("slider").press("Home");
     await start.click();
-    await expect(activeTurn(guest)).toHaveText("À toi de jouer", { timeout: 18_000 });
+    await expectLocalTurn(guest, 18_000);
 
     await expect(hub(newcomer).getByText("En cours", { exact: true })).toBeVisible();
     await join(newcomer).click();

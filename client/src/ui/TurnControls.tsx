@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { PowerKind } from "../game/gameTypes";
 import { powerCardCount, type PowerView } from "../game/powers";
-import type { TurnAction, TurnView } from "../game/turn";
+import { TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
 import { CardBackMark, CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
 import type { CardFeedback } from "./useCardFeedback";
@@ -55,14 +55,12 @@ function PowerControls({
 }
 
 export function TurnPanel({
-  view, canPlay, act, remaining, playerId, canReact,
+  view, canPlay, act, remaining, piles,
 }: TurnControlsProps & {
   remaining: number;
-  playerId: string;
-  canReact: boolean;
+  piles: ReactNode;
 }) {
   const { power } = view;
-  const activeLabel = view.playerId === playerId ? "À toi de jouer" : `Au tour de ${view.playerName}`;
   const notice = view.reaction.notice;
   const reactor = notice && view.players.find(({ id }) => id === notice.playerId)?.pseudo;
   const feedback = reactor && notice ? {
@@ -82,32 +80,39 @@ export function TurnPanel({
       Dutch
     </button>
   );
-  const normalInstruction = canPlay
-    ? view.hasDrawn ? "Choisis une carte à remplacer." : "Prends une carte dans la pioche."
-    : canReact ? "Touche 3 fois ou glisse une carte." : null;
+  const fraction = Math.min(1, Math.max(0, remaining / TURN_DURATION_MS));
+  const seconds = Math.ceil(fraction * TURN_DURATION_MS / 1_000);
+  const discarding = canPlay && view.hasDrawn;
   return (
-    <section className="round-panel" aria-label="Tour de jeu">
-      <div className="round-heading">
-        <strong role="status">{power ? powerLabels[power.kind].title : activeLabel}</strong>
-        <span role="timer" className="round-timer">{Math.ceil(remaining / 1_000)} s</span>
+    <section className="turn-layout" aria-label="Tour de jeu">
+      <div className="round-panel turn-panel">
+        <svg key={`${view.number}:${power?.kind ?? "turn"}`} className="turn-clock" role="progressbar"
+          aria-label="Temps restant" aria-valuemin={0} aria-valuemax={TURN_DURATION_MS / 1_000}
+          aria-valuenow={seconds} aria-valuetext={`${seconds} secondes`}>
+          <rect className="turn-clock-track" x="1.5" y="1.5" rx="10" />
+          <rect className="turn-clock-progress" x="1.5" y="1.5" rx="10" pathLength="100" strokeDashoffset={100 * (1 - fraction)} />
+        </svg>
+        <strong className="turn-player" role="status">{view.playerName} joue</strong>
       </div>
-      {power && canPlay ? (
-        <PowerControls power={power} act={act} message={message} extraActions={dutchButton} />
-      ) : (
-        <>
-          {(message || (power ? activeLabel : normalInstruction)) && (
-            <p aria-live="polite">{message ?? (power ? activeLabel : normalInstruction)}</p>
-          )}
-          {(dutchButton || (canPlay && view.hasDrawn)) && (
-            <div className="power-actions">
-              {canPlay && view.hasDrawn && (
-                <button type="button" onClick={() => act({ kind: "discard" })}>Défausser la carte tirée</button>
+      {(power || message || dutchButton || discarding) && (
+        <div className="round-panel turn-choices">
+          {power && <h2 className="power-title">{powerLabels[power.kind].title}</h2>}
+          {power && canPlay ? (
+            <PowerControls power={power} act={act} message={message} extraActions={dutchButton} />
+          ) : (
+            <>
+              {message && <p aria-live="polite">{message}</p>}
+              {(dutchButton || discarding) && (
+                <div className="power-actions">
+                  {discarding && <button type="button" onClick={() => act({ kind: "discard" })}>Défausser la carte tirée</button>}
+                  {dutchButton}
+                </div>
               )}
-              {dutchButton}
-            </div>
+            </>
           )}
-        </>
+        </div>
       )}
+      {piles}
     </section>
   );
 }
