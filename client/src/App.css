@@ -2038,7 +2038,11 @@ button.pile-slot:not(:disabled) .pile-card,
 }
 
 .round-results .card-face b { font-size: clamp(0.85rem, 4.25vw, 1.12rem); }
-.round-results .card-face.joker-face b { font-size: clamp(0.5rem, 2.55vw, 0.64rem); }
+.round-results .card-face.joker-face b {
+  font-family: Arial, sans-serif;
+  font-size: clamp(0.42rem, 2.1vw, 0.58rem);
+  letter-spacing: 0;
+}
 
 .round-results .card-face.red-suit {
   color: #a42236;
