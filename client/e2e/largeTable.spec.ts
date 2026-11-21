@@ -60,6 +60,7 @@ for (const count of [4, 5, 6]) {
       const guests = await Promise.all(Array.from({ length: count - 1 }, () => browser.newPage({ baseURL })));
       const hostName = `Table${count}C${cards}`;
       const joker = count === 6 && cards === 6;
+      const seatsViewports = count === 6 ? [...viewports, { name: "portrait-320", width: 320, height: 568 }] : viewports;
       try {
         const start = await openTwoPlayerHub(host, guests[0], hostName, "Invite1");
         for (const [index, guest] of guests.slice(1).entries()) {
@@ -93,7 +94,7 @@ for (const count of [4, 5, 6]) {
         } else await start.click();
         const last = guests.at(-1)!;
         await expectLocalTurn(last, 21_000);
-        for (const { name, width, height } of viewports) {
+        for (const { name, width, height } of seatsViewports) {
           await last.setViewportSize({ width, height });
           await checkSeats(last, count, cards);
           await expect(drawDeck(last)).toBeEnabled();
@@ -108,7 +109,7 @@ for (const count of [4, 5, 6]) {
         await drawDeck(host).click();
         await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
         await host.getByRole("button", { name: "Donner à Invite5", exact: true }).click();
-        for (const { name, width, height } of viewports) {
+        for (const { name, width, height } of seatsViewports) {
           await last.setViewportSize({ width, height });
           await checkSeats(last, 6, 7);
           await last.screenshot({ path: testInfo.outputPath(`${name}-joker.png`), fullPage: true });
