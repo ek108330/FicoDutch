@@ -20,6 +20,7 @@ export type GamePlayer = {
   memorizedPositions?: number[];
   roundScore: number;
   totalScore: number;
+  previousRank?: number;
   scoreHistory: number[];
   hasLeft: boolean;
 };

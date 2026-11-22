@@ -1,7 +1,7 @@
 import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { ChevronRight, Megaphone, Trophy } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Megaphone, Trophy } from "lucide-react";
 import { GAME_CONFIG } from "../config/gameConfig";
-import type { RoundResultView } from "../game/hands";
+import { rankPlayers, type RoundResultView } from "../game/hands";
 import { VARIANT_LABELS, type GameVariants } from "../game/variants";
 import PlayingCard from "./PlayingCard";
 import PerimeterClock from "./PerimeterClock";
@@ -72,17 +72,28 @@ function PlayerBadges({ id, result }: { id: string; result: RoundResultView }) {
   );
 }
 
+function RankingPosition({ rank, previousRank }: { rank: number; previousRank?: number }) {
+  const change = previousRank === undefined ? 0 : previousRank - rank;
+  const Icon = change > 0 ? ArrowUp : ArrowDown;
+  const places = Math.abs(change);
+  const label = `${change > 0 ? "Gagne" : "Perd"} ${places} ${places === 1 ? "place" : "places"}`;
+  return <span className="ranking-position">
+    {rank}
+    {change !== 0 && <span className="rank-movement" data-direction={change > 0 ? "up" : "down"}
+      role="img" aria-label={label} title={label}><Icon size={13} strokeWidth={2.8} aria-hidden="true" /></span>}
+  </span>;
+}
+
 function Ranking({ result }: { result: RoundResultView }) {
-  const sorted = [...result.players].sort((a, b) => a.totalScore - b.totalScore);
   return (
     <table className="score-ranking" aria-label="Classement cumulé">
       <thead>
         <tr><th>Rang</th><th>Joueur</th><th>Total</th></tr>
       </thead>
       <tbody>
-        {sorted.map(({ id, pseudo, totalScore, roundScore }) => (
+        {rankPlayers(result.players).map(({ rank, player: { id, pseudo, totalScore, roundScore, previousRank } }) => (
           <tr key={id}>
-            <td>{sorted.findIndex((player) => player.totalScore === totalScore) + 1}</td>
+            <td><RankingPosition rank={rank} previousRank={previousRank} /></td>
             <th scope="row"><span className="result-player-heading"><span>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
             <td>{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></td>
           </tr>
@@ -135,7 +146,8 @@ export default function RoundResults({
     <main className="game-screen result-screen" onClick={clickScreen} onPointerDown={beginSwipe} onPointerUp={endSwipe}
       onPointerCancel={() => { touchOrigin.current = null; }}>
       <section className="round-results" aria-labelledby="result-title">
-        {!isFinal && <PerimeterClock remaining={remaining} duration={GAME_CONFIG.round.resultsMs} label="Temps avant la manche suivante" />}
+        {!isFinal && <PerimeterClock remaining={remaining} duration={GAME_CONFIG.round.resultsMs}
+          label="Temps avant la manche suivante" radius={15} />}
         <div className="result-heading">
           <h1 id="result-title">{isFinal ? "Fin de la partie" : `Manche ${roundNumber}`}</h1>
           <button type="button" className="result-progress" onClick={flipPage}

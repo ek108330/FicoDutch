@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export async function openSettings(page: Page) {
   await page.getByRole("button", { name: "Paramètres du jeu" }).click();
@@ -71,13 +71,27 @@ export const discard = (page: Page) => page.locator(".pile-slot").filter({ has: 
 export const activeTurn = (page: Page) => page.getByRole("region", { name: "Tour de jeu" }).getByRole("status");
 export const turnClock = (page: Page) => page.getByRole("progressbar", { name: "Temps restant" });
 
+export async function expectClockFromTop(clock: Locator) {
+  const progress = clock.locator("path.perimeter-clock-progress");
+  await expect(progress).toHaveAttribute("d", /^M /);
+  const { center, startX, startY, nextX, nextY } = await progress.evaluate((element: SVGPathElement) => {
+    const { x: startX, y: startY } = element.getPointAtLength(0);
+    const { x: nextX, y: nextY } = element.getPointAtLength(2);
+    return { center: element.ownerSVGElement!.clientWidth / 2, startX, startY, nextX, nextY };
+  });
+  expect(Math.abs(startX - center)).toBeLessThan(1);
+  expect(startY).toBeCloseTo(1.5);
+  expect(nextX).toBeGreaterThan(startX);
+  expect(nextY).toBeCloseTo(startY);
+}
+
 export async function expectCenteredTurnPanel(page: Page) {
   const panel = page.locator(".turn-panel[data-local-turn]");
   await expect(panel).toHaveCSS("background-color", "rgb(243, 222, 154)");
   const [text, piles, ownName] = await Promise.all([
     panel.boundingBox(), page.locator(".turn-layout .table-piles").boundingBox(), page.locator(".position-bottom .player-name").boundingBox(),
   ]);
-  expect(text!.y).toBeGreaterThan(piles!.y + piles!.height);
+  expect(text!.y - piles!.y - piles!.height).toBeGreaterThanOrEqual(9);
   expect(text!.y + text!.height).toBeLessThanOrEqual(ownName!.y);
   expect(text!.x + text!.width / 2).toBeCloseTo(piles!.x + piles!.width / 2, 0);
   const overlap = await page.locator(".table-player:not(.position-bottom)").evaluateAll((seats, box) =>

@@ -28,6 +28,11 @@ function handPoints(cards: Card[]) {
   return cards.reduce((sum, card) => sum + getCardValue(card), 0);
 }
 
+export function rankPlayers<Player extends { totalScore: number }>(players: readonly Player[]) {
+  const sorted = [...players].sort((a, b) => a.totalScore - b.totalScore);
+  return sorted.map((player) => ({ player, rank: sorted.findIndex(({ totalScore }) => totalScore === player.totalScore) + 1 }));
+}
+
 export function finishRound(state: GameState, now: number, emptyHandPlayerId: string | null = null): GameState {
   if (state.phase !== "playing") return state;
   const baseScores = state.players.map(({ id, cards }) => ({
@@ -90,9 +95,9 @@ export function getRoundResultView(state: GameState) {
   return {
     ...state.result,
     endThreshold: state.endThreshold,
-    players: state.players.map(({ id, pseudo, roundScore, totalScore, cards, handLayout }) => ({
+    players: state.players.map(({ id, pseudo, roundScore, totalScore, cards, handLayout, previousRank }) => ({
       id, pseudo, roundScore, totalScore, penaltyPoints: roundScore - handPoints(cards),
-      cards: cards.map(getCardFace), ...(handLayout && { handLayout }),
+      cards: cards.map(getCardFace), ...(handLayout && { handLayout }), ...(previousRank !== undefined && { previousRank }),
     })),
   };
 }

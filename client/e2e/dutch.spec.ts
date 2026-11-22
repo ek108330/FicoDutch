@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { activeTurn, discard, discardDrawn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { activeTurn, discard, discardDrawn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub,
+  expectLocalTurn, expectClockFromTop } from "./tableFlow";
 
 const announce = (page: Page) => page.getByRole("button", { name: "Annoncer Dutch en fin de tour" });
 
@@ -38,6 +39,9 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await host.getByRole("button", { name: "Choisir la carte 1 de AliceDutch" }).click();
     await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
     await expect(host.getByRole("button", { name: "Échanger les cartes" })).toBeDisabled();
+    await expect(host.getByRole("button", { name: "Échanger les cartes" })).toHaveCSS("color", "rgb(84, 69, 43)");
+    await expect(host.getByRole("button", { name: "Annuler l’échange" })).toHaveCSS("color", "rgb(39, 50, 36)");
+    await expect(host.getByText("La protection Dutch empêche l’échange.")).toHaveCSS("color", "rgb(39, 50, 36)");
     await expect(host.getByText("La protection Dutch empêche l’échange.")).toBeVisible();
     await expect(guest.locator(".player-cards .face-up")).toHaveCount(0);
     await expectTableFits(host);
@@ -128,6 +132,7 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
     await host.mouse.up();
     await expect(activeTurn(guest)).toHaveText("Dernières réactions");
     await expect(guest.getByRole("progressbar", { name: "Temps pour réagir" })).toHaveAttribute("aria-valuemax", "3");
+    await expectClockFromTop(guest.getByRole("progressbar", { name: "Temps pour réagir" }));
     await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");
     await guest.locator('.position-bottom [data-hand-slot="3"]').click({ clickCount: 3 });
     await expect(discard(host)).toHaveAccessibleName("Défausse, 6 de pique");

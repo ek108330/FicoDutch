@@ -3,6 +3,7 @@ import { createRound } from "./createRound.ts";
 import type { GameState, GamePlayer } from "./gameTypes";
 import type { GameVariants } from "./variants";
 import type { HubPlayer } from "../../../shared/hubTypes";
+import { rankPlayers } from "./hands.ts";
 
 type RoundMember = Pick<HubPlayer, "id" | "pseudo" | "connected">;
 
@@ -38,7 +39,9 @@ export function startNextRound(
   if (state.phase !== "results" || state.roundNumber !== roundNumber ||
       !result || result.gameWinnerIds.length > 0) return state;
 
-  const players = state.players.filter(({ hasLeft }) => !hasLeft);
+  const previousRanks = new Map(rankPlayers(state.players).map(({ player, rank }) => [player.id, rank]));
+  const players = state.players.filter(({ hasLeft }) => !hasLeft)
+    .map((player) => ({ ...player, previousRank: previousRanks.get(player.id) }));
   const previousIds = new Set(state.players.map(({ id }) => id));
   const startingScore = Math.max(...state.players.map(({ totalScore }) => totalScore));
   const arrivals = members.filter(({ id, connected }) => connected && !previousIds.has(id))

@@ -11,6 +11,7 @@ import EmojiButtons from "./EmojiButtons";
 import { useCardFeedback, type PlayGameSound } from "./useCardFeedback";
 import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
+import PerimeterClock from "./PerimeterClock";
 
 type RoundScreenProps = {
   hubId: string;
@@ -120,17 +121,14 @@ export default function RoundScreen({
 
   if (pause || !scene || turn.waitingForClock || !connectionReady) {
     const hostPaused = pause?.reason === "host";
-    const seconds = pause?.deadline === undefined ? null : Math.min(
-      GAME_CONFIG.network.reconnectGracePeriodSeconds,
-      Math.ceil(Math.max(0, pause.deadline - now) / 1_000)
-    );
     return (
       <main className="game-screen">
         {gameActions()}
         <section className="round-results" aria-labelledby="pause-title">
+          {hostPaused && pause.deadline !== undefined && <PerimeterClock remaining={pause.deadline - now}
+            duration={GAME_CONFIG.network.reconnectGracePeriodSeconds * 1_000} label="Délai de reprise" radius={15} />}
           <h1 id="pause-title">{hostPaused ? "Partie en pause" : "Reconnexion à la table"}</h1>
           <p role="status">{hostPaused ? "En attente du retour de l’hôte." : "Ta place est conservée."}</p>
-          {hostPaused && seconds !== null && <p>Délai de reprise <span role="timer">{seconds} s</span></p>}
           {canLeave && playerId !== hostId && <button type="button" onClick={onLeave}>Quitter la table</button>}
         </section>
       </main>
@@ -191,8 +189,10 @@ export default function RoundScreen({
       <main className="game-screen">
         {gameActions()}
         <section className="round-results" aria-label="Transition">
+          <PerimeterClock remaining={turn.remaining} duration={GAME_CONFIG.round.transitionMs}
+            label="Temps avant la distribution" radius={15} />
           <h1>Manche {roundNumber}</h1>
-          <p>Distribution dans <span role="timer">{Math.ceil(turn.remaining / 1_000)} s</span></p>
+          <p>Distribution des cartes</p>
         </section>
       </main>
     );
@@ -267,16 +267,10 @@ export default function RoundScreen({
               <p role="status">Distribution des cartes</p>
             </section>
           ) : (
-            <section className="round-panel" aria-label="Mémorisation">
-              {memorizing ? (
-                <>
-                  <div className="round-heading">
-                    <strong>{roundNumber > 1 ? `Manche ${roundNumber} · Mémorisation` : "Mémorisation"}</strong>
-                    <span role="timer" className="round-timer">{Math.ceil(turn.remaining / 1_000)} s</span>
-                  </div>
-                  <p>{canSelect ? `Consulte jusqu’à ${limit} de tes cartes.` : "Connexion à l’hôte en cours…"}</p>
-                </>
-              ) : <p role="status">Mémorisation terminée</p>}
+            <section className="round-panel memorization-panel" aria-label="Mémorisation">
+              <PerimeterClock remaining={turn.remaining} duration={GAME_CONFIG.round.memorizationMs}
+                label="Temps de mémorisation" />
+              <strong>Mémorisation</strong>
             </section>
           )
         }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock,
+  expectLocalTurn, expectClockFromTop } from "./tableFlow";
 
 async function setConnection(page: Page, online: boolean) {
   if (!online) await page.evaluate(() => window.dispatchEvent(new Event("offline")));
@@ -10,7 +11,7 @@ async function setConnection(page: Page, online: boolean) {
 async function secondsLeft(page: Page) {
   const clock = turnClock(page);
   return await clock.isVisible() ? Number(await clock.getAttribute("aria-valuenow"))
-    : Number.parseInt(await page.getByRole("timer").innerText(), 10);
+    : Number(await page.getByRole("progressbar", { name: "Délai de reprise" }).getAttribute("aria-valuenow"));
 }
 
 async function drawFirstCard(guest: Page) {
@@ -70,6 +71,7 @@ test("pause de la table et reprise du chronomètre après le retour de l’hôte
     await expect(guest.getByText("En attente du retour de l’hôte.")).toBeVisible();
     await expect(guest.locator(".drawn-card[data-draggable]")).toHaveCount(0);
     const delay = await secondsLeft(guest);
+    await expectClockFromTop(guest.getByRole("progressbar", { name: "Délai de reprise" }));
     expect(delay).toBeGreaterThan(110);
     expect(delay).toBeLessThanOrEqual(120);
     await guest.setViewportSize({ width: 390, height: 844 });

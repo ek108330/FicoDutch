@@ -56,7 +56,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await expect(newcomer.getByRole("heading", { name: "Manche 2" })).toBeVisible();
     await join(late).click();
     await expect(late.getByText("Tu entreras en jeu après la manche 2.")).toBeVisible();
-    await expect(newcomer.getByText("Manche 2 · Mémorisation")).toBeVisible({ timeout: 9_000 });
+    await expect(newcomer.getByRole("region", { name: "Mémorisation" })).toHaveText("Mémorisation", { timeout: 9_000 });
     await expect(newcomer.locator(".playing-card.face-down")).toHaveCount(12);
     await expect(newcomer.locator(".position-bottom .playing-card.face-down")).toHaveCount(4);
     await newcomer.getByRole("button", { name: "Carte 1 face cachée", exact: true }).click();

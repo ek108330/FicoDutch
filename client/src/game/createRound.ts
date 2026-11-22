@@ -7,6 +7,7 @@ type RoundPlayer = {
   pseudo: string;
   isBot?: true;
   totalScore: number;
+  previousRank?: number;
   scoreHistory?: number[];
 };
 
@@ -37,6 +38,7 @@ export function createRound(
     handVersion: 0,
     roundScore: 0,
     totalScore: player.totalScore,
+    ...(player.previousRank !== undefined && { previousRank: player.previousRank }),
     scoreHistory: player.scoreHistory ?? [],
     hasLeft: false,
   }));

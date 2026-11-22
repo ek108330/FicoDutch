@@ -4,7 +4,7 @@ import { GAME_CONFIG } from "../src/config/gameConfig.ts";
 import type { CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import { resumeGameClock } from "../src/game/gameClock.ts";
-import { finishRound, getRoundResultView } from "../src/game/hands.ts";
+import { finishRound, getRoundResultView, rankPlayers } from "../src/game/hands.ts";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "../src/game/roundCycle.ts";
 import { beginPlay, playTurn } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
@@ -30,6 +30,8 @@ test("au seuil exact, le plus petit total remporte la partie et les égalités s
   assert.deepEqual(result.result?.gameWinnerIds, ["alice", "charlie"]);
   assert.equal(result.phaseDeadline, null);
   assert.deepEqual(getRoundResultView(result)?.players.map(({ totalScore }) => totalScore), [23, 50, 23]);
+  assert.deepEqual(rankPlayers(result.players).map(({ player, rank }) => [player.id, rank]),
+    [["alice", 1], ["charlie", 1], ["bob", 3]]);
   assert.equal(startNextRound(result, 1, members, 1_100), result);
   assert.equal(toggleNextVariant(result, 1, "sixCards", 1_100), result);
   assert.equal(finishRound(result, 1_100), result);
@@ -109,6 +111,7 @@ test("la manche suivante admet les nouveaux joueurs en ligne au plus haut total 
   };
   const next = advanceRoundSetup(state, 1, roster, result.phaseDeadline!);
   assert.equal(next.openingPlayerId, "alice");
+  assert.deepEqual(next.players.map(({ previousRank }) => previousRank), [2, 3, undefined, undefined]);
   assert.deepEqual(next.players.map(({ id, totalScore, scoreHistory, cards }) => ({
     id, totalScore, scoreHistory, count: cards.length,
   })), [

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, drawDeck, expectScreenFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, drawDeck, expectScreenFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn,
+  expectClockFromTop } from "./tableFlow";
 
 const next = (page: Page) => page.getByRole("button", { name: "Lancer la manche suivante" });
 const resultTitle = (page: Page) => page.locator(".result-screen").getByRole("heading", { level: 1 });
@@ -46,9 +47,11 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     for (const page of [host, guest]) {
       await expect(resultTitle(page)).toHaveText("Manche 1");
       await expect(page.getByRole("progressbar", { name: "Temps avant la manche suivante" })).toBeVisible();
+      await expectClockFromTop(page.getByRole("progressbar", { name: "Temps avant la manche suivante" }));
       await expect(page.getByRole("timer")).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Main de AliceManches" }).getByText("27 points")).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de AliceManches" })).toHaveCSS("background-color", "rgb(243, 222, 154)");
+      await expect(page.getByRole("heading", { name: "AliceManches" })).toHaveCSS("color", "rgb(39, 50, 36)");
       await expect(page.getByRole("region", { name: "Main de BobManches" })).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await expect(page.getByRole("region", { name: "Main de BobManches" }).getByText("36 +10", { exact: true })).toBeVisible();
       await expect(next(page)).toHaveCount(0);
@@ -56,6 +59,7 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     await guest.screenshot({ path: testInfo.outputPath("01-resultats-manche-1.png") });
     await resultTitle(host).click();
     await expect(ranking(host)).toBeVisible();
+    await expect(ranking(host).locator(".rank-movement")).toHaveCount(0);
     await expect(guest.getByRole("region", { name: "Résultat de la manche" })).toBeVisible();
     await expect(ranking(guest)).toHaveCount(0);
     await guest.setViewportSize({ width: 390, height: 844 });
@@ -69,16 +73,18 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     await expect(ranking(host)).toBeVisible();
     await host.screenshot({ path: testInfo.outputPath("02-classement-et-variantes.png") });
 
+    await host.evaluate(() => { Math.random = () => 0.02; });
     await next(host).click();
     await expect(guest.getByRole("region", { name: "Transition" }).getByRole("heading", { name: "Manche 2" }))
       .toBeVisible();
+    await expectClockFromTop(guest.getByRole("progressbar", { name: "Temps avant la distribution" }));
     await guest.setViewportSize({ width: 844, height: 390 });
     await guest.screenshot({ path: testInfo.outputPath("03-transition-paysage.png") });
     await guest.locator(".game-table.is-dealing").waitFor({ state: "visible", timeout: 7_000 });
     await guest.screenshot({ path: testInfo.outputPath("04-distribution.png") });
 
     for (const page of [host, guest]) {
-      await expect(page.getByText("Manche 2 · Mémorisation")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Mémorisation" })).toHaveText("Mémorisation");
       await expect(page.locator(".position-bottom .playing-card.face-down")).toHaveCount(6);
       await expect(page.locator(".position-top .playing-card.face-down")).toHaveCount(6);
     }
@@ -89,14 +95,18 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
 
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
-      await expect(page.getByText("AliceManches remporte la partie.")).toBeVisible();
+      await expect(page.getByText("BobManches remporte la partie.")).toBeVisible();
       await expect(page.getByText("Seuil de 50 points atteint.")).toBeVisible();
       await resultTitle(page).click();
       await expect(page.getByRole("group", { name: "Variantes de la partie" })).toHaveText(/6 cartes/);
       await expect(sixCards(page)).toHaveCount(0);
       await expect(ranking(page).getByRole("columnheader", { name: "Progression" })).toHaveCount(0);
-      await expect(ranking(page).getByRole("row", { name: /AliceManches/ })).toContainText("62 (+35)");
-      await expect(ranking(page).getByRole("row", { name: /BobManches/ })).toContainText("88 (+42)");
+      const alice = ranking(page).getByRole("row", { name: /AliceManches/ });
+      const bob = ranking(page).getByRole("row", { name: /BobManches/ });
+      await expect(alice).toContainText("79 (+52)");
+      await expect(alice.getByRole("img", { name: "Perd 1 place" })).toHaveCSS("color", "rgb(255, 157, 150)");
+      await expect(bob).toContainText("71 (+25)");
+      await expect(bob.getByRole("img", { name: "Gagne 1 place" })).toHaveCSS("color", "rgb(154, 230, 173)");
       await expect(next(page)).toHaveCount(0);
     }
     await guest.setViewportSize({ width: 390, height: 844 });
@@ -107,6 +117,7 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     await host.setViewportSize({ width: 320, height: 568 });
     await expectScreenFits(host);
     await host.screenshot({ path: testInfo.outputPath("06-relancer-partie-portrait.png") });
+    await host.evaluate(() => { Math.random = () => 0.999; });
     await startOver.click();
 
     await Promise.all([host, guest].map((page) => expect(page.getByRole("region", { name: "Transition" })

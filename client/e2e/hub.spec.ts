@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { discardDrawn, activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub,
+  expectLocalTurn, expectClockFromTop } from "./tableFlow";
 
 for (const cardsPerPlayer of [4, 6]) {
   test(`mémorisation à ${cardsPerPlayer} cartes pour l’hôte et l’invité`, async ({
@@ -39,7 +40,11 @@ for (const cardsPerPlayer of [4, 6]) {
 
       const limit = cardsPerPlayer === 6 ? 3 : 2;
       for (const page of [host, guest]) {
-        await expect(page.getByRole("timer")).toBeVisible();
+        const prompt = page.getByRole("region", { name: "Mémorisation" });
+        await expect(prompt).toHaveText("Mémorisation");
+        const clock = prompt.getByRole("progressbar", { name: "Temps de mémorisation" });
+        await expect(clock).toHaveAttribute("aria-valuemax", "15");
+        await expectClockFromTop(clock);
         const ownHand = page.locator(".position-bottom");
         const cards = ownHand.getByRole("button", { name: /^Carte / });
         for (let i = 0; i < limit; i++) {

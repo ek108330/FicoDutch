@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn, expectCenteredTurnPanel } from "./tableFlow";
+import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn,
+  expectCenteredTurnPanel, expectClockFromTop } from "./tableFlow";
 
 const faceUpHands = (page: Page) => page.locator(".player-cards .face-up");
 const targetCard = (page: Page, position: number, pseudo: string) =>
@@ -29,10 +30,12 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expectLocalTurn(guest, 17_000);
     await expect(guest.getByRole("timer")).toHaveCount(0);
     const progress = turnClock(guest).locator(".perimeter-clock-progress");
+    await expectClockFromTop(turnClock(guest));
     const originalOffset = Number(await progress.getAttribute("stroke-dashoffset"));
     await expect.poll(async () => Number(await progress.getAttribute("stroke-dashoffset"))).toBeLessThan(originalOffset);
     await expect.poll(async () => Number(await turnClock(guest).getAttribute("aria-valuenow"))).toBeLessThan(60);
     await expect(host.locator(".position-top .player-name").getByRole("progressbar", { name: "Temps restant" })).toBeVisible();
+    await expectClockFromTop(turnClock(host));
     await expect(host.locator(".table-center .turn-panel")).toHaveCount(0);
     const otherHand = guest.locator(".position-top .player-cards");
     const beforePower = await otherHand.boundingBox();
@@ -47,6 +50,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expect(guest.locator(".position-bottom .playing-card[data-selected=true]")).toHaveCount(1);
     await expect(host.locator(".position-top .playing-card[data-exchange-selected=true]")).toHaveCount(1);
     await expect(host.locator(".position-top .playing-card[data-exchange-selected=true]")).toHaveCSS("background-color", "rgb(242, 206, 103)");
+    await expect(host.locator(".position-top [data-exchange-selected=true] .card-back-pattern span")).toHaveCSS("color", "rgb(72, 52, 19)");
     await expect(faceUpHands(guest)).toHaveCount(0);
     await expect(faceUpHands(host)).toHaveCount(0);
     await expectTableFits(guest);
@@ -64,6 +68,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expect(faceUpHands(host)).toHaveCount(2);
     await expect(host.locator(".power-card-turn")).toHaveCount(2);
     await expect(host.locator(".position-bottom .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
+    await expect(host.locator(".position-bottom .face-up .drawn-card-front")).toHaveCSS("color", "rgb(53, 42, 22)");
     await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Roi de pique");
     await expect(guest.getByRole("heading", { name: "Pouvoir du Valet" })).toHaveCount(0);
     await expect(guest.locator(".position-top .player-name").getByRole("progressbar", { name: "Temps restant" })).toBeVisible();
@@ -79,6 +84,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await guest.setViewportSize({ width: 390, height: 844 });
     const swapValet = host.locator(".turn-player-row").getByRole("button", { name: "Échanger les cartes" });
     await expect(swapValet).toBeVisible();
+    await expect(swapValet).toHaveCSS("color", "rgb(39, 50, 36)");
     await expect(host.locator(".turn-player-row").getByRole("button", { name: "Annuler l’échange" })).toBeVisible();
     await expect(guest.getByRole("button", { name: "Échanger les cartes" })).toHaveCount(0);
     await swapValet.click();
@@ -96,6 +102,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expect(faceUpHands(host)).toHaveCount(0);
     const lookClock = (page: Page) => page.getByRole("progressbar", { name: "Temps de consultation de la carte" });
     await expect(lookClock(host)).toHaveAttribute("aria-valuemax", "10");
+    await expectClockFromTop(lookClock(host));
     await expect(guest.getByRole("button", { name: /Terminer le pouvoir|Passer le pouvoir/ })).toHaveCount(0);
     await hideOwn.locator(".power-card-turn").evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));

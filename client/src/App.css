@@ -1472,10 +1472,10 @@ input {
 .turn-layout {
   position: relative;
   display: grid;
-  grid-template: "piles" auto "banner" 38px / minmax(0, 1fr);
+  grid-template: "piles" auto "banner" 32px / minmax(0, 1fr);
   align-items: center;
   justify-items: center;
-  gap: 4px;
+  row-gap: 10px;
   width: min(100%, 550px);
 }
 
@@ -1545,11 +1545,19 @@ input {
   touch-action: manipulation;
 }
 
-.turn-panel .turn-swap:not(:disabled) {
-  border-color: #8f712d;
+.turn-panel[data-local-turn] button {
+  border-color: #806025;
   background: #fff1c1;
-  color: #303629;
+  color: #273224;
 }
+
+.turn-panel[data-local-turn] button:disabled {
+  opacity: 1;
+  background: #d5c28b;
+  color: #54452b;
+}
+
+.turn-panel[data-local-turn] button:focus-visible { outline-color: #654318; }
 
 .turn-choices .power-title {
   margin: 0;
@@ -1566,9 +1574,7 @@ input {
   pointer-events: none;
 }
 
-.perimeter-clock rect {
-  width: calc(100% - 3px);
-  height: calc(100% - 3px);
+.perimeter-clock path {
   fill: none;
   stroke-width: 2.8;
 }
@@ -1602,22 +1608,7 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   .perimeter-clock-progress { transition: stroke-dashoffset 130ms linear; }
 }
 
-.round-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.round-timer {
-  min-width: 3em;
-  padding: 3px 6px;
-  border-radius: 6px;
-  background: #f3de9a;
-  color: #273224;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
+.memorization-panel { position: relative; }
 
 .round-panel p {
   margin: 6px 0;
@@ -1980,6 +1971,7 @@ button.pile-slot:not(:disabled) .pile-card,
 .game-table .playing-card[data-selected="true"] .power-card-turn .drawn-card-front {
   background: #ffe39a;
   border-color: #f0c661;
+  color: #352a16;
 }
 
 .table-player.is-active-player .player-name {
@@ -2048,6 +2040,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 }
 
 .round-results {
+  position: relative;
   box-sizing: border-box;
   width: min(100%, 850px);
   padding: clamp(16px, 4vw, 40px);
@@ -2062,13 +2055,10 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 }
 
 .result-screen .round-results {
-  position: relative;
   width: min(100%, 780px);
   padding: clamp(9px, 2vw, 18px);
   cursor: pointer;
 }
-
-.result-screen .perimeter-clock rect { rx: 15px; }
 
 .result-heading {
   display: grid;
@@ -2210,6 +2200,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 .result-penalty,
 .ranking-round-score { color: #f3de9a; }
 .result-penalty { font-weight: 700; }
+.result-hand[data-winner="true"] .result-penalty { color: #694c13; }
 
 .sr-only,
 .result-sr-only {
@@ -2322,6 +2313,17 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 .score-ranking thead th {
   color: #f3de9a;
 }
+
+.ranking-position {
+  display: inline-flex;
+  min-width: 2em;
+  align-items: center;
+  gap: 3px;
+}
+
+.rank-movement { display: inline-flex; }
+.rank-movement[data-direction="up"] { color: #9ae6ad; }
+.rank-movement[data-direction="down"] { color: #ff9d96; }
 
 .result-variants {
   min-width: 0;
@@ -2489,7 +2491,6 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .turn-layout {
     width: min(66vw, 545px);
-    gap: 3px;
   }
 
   .is-large-table .turn-layout {
@@ -2723,8 +2724,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .game-table.is-large-table[data-player-count="6"] .position-bottom .player-cards { --card-height: 36px; }
 
   .game-table[data-player-count="6"] .turn-layout {
-    grid-template-rows: auto 32px;
-    row-gap: 1px;
+    grid-template-rows: auto 23px;
   }
 
   .game-table.is-large-table[data-player-count="6"] .turn-panel:has(.turn-choices) {
@@ -2756,7 +2756,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
     top: 44.5%;
   }
 
-  .turn-layout { grid-template-rows: auto 32px; }
+  .turn-layout { grid-template-rows: auto 25px; }
 
   .game-table:not(.is-large-table) .position-bottom .player-cards {
     --card-height: clamp(34px, 12dvh, 44px);
