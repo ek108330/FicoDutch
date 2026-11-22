@@ -82,6 +82,9 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     await dragCard(guest, 3, true, testInfo.outputPath("02-carte-glissee-portrait.png"));
     const opponentFlight = host.locator('[data-card-animation="reaction-discard"]');
     await expect(opponentFlight.locator(".card-face b")).toHaveText("6");
+    const previous = host.locator(".discard-cover");
+    await expect(previous.locator(".card-face b")).toHaveText("5");
+    await previous.evaluate((card) => card.getAnimations()[0].pause());
     const startX = await opponentFlight.evaluate((card: HTMLElement) => Number.parseFloat(card.style.left));
     expect(startX).toBeCloseTo(opponentCard.x, 1);
     await opponentFlight.evaluate((card) => {
@@ -90,7 +93,10 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
       animation.currentTime = 320;
     });
     await host.screenshot({ path: testInfo.outputPath("07-reaction-vue-adversaire.png") });
+    await expect(previous).toHaveCSS("opacity", "1");
+    await previous.evaluate((card) => card.getAnimations()[0].play());
     await opponentFlight.evaluate((card) => card.getAnimations()[0].play());
+    await expect(previous).toHaveCount(0);
     await expect(ownCards(guest)).toHaveCount(3);
     const retainedSlot = (await fixedSlot.boundingBox())!;
     expect(retainedSlot.x).toBeCloseTo(originalSlot.x, 1);

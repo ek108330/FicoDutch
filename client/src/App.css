@@ -1033,13 +1033,9 @@ input {
 }
 
 .table-options {
-  position: absolute;
-  z-index: 3;
-  top: 8px;
-  left: 8px;
+  grid-row: 2;
   display: flex;
   align-items: center;
-  min-height: 44px;
   font: 600 0.75rem/1.25 var(--sans);
 }
 
@@ -1050,25 +1046,25 @@ input {
 
 .table-options .emoji-buttons button {
   width: clamp(26px, 8vw, 36px);
-  height: clamp(30px, 9vw, 36px);
+  height: var(--table-toolbar-height);
   background: #123b2a;
   font-size: clamp(0.95rem, 4.3vw, 1.2rem);
 }
 
 .table-emoji {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: calc(100% + 1px);
+  left: 50%;
+  translate: -50% 0;
   z-index: 1;
   display: grid;
   place-items: center;
-  min-width: 34px;
-  min-height: 34px;
-  transform: translate(60%, -28%);
+  width: clamp(23px, 4.3dvh, 32px);
+  aspect-ratio: 1;
   border: 1px solid #b79a55;
   border-radius: 50%;
   background: #f7eac4;
-  font: 1.15rem/1 var(--sans);
+  font: clamp(0.9rem, 2.5dvh, 1.15rem)/1 var(--sans);
   pointer-events: none;
 }
 
@@ -1100,10 +1096,14 @@ input {
   to { opacity: 0; transform: scale(1.16); }
 }
 
-:is(.position-right, .position-right-top, .position-right-bottom) .table-emoji {
-  right: auto;
-  left: 0;
-  transform: translate(-60%, -28%);
+@media (prefers-reduced-motion: no-preference) {
+  .table-emoji { animation: table-emoji-zoom 300ms ease-out both; }
+}
+
+@keyframes table-emoji-zoom {
+  from { opacity: 0; scale: 0.55; }
+  65% { opacity: 1; scale: 1.16; }
+  to { opacity: 1; scale: 1; }
 }
 
 .hub-management {
@@ -1559,6 +1559,24 @@ input {
 
 .turn-panel[data-local-turn] button:focus-visible { outline-color: #654318; }
 
+.game-table .turn-panel[data-joker] {
+  min-width: 0;
+  padding: 3px 6px;
+  color: #352a16;
+  font-size: 0.71rem;
+}
+
+.joker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.joker-heading h2 { margin: 0; color: inherit; font: inherit; font-weight: 800; }
+.turn-panel .joker-heading button { display: grid; place-items: center; padding: 1px 3px; }
+.turn-panel[data-joker] .joker-instruction { margin: 1px 0 0; white-space: nowrap; }
+
 .turn-choices .power-title {
   margin: 0;
   font: inherit;
@@ -1701,6 +1719,7 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
 }
 
 .card-face.joker-face {
+  color: #352a16;
   font-size: clamp(0.75rem, 2.6dvh, 1.25rem);
 }
 
@@ -1934,7 +1953,8 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   cursor: grabbing;
 }
 
-.flying-card {
+.flying-card,
+.discard-cover {
   position: fixed;
   z-index: 5;
   margin: 0;
@@ -1947,14 +1967,24 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   font-size: clamp(16px, 3.8dvh, 34px);
 }
 
-.flying-card.face-up {
+:is(.flying-card, .discard-cover).face-up {
   box-sizing: border-box;
   background: #fff9e9;
   border: 1px solid #ecd59b;
   color: #252b26;
 }
 
-.flying-card .red-suit { color: #a42236; }
+:is(.flying-card, .discard-cover) .red-suit { color: #a42236; }
+
+.discard-cover { z-index: 4; }
+
+.discard-cover:not(.face-up) {
+  border: 1px dashed #8fcaab;
+  background: #1a6040;
+  color: #fff;
+  font: 600 0.75rem/1 var(--sans);
+}
+
 .discard-origin { visibility: hidden; }
 
 button.pile-slot:not(:disabled) {
@@ -1994,6 +2024,8 @@ button.pile-slot:not(:disabled) .pile-card,
   color: #f3de9a;
 }
 
+.table-player .player-name { position: relative; }
+
 .player-name-label {
   position: relative;
   display: inline-block;
@@ -2004,12 +2036,11 @@ button.pile-slot:not(:disabled) .pile-card,
 .player-name-label > .perimeter-clock { inset-block-start: -3px; height: calc(100% + 6px); }
 
 .gift-recipient-name {
+  position: absolute;
+  inset: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  color: inherit;
-  font: inherit;
-  overflow-wrap: anywhere;
 }
 
 .game-table .player-name:has(.dutch-icon) {
@@ -2783,4 +2814,83 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .game-screen .game-table[data-player-count="2"] .position-top {
     top: 52px;
   }
+}
+
+.game-screen.table-screen {
+  --table-toolbar-height: clamp(27px, 5dvh, 36px);
+  height: 100dvh;
+  display: grid;
+  grid-template: minmax(0, 1fr) var(--table-toolbar-height) / minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: center;
+  row-gap: 10px;
+}
+
+.game-screen.table-screen > .game-table[data-player-count] {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (orientation: portrait) and (max-height: 760px) {
+  .game-screen.table-screen .game-table.is-large-table { padding-top: 30px; }
+}
+
+@media (orientation: portrait) and (max-height: 600px) {
+  .game-screen.table-screen .game-table[data-player-count="6"] {
+    padding-top: 27px;
+    row-gap: 1px;
+  }
+
+  .table-screen .game-table.is-large-table[data-player-count="6"] .player-cards { --hand-gap: 2px; }
+
+  .table-screen .game-table[data-player-count="6"] .turn-panel[data-joker] {
+    padding-inline: 4px;
+    font-size: 0.65rem;
+  }
+
+  .table-screen .game-table.is-large-table[data-player-count="6"] .table-piles :is(.pile-card, .deck-placeholder, .discard-placeholder) {
+    width: 32px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .game-screen.table-screen .game-table.is-large-table {
+    padding-top: 37px;
+    row-gap: 3px;
+  }
+
+  .game-screen.table-screen .game-table[data-player-count="2"] .position-top { top: 6px; }
+
+  .table-screen .game-table:not(.is-large-table) .player-cards {
+    --card-width: clamp(24px, 6.5dvh, 43px);
+    --card-height: clamp(33px, 9.6dvh, 51px);
+    --hand-gap: 4px;
+  }
+
+  .table-screen .game-table.is-large-table .player-cards {
+    --card-height: clamp(34px, 8.5dvh, 40px);
+    --hand-gap: 4px;
+  }
+
+  .table-screen .game-table.is-large-table .position-top {
+    align-self: start;
+    translate: 0 -8px;
+  }
+
+  .table-screen .turn-layout { grid-template-rows: auto 23px; }
+
+  .table-screen .turn-layout .pile-card {
+    width: calc(33px * var(--card-ratio));
+    height: 33px;
+  }
+
+  .table-screen .turn-layout .pile-card .joker-face { font-size: 0.68rem; }
+
+  .table-screen .turn-layout .turn-panel[data-joker] { padding: 1px 6px; line-height: 1; }
+  .table-screen .joker-heading button { height: 16px; padding: 0 2px; }
+}
+
+@media (orientation: landscape) and (max-height: 370px) {
+  .table-screen .game-table.is-large-table .table-center { translate: 0 -18px; }
+  .table-screen .game-table.is-large-table .position-top { translate: 0 -30px; }
 }

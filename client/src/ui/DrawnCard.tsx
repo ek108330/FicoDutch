@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, type PointerEvent, type RefObject } from "reac
 import type { CardFace } from "../game/cards";
 import { describeCardFace } from "./cardLabels";
 import { CardBackMark, CardFaceMark } from "./PlayingCard";
-import { flyCard, reducedMotion } from "./cardAnimations";
+import { flyCard, flyToDiscard, reducedMotion } from "./cardAnimations";
 
 type Drag = { pointer: number; x: number; y: number; moving: boolean; target?: HTMLElement };
 
@@ -79,8 +79,9 @@ export default function DrawnCard({ face, center, botName, onDrop, onSlide }: {
     const target = current.moving ? targetAt(element, event.clientX, event.clientY) : undefined;
     if (target && onDrop) {
       const position = target.dataset.cardPosition;
-      flyCard(element.getBoundingClientRect(), target.getBoundingClientRect(), "discard",
-        position === undefined ? element.querySelector(".card-face") : null);
+      const from = element.getBoundingClientRect();
+      if (position === undefined) flyToDiscard(from, target, "discard", element.querySelector(".card-face"));
+      else flyCard(from, target.getBoundingClientRect(), "discard");
       reset(element, false);
       onDrop(position === undefined ? null : Number(position));
     } else reset(element, true);

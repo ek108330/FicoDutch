@@ -1,11 +1,20 @@
 import type { CardTarget, PublicCardMove } from "../game/gameTypes";
 
 type Flight = "reaction" | "reaction-discard" | "bot-discard" | "swap" | "gift" | "penalty" | "discard";
+type DiscardFlight = Extract<Flight, "reaction" | "reaction-discard" | "bot-discard" | "discard">;
 const flightDuration: Record<Flight, number> = {
   reaction: 360, "reaction-discard": 640, "bot-discard": 640, swap: 1_060, gift: 460, penalty: 540, discard: 360,
 };
+const arrivalOffset = 0.83;
+const flightEasing = "ease-in-out";
 
 export const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const discardCovers = new WeakMap<Element, HTMLElement>();
+
+function placeAt(element: HTMLElement, { x, y, width, height }: DOMRect) {
+  Object.assign(element.style, { left: `${x}px`, top: `${y}px`, width: `${width}px`, height: `${height}px` });
+  document.body.append(element);
+}
 
 export function flyCard(from: DOMRect, to: DOMRect, kind: Flight, face?: Element | null) {
   if (reducedMotion()) return;
@@ -28,16 +37,42 @@ export function flyCard(from: DOMRect, to: DOMRect, kind: Flight, face?: Element
     back.append(mark);
     card.append(back);
   }
-  Object.assign(card.style, { left: `${from.x}px`, top: `${from.y}px`, width: `${from.width}px`, height: `${from.height}px` });
-  document.body.append(card);
+  placeAt(card, from);
   const arrival = `translate(${x}px, ${y}px) scale(${scale})`;
   const animation = card.animate([
     { transform: "translate(0, 0) scale(1)", opacity: 1 },
     { transform: `translate(${x / 2 - y / distance * arc}px, ${y / 2 + x / distance * arc}px) rotate(${rotation}deg)`, opacity: 1, offset: 0.48 },
-    { transform: arrival, opacity: 1, offset: 0.83 },
+    { transform: arrival, opacity: 1, offset: arrivalOffset },
     { transform: arrival, opacity: 0 },
-  ], { duration: flightDuration[kind], easing: "ease-in-out", fill: "forwards" });
+  ], { duration: flightDuration[kind], easing: flightEasing, fill: "forwards" });
   void animation.finished.then(() => card.remove(), () => card.remove());
+}
+
+export function flyToDiscard(from: DOMRect, target: Element, kind: DiscardFlight, face?: Element | null,
+  previous = target.querySelector(":scope > .card-face")) {
+  if (reducedMotion()) return;
+  const box = target.getBoundingClientRect();
+  const table = target.closest(".game-table");
+  if (table && target.matches(".discard-slot")) {
+    discardCovers.get(table)?.remove();
+    const cover = document.createElement("span");
+    cover.className = `playing-card discard-cover${previous ? " face-up" : ""}`;
+    cover.setAttribute("aria-hidden", "true");
+    if (previous) cover.append(previous.cloneNode(true));
+    else cover.textContent = "Vide";
+    discardCovers.set(table, cover);
+    placeAt(cover, box);
+    const reveal = cover.animate([{ opacity: 1, easing: "steps(1, end)" },
+      { opacity: 0, offset: arrivalOffset }, { opacity: 0 }], {
+      duration: flightDuration[kind], easing: flightEasing, fill: "forwards",
+    });
+    const remove = () => {
+      cover.remove();
+      if (discardCovers.get(table) === cover) discardCovers.delete(table);
+    };
+    void reveal.finished.then(remove, remove);
+  }
+  flyCard(from, box, kind, face);
 }
 
 export function animatePublicMove(table: HTMLElement, move: PublicCardMove) {
@@ -46,12 +81,8 @@ export function animatePublicMove(table: HTMLElement, move: PublicCardMove) {
     const target = table.querySelector(".discard-slot, .discard-placeholder");
     if (source && target) {
       const kind = move.kind === "reaction" ? "reaction-discard" : "bot-discard";
-      flyCard(source.getBoundingClientRect(), target.getBoundingClientRect(), kind, source.querySelector(".card-face"));
-      if (!reducedMotion()) {
-        target.querySelector(".card-face")?.animate(
-          [{ opacity: 0 }, { opacity: 0, offset: 0.8 }, { opacity: 1 }], { duration: flightDuration[kind] },
-        );
-      }
+      flyToDiscard(source.getBoundingClientRect(), target, kind, source.querySelector(".card-face"),
+        target.querySelector(".previous-discard .card-face"));
     }
     return;
   }

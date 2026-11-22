@@ -154,6 +154,17 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await expectLocalTurn(guest, 17_000);
     await playSpecialCard(guest, 1, "Joker+");
 
+    const panel = guest.locator(".turn-panel[data-joker]");
+    await expect(panel.locator(".turn-player-row")).toHaveCount(0);
+    await expect(panel.getByRole("heading", { name: "Pouvoir du Joker+" })).toHaveCSS("color", "rgb(53, 42, 22)");
+    await expect(panel.getByText("Glisse sur un joueur.", { exact: true })).toHaveCSS("color", "rgb(53, 42, 22)");
+    await expect(guest.locator(".discard-slot .joker-face")).toHaveCSS("color", "rgb(53, 42, 22)");
+    const firstLine = (await panel.locator(".joker-heading").boundingBox())!;
+    const secondLine = (await panel.locator(".joker-instruction").boundingBox())!;
+    expect(firstLine.y + firstLine.height).toBeLessThan(secondLine.y);
+    await expect(guest.locator(".discard-cover")).toHaveCount(0);
+    await guest.screenshot({ path: testInfo.outputPath("04-pouvoir-joker-deux-lignes.png") });
+
     const recipient = guest.locator(".position-top");
     await expect(recipient.locator(".player-name")).toHaveText(alice);
     await expect(host.getByRole("button", { name: /^Donner une carte à / })).toHaveCount(0);

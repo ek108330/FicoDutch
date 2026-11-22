@@ -31,6 +31,7 @@ export type TurnView = {
   deckCount: number;
   discardCount: number;
   topDiscard: CardFace | null;
+  previousDiscard: CardFace | null;
   power: PowerView | null;
   cardMotion: CardMotionView | null;
   players: Array<{ id: string; pseudo: string; isBot?: true; cardCount: number; handVersion: number; handLayout?: HandLayout }>;
@@ -241,6 +242,7 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
   if (state.phase !== "playing" || !turn || !player) return null;
 
   const topDiscard = state.discardPile.at(-1);
+  const previousDiscard = state.discardPile.at(-2);
   const canSeePrivateCards = !turn.finalReaction && player.id === viewerId && now < turn.deadline;
   return {
     number: turn.number,
@@ -253,6 +255,7 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     deckCount: state.drawPile.length,
     discardCount: state.discardPile.length,
     topDiscard: topDiscard ? getCardFace(topDiscard) : null,
+    previousDiscard: previousDiscard ? getCardFace(previousDiscard) : null,
     power: turn.power ? getPowerView(state, turn.power, canSeePrivateCards) : null,
     cardMotion: getCardMotionView(state, now),
     players: state.players.map(({ id, pseudo, isBot, cards, handVersion, handLayout }) => ({

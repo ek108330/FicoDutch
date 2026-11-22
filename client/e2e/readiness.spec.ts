@@ -61,9 +61,9 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await expectLocalTurn(guest, 20_000);
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", /^[1-9]\d*$/);
     await guest.setViewportSize({ width: 390, height: 844 });
-    const optionsBox = (await guest.locator(".table-options").boundingBox())!;
+    const settingsBox = (await guest.locator(".game-actions .settings-trigger").boundingBox())!;
     const opponentName = (await guest.locator(".position-top .player-name").boundingBox())!;
-    expect(optionsBox.y + optionsBox.height).toBeLessThan(opponentName.y);
+    expect(settingsBox.y + settingsBox.height).toBeLessThan(opponentName.y);
     await openSettings(guest);
     await expect(sound).toHaveAttribute("aria-pressed", "true");
     await closeSettings(guest);

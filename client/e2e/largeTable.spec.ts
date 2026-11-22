@@ -38,6 +38,8 @@ async function checkSeats(page: Page, count: number, cards: number) {
     }));
   expect(boxes).toHaveLength(count + 1);
   const tableBox = (await table.boundingBox())!;
+  const toolbar = (await page.getByRole("group", { name: "Emojis de la table" }).boundingBox())!;
+  expect(toolbar.y).toBeGreaterThan(tableBox.y + tableBox.height);
   for (const [index, box] of boxes.entries()) {
     expect(box.left, box.label).toBeGreaterThanOrEqual(tableBox.x);
     expect(box.right, box.label).toBeLessThanOrEqual(tableBox.x + tableBox.width);

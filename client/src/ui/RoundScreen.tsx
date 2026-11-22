@@ -156,7 +156,7 @@ export default function RoundScreen({
   if (scene.phase === "results") {
     if (turn.finalMotion) {
       return (
-        <main className="game-screen">
+        <main className="game-screen table-screen">
           {gameActions()}
           <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion} playSound={playSound}
             players={scene.result.players.map(({ id, pseudo, cards, handLayout }) => ({ id, pseudo, cardCount: cards.length, handLayout }))}
@@ -221,11 +221,8 @@ export default function RoundScreen({
     : undefined;
 
   return (
-    <main className="game-screen">
+    <main className="game-screen table-screen">
       {gameActions(canLeave && playerId !== hostId && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>)}
-      {emojisEnabled && <div className="table-options">
-        <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />
-      </div>}
       <GameTable
         localPlayerId={playerId}
         playSound={playSound}
@@ -275,6 +272,9 @@ export default function RoundScreen({
           )
         }
       />
+      {emojisEnabled && <div className="table-options">
+        <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />
+      </div>}
     </main>
   );
 }

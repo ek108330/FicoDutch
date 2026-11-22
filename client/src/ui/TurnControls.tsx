@@ -21,7 +21,7 @@ const powerLabels: Record<PowerKind, { title: string; instruction: string }> = {
   "look-other": { title: "Pouvoir du 9", instruction: "Choisis une carte adverse à regarder." },
   "blind-swap": { title: "Pouvoir du 10", instruction: "Échange deux cartes face cachée." },
   "look-and-swap": { title: "Pouvoir du Valet", instruction: "Choisis deux cartes à regarder." },
-  "give-card": { title: "Pouvoir du Joker+", instruction: "Glisse la carte vers un joueur." },
+  "give-card": { title: "Pouvoir du Joker+", instruction: "Glisse sur un joueur." },
 };
 
 function PowerControls({ power, act }: {
@@ -51,6 +51,7 @@ export function TurnPanel({
   piles: ReactNode;
 }) {
   const { power } = view;
+  const giving = canPlay && power?.kind === "give-card";
   const valetPair = canPlay && power?.kind === "look-and-swap" && power.selection?.remaining === 0;
   const canSwap = valetPair && power.selection?.canSwap === true;
   const swapTap = useTapAction(canSwap ? () => act({ kind: "power-swap" }) : undefined);
@@ -67,11 +68,20 @@ export function TurnPanel({
   return (
     <section className="turn-layout" aria-label="Tour de jeu">
       {piles}
-      {showCenter ? <div className="round-panel turn-panel" data-local-turn={canPlay || undefined}>
+      {showCenter ? <div className="round-panel turn-panel" data-local-turn={canPlay || undefined} data-joker={giving || undefined}>
         {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}`}
           remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : TURN_DURATION_MS}
           label={view.finalReaction ? "Temps pour réagir" : "Temps restant"} />}
-        <div className="turn-player-row">
+        {giving ? <>
+          <strong className="sr-only" role="status">{turnLabel}</strong>
+          <div className="joker-heading">
+            <h2 aria-label={powerLabels["give-card"].title}>Joker+</h2>
+            <button type="button" aria-label="Passer le pouvoir" title="Passer le pouvoir" onClick={() => act({ kind: "power-pass" })}>
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+          <p className="joker-instruction">{powerLabels["give-card"].instruction}</p>
+        </> : <div className="turn-player-row">
           <strong className="turn-player" role="status">{turnLabel}</strong>
           {valetPair && <div className="turn-decision">
             <button type="button" className="turn-swap" aria-label="Échanger les cartes" disabled={!canSwap}
@@ -83,8 +93,8 @@ export function TurnPanel({
               <X size={18} aria-hidden="true" />
             </button>
           </div>}
-        </div>
-        {canPlay && power && (
+        </div>}
+        {!giving && canPlay && power && (
           <div className="turn-choices">
             <h2 className="power-title">{powerLabels[power.kind].title}</h2>
             {valetPair && !canSwap && <p>La protection Dutch empêche l’échange.</p>}
@@ -124,6 +134,7 @@ export function TurnPiles({ view, canPlay, act, feedback, onGiftSlide }: TurnCon
         {feedback?.pile === "discard" && <span key={feedback.id}
           className={`card-feedback feedback-${feedback.kind}`} aria-hidden="true" />}
         {view.topDiscard ? <CardFaceMark face={view.topDiscard} /> : "Vide"}
+        {view.previousDiscard && <span className="previous-discard" hidden><CardFaceMark face={view.previousDiscard} /></span>}
       </span>
     </>
   );

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type PointerEvent, type RefObject } from "react";
-import { flyCard, reducedMotion } from "./cardAnimations";
+import { flyToDiscard, reducedMotion } from "./cardAnimations";
 import type { PlayGameSound } from "./useCardFeedback";
 
 type Point = { x: number; y: number };
@@ -51,7 +51,7 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
   function playReaction(element: HTMLButtonElement) {
     if (!reaction) return;
     const target = reaction.center.current?.querySelector(".discard-slot");
-    if (target) flyCard(element.getBoundingClientRect(), target.getBoundingClientRect(), "reaction");
+    if (target) flyToDiscard(element.getBoundingClientRect(), target, "reaction");
     reaction.playSound("reaction");
     reaction.play();
   }

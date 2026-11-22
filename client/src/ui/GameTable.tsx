@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { Megaphone } from "lucide-react";
 import { emojis } from "../../../shared/hubSocial.json";
-import type { HubEmoji } from "../../../shared/hubTypes";
 import type { CardFace } from "../game/cards";
 import type { CardTarget, PowerKind } from "../game/gameTypes";
 import { getHandLayout, type HandLayout } from "../game/handLayout";
@@ -10,7 +9,8 @@ import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
 import { TURN_DURATION_MS, type TurnView } from "../game/turn";
 import PlayingCard, { CardFaceMark } from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
-import { animatePublicMove, flyCard } from "./cardAnimations";
+import { animatePublicMove, flyToDiscard } from "./cardAnimations";
+import type { TableEmoji } from "../network/useTableEmojis";
 import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
 import { useTapAction } from "./useTapAction";
@@ -32,7 +32,7 @@ type GameTableProps = {
   opponentClock?: { turn: number; remaining: number };
   dealing?: boolean;
   protectedPlayerId?: string;
-  tableEmojis?: ReadonlyMap<string, HubEmoji>;
+  tableEmojis?: ReadonlyMap<string, TableEmoji>;
   onReplace?: (position: number) => void;
   onDiscardDrawn?: () => void;
   dutchControl?: { armed: boolean; toggle: () => void };
@@ -114,7 +114,7 @@ export default function GameTable({
   function replaceCard(position: number) {
     const target = center.current?.querySelector(".discard-slot");
     const source = table.current?.querySelector(`.position-bottom [data-card-position="${position}"]`);
-    if (source && target) flyCard(source.getBoundingClientRect(), target.getBoundingClientRect(), "discard");
+    if (source && target) flyToDiscard(source.getBoundingClientRect(), target, "discard");
     onReplace?.(position);
   }
   const localIndex = players.findIndex((player) => player.id === localPlayerId);
@@ -158,16 +158,13 @@ export default function GameTable({
         return (
           <div className={`table-player position-${position}${active ? " is-active-player" : ""}`} key={player.id} data-hand-player={player.id}
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
-            {emoji && <span className="table-emoji" role="status"
-              aria-label={`${player.pseudo} · ${emojis[emoji].label}`}>{emojis[emoji].symbol}</span>}
             <div className="player-name">
               <span className="player-name-label">
-                {giveToPlayer ? (
+                {name}
+                {giveToPlayer && (
                   <button type="button" className="gift-recipient-name" aria-label={`Donner une carte à ${player.pseudo}`}
-                    onClick={(event) => { if (event.detail === 0) power.choosePlayer(player.id); }}>
-                    {name}
-                  </button>
-                ) : name}
+                    onClick={(event) => { if (event.detail === 0) power.choosePlayer(player.id); }} />
+                )}
                 {clock && <PerimeterClock key={clock.turn} remaining={clock.remaining} duration={TURN_DURATION_MS} label="Temps restant" />}
               </span>
               {announce && <DutchButton {...announce} />}
@@ -177,6 +174,8 @@ export default function GameTable({
                   <Megaphone size={15} aria-hidden="true" />
                 </span>
               )}
+              {emoji && <span key={emoji.until} className="table-emoji" role="status"
+                aria-label={`${player.pseudo} · ${emojis[emoji.emoji].label}`}>{emojis[emoji.emoji].symbol}</span>}
             </div>
             <div className="hand-line">
               <div className="player-cards" style={handStyle}>

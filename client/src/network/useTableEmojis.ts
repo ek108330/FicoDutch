@@ -4,10 +4,11 @@ import type { HubEmoji, HubPlayer } from "../../../shared/hubTypes";
 import type { GameState } from "../game/gameTypes";
 import type { useHubPeers } from "./useHubPeers";
 
-const EMOJI_DURATION_MS = 3_000;
+const EMOJI_DURATION_MS = 5_000;
 const EMOJI_INTERVAL_MS = 800;
 
 type VisibleEmoji = { emoji: HubEmoji; roundNumber: number; clockVersion: number; until: number };
+export type TableEmoji = Pick<VisibleEmoji, "emoji" | "until">;
 type EmojiMessage = { type: unknown; emoji?: unknown; playerId?: unknown; roundNumber?: unknown; clockVersion?: unknown };
 type Options = {
   playerId: string;
@@ -74,10 +75,10 @@ export function useTableEmojis({
     else send(hostId, { type: "table-emoji-request", emoji, roundNumber, clockVersion });
   }
 
-  const visible = new Map<string, HubEmoji>();
+  const visible = new Map<string, TableEmoji>();
   for (const [id, entry] of recent) {
     if (entry.roundNumber === roundNumber && entry.clockVersion === clockVersion && entry.until > now) {
-      visible.set(id, entry.emoji);
+      visible.set(id, entry);
     }
   }
 
