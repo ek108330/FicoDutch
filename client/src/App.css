@@ -2238,6 +2238,14 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   letter-spacing: 0;
 }
 
+@media (orientation: landscape) and (min-width: 585px) and (max-height: 450px) {
+  .result-cards:has(> :nth-child(7)) { container-type: inline-size; }
+
+  .result-cards:has(> :nth-child(7)) > .playing-card {
+    width: clamp(20px, calc((100cqi - 18px) / 7), 28.6px);
+  }
+}
+
 .round-results .card-face.red-suit {
   color: #a42236;
 }
