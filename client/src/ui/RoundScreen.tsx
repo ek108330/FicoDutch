@@ -23,6 +23,8 @@ type RoundScreenProps = {
   peers: ReturnType<typeof useHubPeers>;
   updateHostRound: UpdateHostRound;
   onLeave: () => void;
+  onRestart: () => void;
+  restarting: boolean;
   settings: ReactNode;
   playSound: PlayGameSound;
   canLeave: boolean;
@@ -35,7 +37,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onLeave, settings, playSound, canLeave, clockVersion, pause,
+  peers, updateHostRound, onLeave, onRestart, restarting, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
@@ -178,6 +180,8 @@ export default function RoundScreen({
         toggleVariant={turn.toggleVariant}
         startNext={turn.startNext}
         onLeave={onLeave}
+        onRestart={onRestart}
+        canRestart={gameFinished && !restarting && members.filter(({ connected }) => connected).length >= GAME_CONFIG.players.min}
       />
     );
   }

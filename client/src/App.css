@@ -728,11 +728,17 @@ input {
 
 /* Cartes FicoDutch */
 
+:root {
+  --card-ratio: calc(63 / 88);
+  --card-corner: 4.762% / 3.409%;
+}
+
 .playing-card {
+  box-sizing: border-box;
   width: 90px;
-  height: 130px;
-  border-radius: 10px;
-  border: 3px solid #ffffff;
+  aspect-ratio: var(--card-ratio);
+  border-radius: var(--card-corner);
+  border: var(--card-edge, 1px) solid #f6fff8;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
@@ -746,10 +752,11 @@ input {
 }
 
 .card-back-pattern {
-  width: 76%;
-  height: 82%;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  border-radius: 6px;
+  box-sizing: border-box;
+  width: 86%;
+  height: 90%;
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: var(--card-corner);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -772,8 +779,6 @@ input {
 @media (max-width: 600px) {
   .playing-card {
     width: 65px;
-    height: 95px;
-    border-width: 2px;
   }
 
   .card-back-pattern span {
@@ -843,12 +848,13 @@ input {
   --hand-width: min(54vw, 720px);
   --card-width: clamp(30px, 7dvh, 74px);
   --card-height: clamp(42px, 10dvh, 105px);
-  --slot-width: min(var(--card-width), calc((var(--hand-width) - (var(--hand-columns) - 1) * var(--hand-gap)) / var(--hand-columns)));
+  --slot-width: min(var(--card-width), calc(var(--card-height) * var(--card-ratio)),
+    calc((var(--hand-width) - (var(--hand-columns) - 1) * var(--hand-gap)) / var(--hand-columns)));
   display: grid;
   justify-content: center;
   gap: var(--hand-gap);
   grid-template-columns: repeat(var(--hand-columns), var(--slot-width));
-  grid-template-rows: repeat(2, var(--card-height));
+  grid-template-rows: repeat(2, calc(var(--slot-width) / var(--card-ratio)));
 }
 
 @media (max-width: 600px) {
@@ -1444,10 +1450,12 @@ input {
 .table-piles .deck-placeholder,
 .table-piles .discard-placeholder,
 .table-piles .pile-card {
-  width: clamp(48px, 8dvh, 74px);
+  width: calc(clamp(58px, 10dvh, 92px) * var(--card-ratio));
   height: clamp(58px, 10dvh, 92px);
   font-size: 0.75rem;
 }
+
+.table-piles :is(.deck-placeholder, .discard-placeholder) { border-radius: var(--card-corner); }
 
 .round-panel {
   width: max-content;
@@ -1626,6 +1634,7 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
 }
 
 .game-table .position-bottom .player-cards {
+  --card-edge: 1.5px;
   --hand-width: min(900px, calc(100vw - 2 * (var(--drawn-width) + var(--drawn-gap) + 16px)));
   --card-width: clamp(37px, 8dvh, 91px);
   --card-height: clamp(50px, 11dvh, 132px);
@@ -1712,8 +1721,8 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  border: 2px dashed #8fcaab;
-  border-radius: 8px;
+  border: 1px dashed #8fcaab;
+  border-radius: var(--card-corner);
 }
 
 .pile-card.deck-slot {
@@ -1778,7 +1787,7 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   left: calc(100% + var(--drawn-gap));
   margin-block: auto;
   width: var(--drawn-width);
-  height: clamp(51px, 11dvh, 111px);
+  aspect-ratio: var(--card-ratio);
   perspective: 450px;
 }
 
@@ -1812,7 +1821,6 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   inset: 0 0 auto auto;
   z-index: 2;
   width: clamp(22px, 5.1dvh, 40px);
-  height: clamp(28px, 7dvh, 54px);
   margin: 0;
   translate: 85% 0;
   pointer-events: none;
@@ -1828,8 +1836,9 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   place-items: center;
   width: 100%;
   height: 100%;
-  border: 2px solid #f3de9a;
-  border-radius: 5px;
+  box-sizing: border-box;
+  border: 1px solid #f3de9a;
+  border-radius: var(--card-corner);
   background: #145c3b;
 }
 
@@ -1841,8 +1850,8 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   inset: 0;
   display: grid;
   place-items: center;
-  border: 2px solid #edc65b;
-  border-radius: 8px;
+  border: var(--card-edge, 1px) solid #edc65b;
+  border-radius: var(--card-corner);
   backface-visibility: hidden;
 }
 
@@ -2210,10 +2219,9 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
 .round-results .playing-card {
   box-sizing: border-box;
-  width: clamp(20px, 5.8vw, 30px);
-  height: clamp(28px, 7.4dvh, 40px);
+  container-type: inline-size;
+  width: clamp(20px, 5.8vw, 28.6px);
   border: 1px solid #ecd59b;
-  border-radius: 4px;
   background: #fff9e9;
   color: #252b26;
 }
@@ -2224,10 +2232,9 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 }
 
 .round-results .card-face b { font-size: clamp(0.85rem, 4.25vw, 1.12rem); }
-.round-results .playing-card:has(.joker-face) { width: clamp(26px, 5.8vw, 30px); }
 .round-results .card-face.joker-face b {
   font-family: Arial, sans-serif;
-  font-size: clamp(0.5rem, 2.1vw, 0.58rem);
+  font-size: min(0.58rem, 34cqi);
   letter-spacing: 0;
 }
 
@@ -2265,6 +2272,16 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 .round-results .result-primary {
   margin-top: 7px;
 }
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.round-results .result-actions .result-primary { margin-top: 0; }
 
 .score-ranking {
   width: 100%;
@@ -2351,17 +2368,9 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .game-screen .game-table {
     min-height: calc(100dvh - 16px);
-    --portrait-card-ratio: 0.71;
-  }
-
-  .game-table .player-cards {
-    --slot-width: min(var(--card-width), calc(var(--card-height) * var(--portrait-card-ratio)),
-      calc((var(--hand-width) - (var(--hand-columns) - 1) * var(--hand-gap)) / var(--hand-columns)));
-    grid-template-rows: repeat(2, calc(var(--slot-width) / var(--portrait-card-ratio)));
   }
 
   .game-table .player-cards .playing-card { container-type: inline-size; }
-  .game-table .player-cards .card-back-pattern { box-sizing: border-box; }
 
   .game-table .player-cards .card-back-pattern span {
     font-size: clamp(10px, 67cqi, 40px);
@@ -2374,15 +2383,10 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .game-table .table-piles :is(.deck-placeholder, .discard-placeholder, .pile-card) {
     width: clamp(46px, 7.4dvh, 62px);
     height: auto;
-    aspect-ratio: var(--portrait-card-ratio);
+    aspect-ratio: var(--card-ratio);
   }
 
   .game-table .table-piles :is(.deck-placeholder, .discard-placeholder) { font-size: clamp(0.57rem, 2.4vw, 0.75rem); }
-
-  .game-table .drawn-card {
-    height: auto;
-    aspect-ratio: var(--portrait-card-ratio);
-  }
 
   .game-table:is([data-player-count="3"], .is-large-table) :is(.position-left, .position-left-top, .position-left-bottom) {
     justify-self: start;
@@ -2484,11 +2488,12 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .table-piles .deck-placeholder,
   .table-piles .discard-placeholder,
   .table-piles .pile-card {
-    width: 58px;
+    width: calc(52px * var(--card-ratio));
     height: 52px;
   }
 
   .turn-layout .pile-card {
+    width: calc(38px * var(--card-ratio));
     height: 38px;
   }
 

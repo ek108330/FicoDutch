@@ -17,6 +17,8 @@ type Props = {
   toggleVariant: (key: keyof GameVariants) => void;
   startNext: () => void;
   onLeave: () => void;
+  onRestart: () => void;
+  canRestart: boolean;
 };
 
 const variantKeys = Object.keys(VARIANT_LABELS) as Array<keyof GameVariants>;
@@ -92,6 +94,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 
 export default function RoundResults({
   result, settings, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
+  onRestart, canRestart,
 }: Props) {
   const [panel, setPanel] = useState<"round" | "ranking">("round");
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
@@ -179,7 +182,14 @@ export default function RoundResults({
             Lancer la manche suivante
           </button>
         )}
-        {isFinal && <button type="button" className="result-primary" onClick={onLeave}>Quitter la table</button>}
+        {isFinal && <div className="result-actions">
+          {isHost && panel === "ranking" && (
+            <button type="button" className="result-primary" disabled={!canRestart} onClick={onRestart}>Nouvelle partie</button>
+          )}
+          <button type="button" className={isHost && panel === "ranking" ? undefined : "result-primary"} onClick={onLeave}>
+            Quitter la table
+          </button>
+        </div>}
       </section>
     </main>
   );

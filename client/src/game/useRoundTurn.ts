@@ -198,7 +198,7 @@ export function useRoundTurn({
       );
     } else if (!isHost && senderId === hostId && message.type === "round-view" && "view" in message) {
       const view = readRoundView(message.view);
-      if (!view) return;
+      if (!view || view.clockVersion < clockVersion) return;
       const receivedAt = performance.now();
       setReceived((current) => acceptRoundView(current, view, receivedAt));
     }

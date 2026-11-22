@@ -5,7 +5,7 @@ const path = require("node:path");
 const { Server } = require("socket.io");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
-  disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame,
+  disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay,
 } = require("./hubManager");
 
@@ -138,8 +138,15 @@ io.on("connection", (socket) => {
     if (completeHostResume(socket.id)) broadcastHubs();
   });
 
-  socket.on("hub:finish", () => {
-    if (finishHubGame(socket.id)) broadcastHubs();
+  socket.on("hub:finish", (gameNumber) => {
+    if (finishHubGame(socket.id, gameNumber)) broadcastHubs();
+  });
+
+  socket.on("hub:restart", (request, acknowledge) => {
+    const restarted = restartHubGame(socket.id, request);
+    if (restarted) broadcastHubs();
+    else socket.emit("hub:error", "Impossible de relancer la partie. Il faut au moins deux joueurs disponibles.");
+    if (typeof acknowledge === "function") acknowledge(restarted);
   });
 
   socket.on("hub:add-bot", (request) => {

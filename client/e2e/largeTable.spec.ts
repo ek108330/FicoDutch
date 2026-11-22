@@ -34,17 +34,21 @@ async function checkSeats(page: Page, count: number, cards: number) {
     const cards = [...hand.querySelectorAll(".playing-card")];
     const rows = new Set(cards.map((card) => (card as HTMLElement).offsetTop)).size;
     const rects = cards.map((card) => card.getBoundingClientRect());
-    return { rows, minWidth: Math.min(...rects.map(({ width }) => width)), ratios: rects.map(({ width, height }) => width / height) };
+    const style = getComputedStyle(cards[0]);
+    return { rows, minWidth: Math.min(...rects.map(({ width }) => width)), ratios: rects.map(({ width, height }) => width / height),
+      opponent: !hand.closest(".position-bottom"), border: Number.parseFloat(style.borderTopWidth),
+      corner: style.borderTopLeftRadius.split(" ").map(Number.parseFloat) };
   }));
   for (const hand of hands) {
     expect(hand.rows).toBe(2);
     expect(hand.minWidth).toBeGreaterThanOrEqual(24);
+    for (const ratio of hand.ratios) expect(ratio).toBeCloseTo(63 / 88, 2);
+    if (hand.opponent) expect(hand.border).toBe(1);
+    expect(hand.corner[0]).toBeCloseTo(100 * 3 / 63, 2);
+    expect(hand.corner[1]).toBeCloseTo(100 * 3 / 88, 2);
   }
   const { width, height } = page.viewportSize()!;
   if (width < height) {
-    for (const { ratios } of hands) {
-      for (const ratio of ratios) expect(ratio).toBeCloseTo(0.71, 2);
-    }
     for (const seat of boxes) {
       if (seat.label.includes("position-left")) expect(seat.left - tableBox.x, seat.label).toBeLessThan(30);
       if (seat.label.includes("position-right")) expect(tableBox.x + tableBox.width - seat.right, seat.label).toBeLessThan(30);

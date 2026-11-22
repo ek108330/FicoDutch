@@ -85,6 +85,7 @@ function createHub(socketId, pseudo) {
     maxPlayers: 6,
     gameStarted: false,
     gameFinished: false,
+    gameNumber: 1,
     createdAt: Date.now(),
     hostPause: null,
     clockVersion: 0,
@@ -242,9 +243,29 @@ function startHubGame(socketId, request) {
   return { hub: getPublicHub(hub) };
 }
 
-function finishHubGame(socketId) {
+function restartHubGame(socketId, request) {
   const current = findPlayerHub(socketId);
-  if (!current?.player.isHost || !current.hub.gameStarted || current.hub.gameFinished) return false;
+  if (!current?.player.isHost || current.hub.id !== request?.hubId) return false;
+  const { hub } = current;
+  if (!hub.gameFinished || hub.hostPause || hub.gameNumber !== request.gameNumber ||
+      hub.players.filter(({ connected }) => connected).length < 2) return false;
+
+  const keys = Object.keys(hub.variants);
+  if (!keys.every((key) => typeof request.variants?.[key] === "boolean")) return false;
+  hub.variants = Object.fromEntries(keys.map((key) => [key, request.variants[key]]));
+  const cardsPerPlayer = hub.variants.sixCards ? 6 : 4;
+  hub.initialCardCounts = Object.fromEntries(hub.players.map(({ id }) => [id, cardsPerPlayer]));
+  hub.memorizationEndsAt = Date.now() + MEMORIZATION_DURATION_MS;
+  hub.gameFinished = false;
+  hub.gameNumber++;
+  hub.clockVersion++;
+  return true;
+}
+
+function finishHubGame(socketId, gameNumber) {
+  const current = findPlayerHub(socketId);
+  if (!current?.player.isHost || !current.hub.gameStarted || current.hub.gameFinished ||
+      current.hub.gameNumber !== gameNumber) return false;
   current.hub.gameFinished = true;
   return true;
 }
@@ -291,6 +312,6 @@ function resolveEncryptedRelay(socketId, request) {
 module.exports = {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
-  finishHubGame, resolveEncryptedRelay,
+  finishHubGame, restartHubGame, resolveEncryptedRelay,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage,
 };

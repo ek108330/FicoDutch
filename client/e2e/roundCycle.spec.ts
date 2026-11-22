@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, drawDeck, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, drawDeck, expectScreenFits, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const next = (page: Page) => page.getByRole("button", { name: "Lancer la manche suivante" });
 const resultTitle = (page: Page) => page.locator(".result-screen").getByRole("heading", { level: 1 });
@@ -32,8 +32,8 @@ async function finishWithDutch(first: Page, last: Page) {
   await discardDrawn(last);
 }
 
-test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, browser, baseURL }, testInfo) => {
-  test.setTimeout(75_000);
+test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même Hub", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(105_000);
   await fixDeckOrder(host);
   const guest = await browser.newPage({ baseURL, hasTouch: true });
   try {
@@ -99,6 +99,34 @@ test("deux manches jusqu’au seuil de fin de partie", async ({ page: host, brow
     }
     await guest.setViewportSize({ width: 390, height: 844 });
     await guest.screenshot({ path: testInfo.outputPath("05-classement-final-portrait.png"), fullPage: true });
+    const startOver = host.getByRole("button", { name: "Nouvelle partie" });
+    await expect(guest.getByRole("button", { name: "Nouvelle partie" })).toHaveCount(0);
+    await expect(startOver).toBeEnabled();
+    await host.setViewportSize({ width: 320, height: 568 });
+    await expectScreenFits(host);
+    await host.screenshot({ path: testInfo.outputPath("06-relancer-partie-portrait.png") });
+    await startOver.click();
+
+    await Promise.all([host, guest].map((page) => expect(page.getByRole("region", { name: "Transition" })
+      .getByRole("heading", { name: "Manche 1" })).toBeVisible()));
+    for (const page of [host, guest]) {
+      await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible({ timeout: 9_000 });
+      await expect(page.locator(".position-bottom .playing-card.face-down")).toHaveCount(6);
+      await expect(page.locator(".position-top .playing-card.face-up")).toHaveCount(0);
+    }
+    await guest.screenshot({ path: testInfo.outputPath("07-nouvelle-partie-memorisation.png") });
+    await finishWithDutch(guest, host);
+    for (const page of [host, guest]) {
+      await resultTitle(page).click();
+      const totals = ranking(page).locator("tbody tr td:last-child");
+      await expect(totals).toHaveCount(2);
+      for (const total of await totals.all()) {
+        const parts = (await total.innerText()).match(/^(\d+) \(\+(\d+)\)$/);
+        expect(parts?.[1]).toBe(parts?.[2]);
+        expect(parts).not.toBeNull();
+      }
+    }
+    await host.screenshot({ path: testInfo.outputPath("08-scores-reinitialises.png") });
     await guest.getByRole("button", { name: "Quitter la table" }).click();
     await expect(guest.getByRole("textbox", { name: "Pseudo" })).toBeVisible();
     await expect(host.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();

@@ -6,7 +6,7 @@ import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
 import { readHubSession, saveHubSession } from "./network/hubSession";
-import type { Hub, HubEnd, HubMembership, HubSession, StartHubRequest } from "../../shared/hubTypes";
+import type { Hub, HubEnd, HubMembership, HubSession, RestartHubRequest, StartHubRequest } from "../../shared/hubTypes";
 import { createRound } from "./game/createRound";
 import { resumeGameClock } from "./game/gameClock";
 import type { GameState } from "./game/gameTypes";
@@ -19,7 +19,12 @@ import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
-type HostRound = { hubId: string; state: GameState };
+type HostRound = { hubId: string; gameNumber: number; state: GameState };
+
+function prepareGame(hub: Hub) {
+  return createRound(hub.players.map(({ id, pseudo, isBot }) => ({ id, pseudo, isBot, totalScore: 0 })),
+    hub.variants, hub.endThreshold);
+}
 
 function App() {
   const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
@@ -32,6 +37,7 @@ function App() {
   const [networkReady, setNetworkReady] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [hostRound, setHostRound] = useState<HostRound | null>(null);
+  const [restarting, setRestarting] = useState(false);
   const hubRef = useRef<CurrentHub | null>(null);
   const sessionRef = useRef(session);
   const readyRef = useRef(false);
@@ -74,10 +80,10 @@ function App() {
   const updateHostRound = useCallback<UpdateHostRound>((hubId, update) => {
     const current = hostRoundRef.current;
     const hub = hubRef.current;
-    if (current?.hubId !== hubId || hub?.id !== hubId || !readyRef.current ||
+    if (current?.hubId !== hubId || hub?.id !== hubId || current.gameNumber !== hub.gameNumber || !readyRef.current ||
         pausedAt.current !== null || !socket.connected) return;
     const state = update(current.state, hub.players);
-    if (state !== current.state) storeHostRound({ hubId, state });
+    if (state !== current.state) storeHostRound({ ...current, state });
   }, [storeHostRound]);
 
   useEffect(() => {
@@ -86,7 +92,7 @@ function App() {
     function applyHub(update: Hub, serverTime: number) {
       const receivedAt = performance.now();
       const previous = hubRef.current?.id === update.id ? hubRef.current : null;
-      let memorizationDeadline = previous?.memorizationDeadline;
+      let memorizationDeadline = previous?.gameNumber === update.gameNumber ? previous.memorizationDeadline : undefined;
       if (memorizationDeadline === undefined && update.memorizationEndsAt !== undefined) {
         memorizationDeadline = receivedAt + Math.max(0, update.memorizationEndsAt - serverTime);
       }
@@ -99,7 +105,10 @@ function App() {
       const round = hostRoundRef.current;
       if (round?.hubId === update.id && update.gameStarted) {
         let state = round.state;
-        if (state.roundNumber === 1 && state.phase === "memorization" &&
+        if (update.gameNumber > round.gameNumber) {
+          state = { ...prepareGame(update), phase: "transition", phaseDeadline: receivedAt + GAME_CONFIG.round.transitionMs };
+          pausedAt.current = null;
+        } else if (state.roundNumber === 1 && state.phase === "memorization" &&
             state.phaseDeadline === null && memorizationDeadline !== undefined) {
           state = { ...state, phaseDeadline: memorizationDeadline };
         }
@@ -112,7 +121,7 @@ function App() {
 
         const presentIds = new Set(update.players.map(({ id }) => id));
         state = applyDepartures(state, presentIds, pausedAt.current ?? receivedAt);
-        if (state !== round.state) storeHostRound({ ...round, state });
+        if (state !== round.state) storeHostRound({ ...round, gameNumber: update.gameNumber, state });
       }
       storeHub({ ...update, memorizationDeadline, pauseDeadline });
     }
@@ -230,7 +239,9 @@ function App() {
 
   useEffect(() => {
     if (networkReady && currentHub && !currentHub.gameFinished && hostRound?.hubId === currentHub.id &&
-        hostRound.state.result?.gameWinnerIds.length) socket.emit("hub:finish");
+        hostRound.gameNumber === currentHub.gameNumber && hostRound.state.result?.gameWinnerIds.length) {
+      socket.emit("hub:finish", currentHub.gameNumber);
+    }
   }, [currentHub, hostRound, networkReady]);
 
   function savePseudo(value: string) {
@@ -281,12 +292,8 @@ function App() {
   function startGame(hub: Hub) {
     if (!networkReady || hostRoundRef.current?.hubId === hub.id) return;
 
-    const state = createRound(
-      hub.players.map(({ id, pseudo, isBot }) => ({ id, pseudo, isBot, totalScore: 0 })),
-      hub.variants,
-      hub.endThreshold
-    );
-    const preparedRound = { hubId: hub.id, state };
+    const state = prepareGame(hub);
+    const preparedRound = { hubId: hub.id, gameNumber: hub.gameNumber, state };
     const request: StartHubRequest = {
       hubId: hub.id,
       variants: state.variants,
@@ -300,6 +307,17 @@ function App() {
     socket.emit("hub:start", request, (accepted: boolean) => {
       if (!accepted && hostRoundRef.current === preparedRound) storeHostRound(null);
     });
+  }
+
+  function restartGame() {
+    const hub = hubRef.current;
+    const round = hostRoundRef.current;
+    if (restarting || !readyRef.current || !hub?.gameFinished || hub.hostPause ||
+        round?.hubId !== hub.id || round.gameNumber !== hub.gameNumber || !round.state.result?.gameWinnerIds.length) return;
+
+    const request: RestartHubRequest = { hubId: hub.id, gameNumber: hub.gameNumber, variants: round.state.variants };
+    setRestarting(true);
+    socket.timeout(5_000).emit("hub:restart", request, () => setRestarting(false));
   }
 
   function leaveHub() {
@@ -339,17 +357,19 @@ function App() {
 
       return (
         <RoundScreen
-          key={currentHub.id}
+          key={`${currentHub.id}:${currentHub.gameNumber}`}
           hubId={currentHub.id}
           hostId={currentHub.hostId}
           playerId={playerId ?? ""}
           deadline={memorizationDeadline}
           members={currentHub.players}
           gameFinished={currentHub.gameFinished}
-          hostRound={hostRound?.hubId === currentHub.id ? hostRound.state : null}
+          hostRound={hostRound?.hubId === currentHub.id && hostRound.gameNumber === currentHub.gameNumber ? hostRound.state : null}
           peers={peers}
           updateHostRound={updateHostRound}
           onLeave={leaveHub}
+          onRestart={restartGame}
+          restarting={restarting}
           settings={settings}
           playSound={playSound}
           clockVersion={currentHub.clockVersion}

@@ -22,6 +22,7 @@ export type Hub = {
   status: HubStatus;
   gameStarted: boolean;
   gameFinished: boolean;
+  gameNumber: number;
   hostPause: { startedAt: number; until: number } | null;
   clockVersion: number;
   initialCardCounts?: Record<string, number>;
@@ -58,6 +59,8 @@ export type StartHubRequest = Pick<Hub, "variants" | "endThreshold"> & {
   hubId: string;
   cardCounts: Record<string, number>;
 };
+
+export type RestartHubRequest = Pick<Hub, "gameNumber" | "variants"> & { hubId: string };
 
 export type PeerDescription = {
   type: "offer" | "answer";

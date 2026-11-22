@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const {
   addHubBot, completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
-  relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, resumeHub, startHubGame, updateHubSettings,
+  relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, restartHubGame, resumeHub, startHubGame, updateHubSettings,
 } = require("./hubManager");
 
 function openTable(t, hostSocket, guestSocket) {
@@ -139,7 +139,7 @@ test("le retour de l’hôte valide une nouvelle horloge et une pause expirée f
 
 test("un Hub en cours réserve des places aux arrivants jusqu’à la limite de six joueurs", (t) => {
   const { hub, request } = openTable(t, "entry-host", "entry-guest");
-  assert.equal(finishHubGame("entry-host"), false);
+  assert.equal(finishHubGame("entry-host", hub.gameNumber), false);
   startHubGame("entry-host", request);
   for (const name of ["Chloe", "Dana", "Eli", "Fiona"]) {
     const joined = joinHub(hub.id, name, name);
@@ -149,11 +149,39 @@ test("un Hub en cours réserve des places aux arrivants jusqu’à la limite de 
   assert.equal(joinHub(hub.id, "Gina", "Gina"), null);
   assert.equal(getAllHubs().find(({ id }) => id === hub.id).status, "full");
   assert.equal(removePlayer("Fiona").deleted, false);
-  assert.equal(finishHubGame("entry-guest"), false);
-  assert.equal(finishHubGame("entry-host"), true);
-  assert.equal(finishHubGame("entry-host"), false);
+  assert.equal(finishHubGame("entry-guest", hub.gameNumber), false);
+  assert.equal(finishHubGame("entry-host", hub.gameNumber), true);
+  assert.equal(finishHubGame("entry-host", hub.gameNumber), false);
   assert.equal(joinHub(hub.id, "Gina", "Gina"), null);
   assert.equal(getAllHubs().find(({ id }) => id === hub.id).status, "finished");
+});
+
+test("seul l’hôte peut relancer une partie terminée, avec les mêmes places et une nouvelle horloge", (t) => {
+  const { hub, guest, request } = openTable(t, "restart-host", "restart-guest");
+  const replay = { hubId: hub.id, gameNumber: hub.gameNumber, variants: { ...hub.variants, sixCards: true } };
+  assert.equal(restartHubGame("restart-host", replay), false);
+  assert.ok(startHubGame("restart-host", request).hub);
+  assert.equal(restartHubGame("restart-host", replay), false);
+  const { session: late } = joinHub(hub.id, "restart-late", "Chloe");
+  assert.equal(finishHubGame("restart-host", hub.gameNumber), true);
+  assert.equal(restartHubGame("restart-guest", replay), false);
+  assert.equal(restartHubGame("restart-host", { ...replay, variants: {} }), false);
+  disconnectPlayer("restart-guest");
+  disconnectPlayer("restart-late");
+  assert.equal(restartHubGame("restart-host", replay), false);
+  assert.ok(resumeHub("restart-guest", guest));
+  assert.equal(restartHubGame("restart-host", replay), true);
+  assert.equal(restartHubGame("restart-host", replay), false);
+  assert.equal(finishHubGame("restart-host", hub.gameNumber), false);
+  const reopened = getAllHubs().find(({ id }) => id === hub.id);
+  assert.equal(reopened.gameNumber, hub.gameNumber + 1);
+  assert.equal(reopened.clockVersion, hub.clockVersion + 1);
+  assert.equal(reopened.endThreshold, hub.endThreshold);
+  assert.equal(reopened.gameFinished, false);
+  assert.deepEqual(reopened.variants, replay.variants);
+  assert.deepEqual(reopened.initialCardCounts, { [hub.hostId]: 6, [guest.playerId]: 6, [late.playerId]: 6 });
+  assert.equal(finishHubGame("restart-host", reopened.gameNumber), true);
+  assert.equal(restartHubGame("restart-host", replay), false);
 });
 
 test("seul l’hôte peut retirer un invité de son Hub et sa session est révoquée", (t) => {
