@@ -1590,6 +1590,7 @@ input {
 .game-table .player-cards .playing-card[data-look-card] {
   position: relative;
   overflow: visible;
+  container-type: size;
 }
 
 [data-look-card] > .perimeter-clock {
@@ -1597,6 +1598,21 @@ input {
   inset: -4px;
   width: calc(100% + 8px);
   height: calc(100% + 8px);
+  transform-origin: center;
+}
+
+.game-table[data-player-count="2"] .position-top [data-look-card] > .perimeter-clock { rotate: 180deg; }
+
+@media (orientation: landscape) {
+  .game-table[data-player-count="3"] :is(.position-left, .position-right) [data-look-card] > .perimeter-clock {
+    inset: 50% auto auto 50%;
+    translate: -50% -50%;
+    width: calc(100cqb + 8px);
+    height: calc(100cqi + 8px);
+  }
+
+  .game-table[data-player-count="3"] .position-left [data-look-card] > .perimeter-clock { rotate: -90deg; }
+  .game-table[data-player-count="3"] .position-right [data-look-card] > .perimeter-clock { rotate: 90deg; }
 }
 
 [data-look-card] > .perimeter-clock .perimeter-clock-progress { stroke: #ffe39a; }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn,
+import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openLobby, openTwoPlayerHub, turnClock, expectLocalTurn,
   expectCenteredTurnPanel, expectClockFromTop } from "./tableFlow";
 
 const faceUpHands = (page: Page) => page.locator(".player-cards .face-up");
@@ -125,6 +125,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await guest.screenshot({ path: testInfo.outputPath("08-neuf-carte-cachee-observateur.png") });
     await host.setViewportSize({ width: 844, height: 390 });
     await expectTableFits(host);
+    await expectClockFromTop(lookClock(host));
     await host.screenshot({ path: testInfo.outputPath("04-neuf-paysage.png") });
     await expectLocalTurn(guest, 11_000);
     await expect(lookClock(guest)).toHaveCount(0);
@@ -201,5 +202,41 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await host.screenshot({ path: testInfo.outputPath("02-joker-sept-cartes.png") });
   } finally {
     await guest.close();
+  }
+});
+
+test("le chrono de consultation commence en haut sur les cartes latérales en paysage", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(40_000);
+  await fixDeckOrder(host);
+  const viewport = { width: 844, height: 390 };
+  await host.setViewportSize(viewport);
+  const guest = await browser.newPage({ baseURL, viewport });
+  const last = await browser.newPage({ baseURL, viewport });
+  try {
+    const start = await openTwoPlayerHub(host, guest, "AliceCadran", "BobCadran");
+    await openLobby(last, "ChloeCadran");
+    await last.locator(".hub-item").filter({ hasText: "Hub de AliceCadran" })
+      .getByRole("button", { name: "Rejoindre", exact: true }).click();
+    await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
+    await expect(start).toBeEnabled();
+    await start.click();
+    await expectLocalTurn(last, 18_000);
+    await playSpecialCard(last, 2, "8");
+    await targetCard(last, 1, "ChloeCadran").click();
+
+    for (const [page, side] of [[host, "right"], [guest, "left"]] as const) {
+      const card = page.locator(`.position-${side} [data-look-card]`);
+      const clock = card.getByRole("progressbar", { name: "Temps de consultation de la carte" });
+      await expectClockFromTop(clock);
+      const frame = (await clock.boundingBox())!;
+      const box = (await card.boundingBox())!;
+      expect(frame.width).toBeGreaterThan(box.width);
+      expect(frame.height).toBeGreaterThan(box.height);
+      expect(frame.y + frame.height / 2).toBeCloseTo(box.y + box.height / 2, 0);
+      await expect.poll(async () => Number(await clock.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(8);
+      await page.screenshot({ path: testInfo.outputPath(`chrono-12h-${side}.png`) });
+    }
+  } finally {
+    await Promise.all([guest.close(), last.close()]);
   }
 });

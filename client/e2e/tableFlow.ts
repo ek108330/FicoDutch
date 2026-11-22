@@ -74,13 +74,16 @@ export const turnClock = (page: Page) => page.getByRole("progressbar", { name: "
 export async function expectClockFromTop(clock: Locator) {
   const progress = clock.locator("path.perimeter-clock-progress");
   await expect(progress).toHaveAttribute("d", /^M /);
-  const { center, startX, startY, nextX, nextY } = await progress.evaluate((element: SVGPathElement) => {
-    const { x: startX, y: startY } = element.getPointAtLength(0);
-    const { x: nextX, y: nextY } = element.getPointAtLength(2);
-    return { center: element.ownerSVGElement!.clientWidth / 2, startX, startY, nextX, nextY };
+  const { center, top, startX, startY, nextX, nextY } = await progress.evaluate((element: SVGPathElement) => {
+    const matrix = element.getScreenCTM()!;
+    const { x: startX, y: startY } = element.getPointAtLength(0).matrixTransform(matrix);
+    const { x: nextX, y: nextY } = element.getPointAtLength(2).matrixTransform(matrix);
+    const box = element.ownerSVGElement!.getBoundingClientRect();
+    return { center: box.x + box.width / 2, top: box.top, startX, startY, nextX, nextY };
   });
   expect(Math.abs(startX - center)).toBeLessThan(1);
-  expect(startY).toBeCloseTo(1.5);
+  expect(startY - top).toBeGreaterThan(0);
+  expect(startY - top).toBeLessThanOrEqual(1.6);
   expect(nextX).toBeGreaterThan(startX);
   expect(nextY).toBeCloseTo(startY);
 }
