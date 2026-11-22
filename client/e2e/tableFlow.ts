@@ -71,6 +71,23 @@ export const discard = (page: Page) => page.locator(".pile-slot").filter({ has: 
 export const activeTurn = (page: Page) => page.getByRole("region", { name: "Tour de jeu" }).getByRole("status");
 export const turnClock = (page: Page) => page.getByRole("progressbar", { name: "Temps restant" });
 
+export async function expectCenteredTurnPanel(page: Page) {
+  const panel = page.locator(".turn-panel[data-local-turn]");
+  await expect(panel).toHaveCSS("background-color", "rgb(243, 222, 154)");
+  const [text, piles, ownName] = await Promise.all([
+    panel.boundingBox(), page.locator(".turn-layout .table-piles").boundingBox(), page.locator(".position-bottom .player-name").boundingBox(),
+  ]);
+  expect(text!.y).toBeGreaterThan(piles!.y + piles!.height);
+  expect(text!.y + text!.height).toBeLessThanOrEqual(ownName!.y);
+  expect(text!.x + text!.width / 2).toBeCloseTo(piles!.x + piles!.width / 2, 0);
+  const overlap = await page.locator(".table-player:not(.position-bottom)").evaluateAll((seats, box) =>
+    seats.some((seat) => {
+      const { left, top, right, bottom } = seat.getBoundingClientRect();
+      return left < box.x + box.width && right > box.x && top < box.y + box.height && bottom > box.y;
+    }), text!);
+  expect(overlap).toBe(false);
+}
+
 export async function discardDrawn(page: Page) {
   const card = drawnCard(page);
   await card.evaluate(async (element) => {

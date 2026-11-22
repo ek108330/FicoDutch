@@ -39,9 +39,7 @@ function PowerControls({ power, act }: {
   return (
     <>
       <p>{instruction}</p>
-      <div className="power-actions">
-        <button type="button" aria-label="Passer le pouvoir" onClick={() => act({ kind: "power-pass" })}>Passer</button>
-      </div>
+      <button type="button" aria-label="Passer le pouvoir" onClick={() => act({ kind: "power-pass" })}>Passer</button>
     </>
   );
 }
@@ -68,7 +66,8 @@ export function TurnPanel({
   }[notice.outcome] : null;
   return (
     <section className="turn-layout" aria-label="Tour de jeu">
-      {showCenter ? <div className="round-panel turn-panel">
+      {piles}
+      {showCenter ? <div className="round-panel turn-panel" data-local-turn={canPlay || undefined}>
         {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}`}
           remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : TURN_DURATION_MS}
           label={view.finalReaction ? "Temps pour réagir" : "Temps restant"} />}
@@ -85,16 +84,15 @@ export function TurnPanel({
             </button>
           </div>}
         </div>
+        {canPlay && power && (
+          <div className="turn-choices">
+            <h2 className="power-title">{powerLabels[power.kind].title}</h2>
+            {valetPair && !canSwap && <p>La protection Dutch empêche l’échange.</p>}
+            <PowerControls power={power} act={act} />
+          </div>
+        )}
       </div> : <strong className="sr-only" role="status">{turnLabel}</strong>}
-      {canPlay && power && (
-        <div className="round-panel turn-choices">
-          <h2 className="power-title">{powerLabels[power.kind].title}</h2>
-          {valetPair && !canSwap && <p>La protection Dutch empêche l’échange.</p>}
-          <PowerControls power={power} act={act} />
-        </div>
-      )}
       {feedback && <p className="sr-only" aria-live="polite">{feedback}</p>}
-      {piles}
     </section>
   );
 }

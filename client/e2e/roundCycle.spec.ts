@@ -48,6 +48,8 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
       await expect(page.getByRole("progressbar", { name: "Temps avant la manche suivante" })).toBeVisible();
       await expect(page.getByRole("timer")).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Main de AliceManches" }).getByText("27 points")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de AliceManches" })).toHaveCSS("background-color", "rgb(243, 222, 154)");
+      await expect(page.getByRole("region", { name: "Main de BobManches" })).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await expect(page.getByRole("region", { name: "Main de BobManches" }).getByText("36 +10", { exact: true })).toBeVisible();
       await expect(next(page)).toHaveCount(0);
     }

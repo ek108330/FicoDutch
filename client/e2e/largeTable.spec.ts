@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, activeTurn, drawDeck, expectScreenFits, fixDeckOrder, openLobby, openTwoPlayerHub,
+  expectLocalTurn, expectCenteredTurnPanel } from "./tableFlow";
 
 const viewports = [
   { name: "ordinateur", width: 1280, height: 800 },
@@ -8,6 +9,22 @@ const viewports = [
   { name: "portrait-compact", width: 360, height: 640 },
   { name: "paysage", width: 844, height: 390 },
 ];
+
+async function expectClockwiseOrder(page: Page, order: string[], ownIndex: number) {
+  const clockwise = await page.locator(".game-table").evaluate((table) => {
+    const { x, y, width, height } = table.getBoundingClientRect();
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const seats = Array.from(table.querySelectorAll(".table-player"), (seat) => {
+      const box = seat.getBoundingClientRect();
+      const angle = Math.atan2(centerX - (box.x + box.width / 2), box.y + box.height / 2 - centerY);
+      return { own: seat.classList.contains("position-bottom"), angle: (angle + 2 * Math.PI) % (2 * Math.PI),
+        name: seat.querySelector(".player-name-label")!.textContent!.replace(/ \(Moi\)$/, "") };
+    });
+    return seats.sort((a, b) => Number(b.own) - Number(a.own) || a.angle - b.angle).map(({ name }) => name);
+  });
+  expect(clockwise).toEqual([...order.slice(ownIndex), ...order.slice(0, ownIndex)]);
+}
 
 async function checkSeats(page: Page, count: number, cards: number) {
   const table = page.locator(`.game-table[data-player-count="${count}"]`);
@@ -98,9 +115,12 @@ for (const count of [4, 5, 6]) {
         } else await start.click();
         const last = guests.at(-1)!;
         await expectLocalTurn(last, 21_000);
+        const order = [hostName, ...guests.map((_, index) => `Invite${index + 1}`)];
+        await Promise.all([host, ...guests].map((page, ownIndex) => expectClockwiseOrder(page, order, ownIndex)));
         for (const { name, width, height } of seatsViewports) {
           await last.setViewportSize({ width, height });
           await checkSeats(last, count, cards);
+          await expectClockwiseOrder(last, order, count - 1);
           await expect(drawDeck(last)).toBeEnabled();
           await last.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
         }
@@ -110,8 +130,21 @@ for (const count of [4, 5, 6]) {
         await last.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
         await discardDrawn(last);
         await expectLocalTurn(host);
+        await host.setViewportSize({ width: 320, height: 568 });
+        const opponents = host.locator(".table-player:not(.position-bottom) .player-cards");
+        const handPositions = () => opponents.evaluateAll((hands) => hands.map((hand) => hand.getBoundingClientRect().toJSON()));
+        const beforePower = await handPositions();
         await drawDeck(host).click();
         await host.getByRole("button", { name: "Remplacer la carte 1", exact: true }).click();
+        await expect(host.getByRole("heading", { name: "Pouvoir du Joker+" })).toBeVisible();
+        await expectCenteredTurnPanel(host);
+        expect(await handPositions()).toEqual(beforePower);
+        await expectScreenFits(host);
+        await expect(host.locator('[data-card-animation="discard"]')).toHaveCount(0);
+        await host.screenshot({ path: testInfo.outputPath("joker-consigne-centree-320.png") });
+        await host.setViewportSize({ width: 740, height: 360 });
+        await expectCenteredTurnPanel(host);
+        await host.screenshot({ path: testInfo.outputPath("joker-consigne-centree-740.png") });
         await host.getByRole("button", { name: "Carte de la pioche à donner" }).press("Enter");
         await host.getByRole("button", { name: "Donner une carte à Invite5", exact: true }).press("Enter");
         for (const { name, width, height } of seatsViewports) {

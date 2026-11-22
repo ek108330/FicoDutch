@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
+import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock, expectLocalTurn, expectCenteredTurnPanel } from "./tableFlow";
 
 const faceUpHands = (page: Page) => page.locator(".player-cards .face-up");
 const targetCard = (page: Page, position: number, pseudo: string) =>
@@ -39,6 +39,9 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
 
     await playSpecialCard(guest, 2, "10");
     expect(await otherHand.boundingBox()).toEqual(beforePower);
+    await guest.setViewportSize({ width: 740, height: 360 });
+    await expectCenteredTurnPanel(guest);
+    await guest.screenshot({ path: testInfo.outputPath("09-consigne-centree-paysage.png") });
     await expect(turnClock(guest)).toHaveAttribute("aria-valuenow", /^(59|60)$/);
     await targetCard(guest, 1, bob).click();
     await expect(guest.locator(".position-bottom .playing-card[data-selected=true]")).toHaveCount(1);
@@ -70,6 +73,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
 
     await host.setViewportSize({ width: 390, height: 844 });
     await expectTableFits(host);
+    await expectCenteredTurnPanel(host);
     await host.screenshot({ path: testInfo.outputPath("02-valet-portrait.png") });
     await guest.screenshot({ path: testInfo.outputPath("03-valet-vue-adversaire.png") });
     await guest.setViewportSize({ width: 390, height: 844 });
@@ -149,6 +153,7 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await expect(host.locator(".deck-slot")).toHaveCSS("animation-name", "gift-pulse");
     await expect(host.locator(".table-center .turn-panel")).toHaveCount(0);
     await expectTableFits(guest);
+    await expectCenteredTurnPanel(guest);
     await host.setViewportSize({ width: 393, height: 702 });
     await host.screenshot({ path: testInfo.outputPath("01-joker-vu-par-adversaire.png") });
     const source = (await guest.locator(".deck-slot").boundingBox())!;

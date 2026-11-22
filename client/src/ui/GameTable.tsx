@@ -61,9 +61,9 @@ type GameTableProps = {
 const positionLayouts: Record<number, string[]> = {
   2: ["top"],
   3: ["left", "right"],
-  4: ["top", "left", "right"],
-  5: ["left-top", "left-bottom", "right-top", "right-bottom"],
-  6: ["top", "left-top", "left-bottom", "right-top", "right-bottom"],
+  4: ["left", "top", "right"],
+  5: ["left-bottom", "left-top", "right-top", "right-bottom"],
+  6: ["left-bottom", "left-top", "top", "right-top", "right-bottom"],
 };
 
 function DutchButton({ armed, toggle }: NonNullable<GameTableProps["dutchControl"]>) {
@@ -117,14 +117,14 @@ export default function GameTable({
     if (source && target) flyCard(source.getBoundingClientRect(), target.getBoundingClientRect(), "discard");
     onReplace?.(position);
   }
-  const localPlayer = players.find((player) => player.id === localPlayerId);
-  const opponents = players.filter((player) => player.id !== localPlayerId);
+  const localIndex = players.findIndex((player) => player.id === localPlayerId);
+  const opponents = localIndex < 0 ? players : [...players.slice(localIndex + 1), ...players.slice(0, localIndex)];
   const positions = positionLayouts[players.length] || [];
   const positionedPlayers = opponents.map((player, index) => ({
     player,
     position: positions[index] || "top",
   }));
-  if (localPlayer) positionedPlayers.push({ player: localPlayer, position: "bottom" });
+  if (localIndex >= 0) positionedPlayers.push({ player: players[localIndex], position: "bottom" });
 
   return (
     <div className={`game-table${dealing ? " is-dealing" : ""}${players.length >= 4 ? " is-large-table" : ""}`}
