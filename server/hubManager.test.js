@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
+const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
 const {
   addHubBot, completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
   relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, restartHubGame, resumeHub, startHubGame, updateHubSettings,
@@ -66,7 +67,7 @@ test("seul l’hôte peut publier la distribution pour les joueurs et paramètre
     status: "in-progress",
     gameStarted: true,
     initialCardCounts: request.cardCounts,
-    memorizationEndsAt: 16_000,
+    memorizationEndsAt: 1_000 + dealingMs + memorizationMs,
   });
   assert.ok(startHubGame("host", request).error);
 });
@@ -182,6 +183,9 @@ test("seul l’hôte peut relancer une partie terminée, avec les mêmes places 
   assert.deepEqual(reopened.initialCardCounts, { [hub.hostId]: 6, [guest.playerId]: 6, [late.playerId]: 6 });
   assert.equal(finishHubGame("restart-host", reopened.gameNumber), true);
   assert.equal(restartHubGame("restart-host", replay), false);
+  assert.equal(interruptHub("restart-guest", hub.id), null);
+  assert.deepEqual(interruptHub("restart-host", hub.id), ["restart-host", "restart-guest"]);
+  assert.equal(getAllHubs().some(({ id }) => id === hub.id), false);
 });
 
 test("seul l’hôte peut retirer un invité de son Hub et sa session est révoquée", (t) => {

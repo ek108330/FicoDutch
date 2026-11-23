@@ -27,7 +27,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
   try {
     const start = await openTwoPlayerHub(host, guest, alice, bob);
     await start.click();
-    await expectLocalTurn(guest, 17_000);
+    await expectLocalTurn(guest, 20_000);
     await expect(guest.getByRole("timer")).toHaveCount(0);
     const progress = turnClock(guest).locator(".perimeter-clock-progress");
     await expectClockFromTop(turnClock(guest));
@@ -151,7 +151,7 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
       await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
     }
     await start.click();
-    await expectLocalTurn(guest, 17_000);
+    await expectLocalTurn(guest, 20_000);
     await playSpecialCard(guest, 1, "Joker+");
 
     const panel = guest.locator(".turn-panel[data-joker]");

@@ -16,7 +16,7 @@ import type { GameVariants } from "./variants";
 type SetupPlayers = Array<{ id: string; pseudo: string; cardCount: number }>;
 type RoundView = { roundNumber: number; clockVersion: number; remainingMs: number | null } & (
   | { phase: "waiting" }
-  | { phase: "transition" | "dealing"; players: SetupPlayers; sixCards: boolean }
+  | { phase: "dealing"; players: SetupPlayers; sixCards: boolean }
   | { phase: "memorization"; players: SetupPlayers; sixCards: boolean; memorized: MemorizedCard[] }
   | { phase: "playing"; turn: TurnView }
   | { phase: "results"; result: RoundResultView; cardMotion: CardMotionView | null }
@@ -39,11 +39,10 @@ type Options = {
 };
 
 const phaseRank: Record<RoundView["phase"], number> = {
-  waiting: -1, transition: 0, dealing: 1, memorization: 2, playing: 3, results: 4,
+  waiting: -1, dealing: 0, memorization: 1, playing: 2, results: 3,
 };
 const phaseLength: Record<RoundView["phase"], number> = {
   waiting: 0,
-  transition: GAME_CONFIG.round.transitionMs,
   dealing: GAME_CONFIG.round.dealingMs,
   memorization: GAME_CONFIG.round.memorizationMs,
   playing: TURN_DURATION_MS,

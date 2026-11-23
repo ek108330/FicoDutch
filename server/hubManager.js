@@ -2,7 +2,7 @@ const { randomBytes, randomUUID } = require("crypto");
 const { emojis, maxMessageLength } = require("../shared/hubSocial.json");
 
 const hubs = new Map();
-const MEMORIZATION_DURATION_MS = 15_000;
+const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
 const HOST_GRACE_MS = 120_000;
 const CHAT_INTERVAL_MS = 650;
 
@@ -161,7 +161,7 @@ function removeHubGuest(socketId, hubId, playerId) {
 
 function interruptHub(socketId, hubId) {
   const current = findPlayerHub(socketId);
-  if (!current?.player.isHost || current.hub.id !== hubId || !current.hub.gameStarted || current.hub.gameFinished) {
+  if (!current?.player.isHost || current.hub.id !== hubId || !current.hub.gameStarted) {
     return null;
   }
   const socketIds = current.hub.players.map((player) => player.socketId).filter(Boolean);
@@ -238,7 +238,7 @@ function startHubGame(socketId, request) {
   }
 
   hub.initialCardCounts = Object.fromEntries(hub.players.map(({ id }) => [id, cardCounts[id]]));
-  hub.memorizationEndsAt = Date.now() + MEMORIZATION_DURATION_MS;
+  hub.memorizationEndsAt = Date.now() + dealingMs + memorizationMs;
   hub.gameStarted = true;
   return { hub: getPublicHub(hub) };
 }
@@ -255,7 +255,7 @@ function restartHubGame(socketId, request) {
   hub.variants = Object.fromEntries(keys.map((key) => [key, request.variants[key]]));
   const cardsPerPlayer = hub.variants.sixCards ? 6 : 4;
   hub.initialCardCounts = Object.fromEntries(hub.players.map(({ id }) => [id, cardsPerPlayer]));
-  hub.memorizationEndsAt = Date.now() + MEMORIZATION_DURATION_MS;
+  hub.memorizationEndsAt = Date.now() + dealingMs + memorizationMs;
   hub.gameFinished = false;
   hub.gameNumber++;
   hub.clockVersion++;

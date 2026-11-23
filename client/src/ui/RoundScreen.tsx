@@ -12,6 +12,7 @@ import { useCardFeedback, type PlayGameSound } from "./useCardFeedback";
 import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
 import PerimeterClock from "./PerimeterClock";
+import { CardBackMark } from "./PlayingCard";
 
 type RoundScreenProps = {
   hubId: string;
@@ -25,6 +26,7 @@ type RoundScreenProps = {
   updateHostRound: UpdateHostRound;
   onLeave: () => void;
   onRestart: () => void;
+  onInterrupt?: () => void;
   restarting: boolean;
   settings: ReactNode;
   playSound: PlayGameSound;
@@ -38,7 +40,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onLeave, onRestart, restarting, settings, playSound, canLeave, clockVersion, pause,
+  peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
@@ -179,22 +181,9 @@ export default function RoundScreen({
         startNext={turn.startNext}
         onLeave={onLeave}
         onRestart={onRestart}
+        onInterrupt={onInterrupt}
         canRestart={gameFinished && !restarting && members.filter(({ connected }) => connected).length >= GAME_CONFIG.players.min}
       />
-    );
-  }
-
-  if (scene.phase === "transition") {
-    return (
-      <main className="game-screen">
-        {gameActions()}
-        <section className="round-results" aria-label="Transition">
-          <PerimeterClock remaining={turn.remaining} duration={GAME_CONFIG.round.transitionMs}
-            label="Temps avant la distribution" radius={15} />
-          <h1>Manche {roundNumber}</h1>
-          <p>Distribution des cartes</p>
-        </section>
-      </main>
     );
   }
 
@@ -228,7 +217,7 @@ export default function RoundScreen({
         playSound={playSound}
         players={scene.phase === "playing" ? scene.turn.players : scene.players}
         memorization={memorization}
-        dealing={phase === "dealing"}
+        dealingUntil={phase === "dealing" ? deadline ?? undefined : undefined}
         activePlayerId={turnControls?.view.playerId}
         opponentClock={turnControls && turnControls.view.playerId !== playerId &&
           !turnControls.view.finalReaction && !power?.lookTarget
@@ -251,7 +240,11 @@ export default function RoundScreen({
         onReplace={turnControls?.canPlay && !power && turnControls.view.hasDrawn && localHand
           ? (position) => turn.act({ kind: "replace", position, handVersion: localHand.handVersion })
           : undefined}
-        piles={turnControls ? null : undefined}
+        piles={turnControls ? null : phase === "dealing" ? (
+          <section className="table-piles" aria-label="Distribution des cartes">
+            <span className="pile-card deck-slot pile-backed deal-deck" data-stacked="true" aria-hidden="true"><CardBackMark /></span>
+          </section>
+        ) : undefined}
         controls={
           turnControls ? (
             <TurnPanel
@@ -259,11 +252,7 @@ export default function RoundScreen({
               remaining={turn.remaining}
               piles={<TurnPiles {...turnControls} feedback={feedback} onGiftSlide={() => playSound("slide")} />}
             />
-          ) : phase === "dealing" ? (
-            <section className="round-panel" aria-label="Distribution">
-              <p role="status">Distribution des cartes</p>
-            </section>
-          ) : (
+          ) : phase === "dealing" ? null : (
             <section className="round-panel memorization-panel" aria-label="Mémorisation">
               <PerimeterClock remaining={turn.remaining} duration={GAME_CONFIG.round.memorizationMs}
                 label="Temps de mémorisation" />

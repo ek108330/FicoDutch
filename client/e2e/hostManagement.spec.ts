@@ -76,7 +76,6 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await drawDeck(guest).click();
     await discardDrawn(guest);
     await expect(host.getByRole("region", { name: "Main de ChloeGestion" })).toBeVisible();
-    await host.getByRole("heading", { name: "Manche 1", exact: true }).click();
     await host.getByRole("button", { name: "Lancer la manche suivante" }).click();
     await expect(host.locator('.game-table[data-player-count="2"]')).toBeVisible({ timeout: 9_000 });
     await expect(formerHand).toHaveCount(0);

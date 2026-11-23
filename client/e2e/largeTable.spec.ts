@@ -182,9 +182,8 @@ for (const count of [4, 5, 6]) {
           const rows = await variants.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
           expect(rows).toHaveLength(4);
           expect(new Set(rows).size).toBe(1);
-          const pager = (await host.getByRole("button", { name: "Afficher le classement cumulé" }).boundingBox())!;
-          const settings = (await host.getByRole("button", { name: "Paramètres du jeu" }).boundingBox())!;
-          expect(pager.x + pager.width).toBeLessThan(settings.x);
+          for (const total of await host.locator(".result-total").all()) await expect(total).toBeInViewport({ ratio: 1 });
+          await expect(host.getByRole("button", { name: "Lancer la manche suivante" })).toBeInViewport({ ratio: 1 });
           await host.screenshot({ path: testInfo.outputPath(`resultats-six-${width}.png`) });
         }
       } finally {

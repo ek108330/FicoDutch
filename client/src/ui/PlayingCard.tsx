@@ -57,10 +57,10 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
     "data-exchange-selected": exchangeSelected || undefined,
     "data-card-position": index,
     "data-hand-slot": slot,
+    "data-deal-order": dealOrder,
     "data-power-reveal": powerReveal || undefined,
     "data-look-card": lookRemaining !== undefined || undefined,
     style: {
-      animationDelay: dealOrder === undefined ? undefined : `${dealOrder * 45}ms`,
       gridColumn: slot === undefined ? undefined : Math.floor(slot / 2) + 1,
       gridRow: slot === undefined ? undefined : slot % 2 + 1,
     },

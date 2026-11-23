@@ -42,7 +42,7 @@ async function openReactionRound(host: Page, guest: Page, hostName: string, gues
     await expect(guest.getByRole("button", { name: variant, exact: true })).toHaveAttribute("aria-pressed", "true");
   }
   await start.click();
-  await expectLocalTurn(guest, 17_000);
+  await expectLocalTurn(guest, 20_000);
   await expect(reactiveCards(guest)).toHaveCount(0);
   await drawDeck(guest).click();
   await discardDrawn(guest);
@@ -128,8 +128,8 @@ test("réaction adjacente, pénalité et fin de manche", async ({ page: host, br
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de BobReflexe" }).getByRole("img", { name: "Manche remportée" })).toBeVisible();
-      await expect(page.getByRole("region", { name: "Main de AliceReflexe" }).getByText("4 points")).toBeVisible();
-      await expect(page.getByRole("region", { name: "Main de BobReflexe" }).getByText("0 point")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de AliceReflexe" }).locator(".result-points")).toHaveText("4");
+      await expect(page.getByRole("region", { name: "Main de BobReflexe" }).locator(".result-points")).toHaveText("0");
       await expect(page.locator(".result-cards .face-up")).toHaveCount(2);
     }
     await host.screenshot({ path: testInfo.outputPath("04-fin-de-manche.png") });

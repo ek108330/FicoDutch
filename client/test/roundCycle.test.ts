@@ -52,8 +52,8 @@ test("en illimité les résultats durent soixante secondes et les variantes s'ap
   assert.equal(advanceRoundSetup(jokers, 1, onlineMembers("alice"), deadline), jokers);
   const next = advanceRoundSetup(jokers, 1, members, deadline);
   assert.equal(next.roundNumber, 2);
-  assert.equal(next.phase, "transition");
-  assert.equal(next.phaseDeadline, deadline + GAME_CONFIG.round.transitionMs);
+  assert.equal(next.phase, "dealing");
+  assert.equal(next.phaseDeadline, deadline + GAME_CONFIG.round.dealingMs);
   assert.equal(next.openingPlayerId, "bob");
   assert.equal(next.endThreshold, null);
   assert.deepEqual(next.players.map(({ cards, roundScore, totalScore, scoreHistory }) =>
@@ -65,18 +65,16 @@ test("en illimité les résultats durent soixante secondes et les variantes s'ap
   assert.equal(new Set(cards.map(({ id }) => id)).size, 54);
 });
 
-test("l'hôte peut démarrer plus tôt et l'ouverture suit la transition et la distribution", () => {
+test("l'hôte peut démarrer la distribution et la mémorisation commence à son terme", () => {
   const result = completedRound([5, 5, 0], ["2", "2", "6"], 100);
   const next = startNextRound(result, 1, members, 1_200, () => 0.999);
   assert.equal(next.openingPlayerId, "bob");
-  const transitionDeadline = 1_200 + GAME_CONFIG.round.transitionMs;
-  assert.equal(advanceRoundSetup(next, 2, members, transitionDeadline - 1), next);
-  assert.equal(advanceRoundSetup(next, 1, members, transitionDeadline), next);
-  const dealing = advanceRoundSetup(next, 2, members, transitionDeadline);
-  assert.equal(dealing.phase, "dealing");
-  const memorization = advanceRoundSetup(dealing, 2, members, transitionDeadline + GAME_CONFIG.round.dealingMs);
+  const dealingDeadline = 1_200 + GAME_CONFIG.round.dealingMs;
+  assert.equal(advanceRoundSetup(next, 2, members, dealingDeadline - 1), next);
+  assert.equal(advanceRoundSetup(next, 1, members, dealingDeadline), next);
+  const memorization = advanceRoundSetup(next, 2, members, dealingDeadline);
   assert.equal(memorization.phase, "memorization");
-  assert.equal(memorization.phaseDeadline, transitionDeadline + GAME_CONFIG.round.dealingMs + 15_000);
+  assert.equal(memorization.phaseDeadline, dealingDeadline + GAME_CONFIG.round.memorizationMs);
   const playing = beginPlay(memorization, memorization.phaseDeadline!, () => 0);
   assert.equal(playing.currentPlayerId, "bob");
   const secondResult = finishRound(playing, 40_000);

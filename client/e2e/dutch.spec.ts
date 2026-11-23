@@ -11,7 +11,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceDutch", "BobDutch");
     await start.click();
-    await expectLocalTurn(guest, 17_000);
+    await expectLocalTurn(guest, 20_000);
     await drawDeck(guest).click();
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await announce(guest).click();
@@ -52,7 +52,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
       await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de AliceDutch" }).getByRole("img", { name: "Manche remportée" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByRole("img", { name: "Annonce Dutch, pénalité de 10 points" })).toBeVisible();
-      await expect(page.getByRole("region", { name: "Main de AliceDutch" }).getByText("20 points")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Main de AliceDutch" }).locator(".result-points")).toHaveText("20");
       await expect(page.getByRole("region", { name: "Main de BobDutch" }).getByText("36 +10", { exact: true })).toBeVisible();
     }
     await guest.setViewportSize({ width: 844, height: 390 });
@@ -80,7 +80,7 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
     await host.getByRole("button", { name: "+1 / -1", exact: true }).click();
     await expect(guest.getByRole("button", { name: "+1 / -1", exact: true })).toHaveAttribute("aria-pressed", "true");
     await start.click();
-    await expectLocalTurn(guest, 17_000);
+    await expectLocalTurn(guest, 20_000);
     await drawDeck(guest).click();
     const cdp = await guest.context().newCDPSession(guest);
     try {

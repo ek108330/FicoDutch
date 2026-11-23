@@ -9,7 +9,7 @@ import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
 import { TURN_DURATION_MS, type TurnView } from "../game/turn";
 import PlayingCard, { CardFaceMark } from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
-import { animatePublicMove, flyToDiscard } from "./cardAnimations";
+import { animateDeal, animatePublicMove, flyToDiscard } from "./cardAnimations";
 import type { TableEmoji } from "../network/useTableEmojis";
 import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
@@ -30,7 +30,7 @@ type GameTableProps = {
   piles?: ReactNode;
   activePlayerId?: string;
   opponentClock?: { turn: number; remaining: number };
-  dealing?: boolean;
+  dealingUntil?: number;
   protectedPlayerId?: string;
   tableEmojis?: ReadonlyMap<string, TableEmoji>;
   onReplace?: (position: number) => void;
@@ -83,7 +83,7 @@ export default function GameTable({
   piles,
   activePlayerId,
   opponentClock,
-  dealing,
+  dealingUntil,
   protectedPlayerId,
   tableEmojis,
   onReplace,
@@ -102,8 +102,24 @@ export default function GameTable({
   const center = useRef<HTMLDivElement>(null);
   const table = useRef<HTMLDivElement>(null);
   const lastMotion = useRef(0);
+  const dealing = dealingUntil !== undefined;
   const publicMove = cardMotion?.move.kind === "reaction" && cardMotion.move.playerId === localPlayerId ? undefined : cardMotion;
   const move = publicMove?.move;
+  useLayoutEffect(() => {
+    const board = table.current;
+    if (dealingUntil === undefined || !board) return;
+    let stop = animateDeal(board, dealingUntil);
+    const resize = () => {
+      stop?.();
+      stop = animateDeal(board, dealingUntil);
+    };
+    window.addEventListener("resize", resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      stop?.();
+    };
+  }, [dealingUntil]);
+
   useLayoutEffect(() => {
     if (!publicMove || !table.current || publicMove.id <= lastMotion.current) return;
     lastMotion.current = publicMove.id;
@@ -140,6 +156,7 @@ export default function GameTable({
       </div>
 
       {positionedPlayers.map(({ player, position }) => {
+        const dealSeat = dealing ? players.indexOf(player) : undefined;
         const ownSelection = position === "bottom" ? memorization : undefined;
         const replace = position === "bottom" ? onReplace : undefined;
         const react = position === "bottom" ? reaction : undefined;
@@ -199,7 +216,7 @@ export default function GameTable({
                       key={layout.slots[index]}
                       index={index}
                       slot={layout.slots[index]}
-                      dealOrder={dealing ? index : undefined}
+                      dealOrder={dealSeat === undefined ? undefined : index * players.length + dealSeat}
                       face={revealed}
                       powerReveal={!!powerFace}
                       onToggle={cardAction}

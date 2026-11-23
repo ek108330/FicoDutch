@@ -52,8 +52,8 @@ export function startNextRound(
   const next = createRound(participants, result.nextVariants, state.endThreshold, roundNumber + 1);
   return {
     ...next,
-    phase: "transition",
-    phaseDeadline: now + GAME_CONFIG.round.transitionMs,
+    phase: "dealing",
+    phaseDeadline: now + GAME_CONFIG.round.dealingMs,
     openingPlayerId: chooseOpeningPlayer(players, result.winnerIds, random),
   };
 }
@@ -63,9 +63,6 @@ export function advanceRoundSetup(
 ): GameState {
   if (state.roundNumber !== roundNumber || state.phaseDeadline === null || now < state.phaseDeadline) return state;
   if (state.phase === "results") return startNextRound(state, roundNumber, members, now);
-  if (state.phase === "transition") {
-    return { ...state, phase: "dealing", phaseDeadline: now + GAME_CONFIG.round.dealingMs };
-  }
   if (state.phase === "dealing") {
     return { ...state, phase: "memorization", phaseDeadline: now + GAME_CONFIG.round.memorizationMs };
   }

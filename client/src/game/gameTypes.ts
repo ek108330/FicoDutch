@@ -3,7 +3,6 @@ import type { HandLayout } from "./handLayout";
 import type { GameVariants } from "./variants";
 
 export type GamePhase =
-  | "transition"
   | "dealing"
   | "memorization"
   | "playing"

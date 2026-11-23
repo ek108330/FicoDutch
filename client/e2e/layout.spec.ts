@@ -6,13 +6,11 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
   const gear = page.getByRole("button", { name: "Paramètres du jeu" });
   try {
     await page.setViewportSize({ width: 393, height: 702 });
-    const [wallpaper] = await Promise.all([
-      page.waitForResponse((response) => response.url().includes("accueil-cartes") && response.ok()),
-      page.goto("/"),
-    ]);
-    expect(wallpaper.headers()["content-type"]).toContain("image/");
+    await page.goto("/");
+    await expect(page.locator(".home-page")).toHaveCSS("background-color", "rgb(16, 47, 41)");
     const logo = page.locator(".brand img");
     await expect(logo).toHaveJSProperty("naturalWidth", 144);
+    await expect(logo).toHaveCSS("width", "30px");
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/ficodutch-logo.png");
     const pseudo = page.getByRole("textbox", { name: "Pseudo" });
     await expect(pseudo).toHaveAttribute("placeholder", "Pseudo");
@@ -43,7 +41,6 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await expect(gear).toBeFocused();
 
     await page.getByRole("button", { name: "Créer un Hub" }).click();
-    await expect(page.locator(".home-page--welcome")).toHaveCount(0);
     const start = page.getByRole("button", { name: "Lancer la partie" });
     await guest.locator(".hub-item").filter({ hasText: "Hub de AliceLayout" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();

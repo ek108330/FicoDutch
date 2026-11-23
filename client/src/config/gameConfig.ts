@@ -1,5 +1,6 @@
 
 import type { HubStatus } from "../../../shared/hubTypes";
+import roundTiming from "../../../shared/roundTiming.json" with { type: "json" };
 
 declare const __BUILD_REVISION__: string;
 export const buildRevision = typeof __BUILD_REVISION__ === "string" ? __BUILD_REVISION__ : "";
@@ -34,9 +35,7 @@ export const GAME_CONFIG = {
 
   round: {
     resultsMs: 60_000,
-    transitionMs: 5_000,
-    dealingMs: 600,
-    memorizationMs: 15_000,
+    ...roundTiming,
   },
 
   player: {

@@ -86,7 +86,7 @@ for (const cardsPerPlayer of [4, 6]) {
       await guest.screenshot({ path: testInfo.outputPath("10-cartes-selectionnees-reaffichees.png") });
 
       await Promise.all([host, guest].map(async (page) => {
-        await expect(page.getByRole("region", { name: "Tour de jeu" })).toBeVisible({ timeout: 17_000 });
+        await expect(page.getByRole("region", { name: "Tour de jeu" })).toBeVisible({ timeout: 20_000 });
         await expect(page.locator(".playing-card.face-up")).toHaveCount(0);
         await expect(page.locator(".position-bottom .player-cards").getByRole("button")).toHaveCount(0);
       }));

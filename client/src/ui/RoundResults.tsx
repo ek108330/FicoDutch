@@ -1,10 +1,11 @@
-import { useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ChevronRight, Megaphone, Trophy } from "lucide-react";
+import { useId, useRef, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, Megaphone, Trophy } from "lucide-react";
 import { GAME_CONFIG } from "../config/gameConfig";
 import { rankPlayers, type RoundResultView } from "../game/hands";
 import { VARIANT_LABELS, type GameVariants } from "../game/variants";
 import PlayingCard from "./PlayingCard";
 import PerimeterClock from "./PerimeterClock";
+import { InterruptConfirmation } from "./HubManagement";
 
 type Props = {
   result: RoundResultView;
@@ -18,32 +19,40 @@ type Props = {
   startNext: () => void;
   onLeave: () => void;
   onRestart: () => void;
+  onInterrupt?: () => void;
   canRestart: boolean;
 };
 
 const variantKeys = Object.keys(VARIANT_LABELS) as Array<keyof GameVariants>;
-const interactive = "button, a, input, select, textarea, summary, dialog";
 const signedScore = new Intl.NumberFormat("fr", { signDisplay: "always" });
 
-function RoundHands({ result }: { result: RoundResultView }) {
+function ResultHands({ result }: { result: RoundResultView }) {
   const winners = result.players.filter(({ id }) => result.winnerIds.includes(id));
   const winnerNames = new Intl.ListFormat("fr").format(winners.map(({ pseudo }) => pseudo));
 
   return (
-    <div role="region" aria-label="Résultat de la manche">
-      <p className="result-sr-only">{winnerNames} {winners.length > 1 ? "remportent" : "remporte"} la manche.</p>
+    <div role="region" aria-label="Résultats de manche et classement cumulé">
+      <p className="sr-only">{winnerNames} {winners.length > 1 ? "remportent" : "remporte"} la manche.</p>
       <div className="result-hands">
-        {result.players.map(({ id, pseudo, cards, roundScore, penaltyPoints }) => (
+        {rankPlayers(result.players).map(({ rank, player: { id, pseudo, cards, roundScore, totalScore, previousRank, penaltyPoints } }) => (
           <section key={id} className="result-hand" data-winner={result.winnerIds.includes(id)} aria-label={`Main de ${pseudo}`}>
             <div className="result-player-heading">
-              <h2>{pseudo}</h2>
+              <RankingPosition rank={rank} previousRank={previousRank} />
+              <h2 title={pseudo}>{pseudo}</h2>
               <PlayerBadges id={id} result={result} />
             </div>
-            {penaltyPoints > 0 ? (
-              <p className="result-points">{roundScore - penaltyPoints} <span className="result-penalty">+{penaltyPoints}</span></p>
-            ) : (
-              <p className="result-points">{roundScore} {roundScore > 1 ? "points" : "point"}</p>
-            )}
+            <dl className="result-scores">
+              <div>
+                <dt>Manche</dt>
+                <dd className="result-points">{penaltyPoints > 0 ? (
+                  <>{roundScore - penaltyPoints} <span className="result-penalty">+{penaltyPoints}</span></>
+                ) : roundScore}</dd>
+              </div>
+              <div>
+                <dt>Total</dt>
+                <dd className="result-total">{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></dd>
+              </div>
+            </dl>
             {cards.length ? (
               <div className="result-cards">
                 {cards.map((face, index) => <PlayingCard key={index} face={face} index={index} />)}
@@ -78,131 +87,81 @@ function RankingPosition({ rank, previousRank }: { rank: number; previousRank?: 
   const places = Math.abs(change);
   const label = `${change > 0 ? "Gagne" : "Perd"} ${places} ${places === 1 ? "place" : "places"}`;
   return <span className="ranking-position">
-    {rank}
+    <span><span className="sr-only">Rang </span>{rank}</span>
     {change !== 0 && <span className="rank-movement" data-direction={change > 0 ? "up" : "down"}
       role="img" aria-label={label} title={label}><Icon size={13} strokeWidth={2.8} aria-hidden="true" /></span>}
   </span>;
 }
 
-function Ranking({ result }: { result: RoundResultView }) {
-  return (
-    <table className="score-ranking" aria-label="Classement cumulé">
-      <thead>
-        <tr><th>Rang</th><th>Joueur</th><th>Total</th></tr>
-      </thead>
-      <tbody>
-        {rankPlayers(result.players).map(({ rank, player: { id, pseudo, totalScore, roundScore, previousRank } }) => (
-          <tr key={id}>
-            <td><RankingPosition rank={rank} previousRank={previousRank} /></td>
-            <th scope="row"><span className="result-player-heading"><span>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
-            <td>{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 export default function RoundResults({
   result, settings, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
-  onRestart, canRestart,
+  onRestart, onInterrupt, canRestart,
 }: Props) {
-  const [panel, setPanel] = useState<"round" | "ranking">("round");
-  const touchOrigin = useRef<{ x: number; y: number } | null>(null);
-  const ignoreClick = useRef(false);
+  const interruptDialog = useRef<HTMLDialogElement>(null);
+  const interruptTitle = useId();
   const gameWinners = result.players.filter(({ id }) => result.gameWinnerIds.includes(id));
   const isFinal = gameWinners.length > 0;
   const seconds = Math.ceil(remaining / 1_000);
   const winnerNames = new Intl.ListFormat("fr").format(gameWinners.map(({ pseudo }) => pseudo));
   const activeVariants = variantKeys.filter((key) => result.nextVariants[key]);
 
-  function flipPage() {
-    setPanel((current) => current === "round" ? "ranking" : "round");
-  }
-
-  function beginSwipe(event: PointerEvent<HTMLElement>) {
-    if (!event.isPrimary) return;
-    ignoreClick.current = false;
-    touchOrigin.current = event.pointerType === "touch" && !(event.target as Element).closest(interactive)
-      ? { x: event.clientX, y: event.clientY } : null;
-  }
-
-  function endSwipe(event: PointerEvent<HTMLElement>) {
-    if (!event.isPrimary || !touchOrigin.current) return;
-    const { x, y } = touchOrigin.current;
-    touchOrigin.current = null;
-    const horizontal = Math.abs(event.clientX - x);
-    if (horizontal < 45 || horizontal < Math.abs(event.clientY - y) * 1.5) return;
-    ignoreClick.current = true;
-    flipPage();
-  }
-
-  function clickScreen(event: MouseEvent<HTMLElement>) {
-    if (ignoreClick.current || (event.target as Element).closest(interactive) || window.getSelection()?.toString()) return;
-    flipPage();
-  }
-
   return (
-    <main className="game-screen result-screen" onClick={clickScreen} onPointerDown={beginSwipe} onPointerUp={endSwipe}
-      onPointerCancel={() => { touchOrigin.current = null; }}>
+    <main className="game-screen result-screen" data-final={isFinal || undefined}>
       <section className="round-results" aria-labelledby="result-title">
         {!isFinal && <PerimeterClock remaining={remaining} duration={GAME_CONFIG.round.resultsMs}
           label="Temps avant la manche suivante" radius={15} />}
         <div className="result-heading">
           <h1 id="result-title">{isFinal ? "Fin de la partie" : `Manche ${roundNumber}`}</h1>
-          <button type="button" className="result-progress" onClick={flipPage}
-            aria-label={panel === "round" ? "Afficher le classement cumulé" : "Afficher les cartes de la manche"}
-            aria-keyshortcuts="ArrowLeft ArrowRight" onKeyDown={(event) => {
-              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-              event.preventDefault();
-              flipPage();
-            }}>
-            <span data-current={panel === "round"} aria-hidden="true" />
-            <span data-current={panel === "ranking"} aria-hidden="true" />
-            <ChevronRight size={15} aria-hidden="true" />
-          </button>
           <div className="result-tools">{settings}</div>
         </div>
         {isFinal ? (
-          <>
+          <div className="result-summary">
             <p className="round-winners">{winnerNames} {gameWinners.length > 1 ? "remportent" : "remporte"} la partie.</p>
             <p>Seuil de {result.endThreshold} points atteint.</p>
-          </>
+          </div>
         ) : seconds === 0 && <p role="status">En attente de joueurs disponibles.</p>}
         {!isFinal && waitingPlayers.length > 0 && (
           <p>En attente de la prochaine manche · {new Intl.ListFormat("fr").format(waitingPlayers)}</p>
         )}
-        <div aria-live="polite">
-          {panel === "round" ? <RoundHands result={result} /> : <Ranking result={result} />}
-        </div>
-        <fieldset className="result-variants" disabled={!isHost || isFinal || seconds === 0}>
-          <legend>{isFinal ? "Variantes de la partie" : "Variantes"}</legend>
-          {isFinal ? (
-            <p>{activeVariants.length ? new Intl.ListFormat("fr").format(activeVariants.map((key) => VARIANT_LABELS[key])) : "Aucune"}</p>
-          ) : (
-            <div className="result-variant-tiles">
-              {variantKeys.map((key) => (
-                <button key={key} type="button" aria-pressed={result.nextVariants[key]} onClick={() => toggleVariant(key)}>
-                  {VARIANT_LABELS[key]}
-                </button>
-              ))}
+        <ResultHands result={result} />
+        <div className="result-footer">
+          <fieldset className="result-variants" disabled={!isHost || isFinal || seconds === 0}>
+            <legend>{isFinal ? "Variantes de la partie" : "Variantes"}</legend>
+            {isFinal ? (
+              <p>{activeVariants.length ? new Intl.ListFormat("fr").format(activeVariants.map((key) => VARIANT_LABELS[key])) : "Aucune"}</p>
+            ) : (
+              <div className="result-variant-tiles">
+                {variantKeys.map((key) => (
+                  <button key={key} type="button" aria-pressed={result.nextVariants[key]} onClick={() => toggleVariant(key)}>
+                    {VARIANT_LABELS[key]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </fieldset>
+          {!isFinal && isHost && (
+            <button type="button" className="result-primary" disabled={!canStartNext} onClick={startNext}>
+              Lancer la manche suivante
+            </button>
+          )}
+          {isFinal && (isHost ? (
+            <div className="result-actions">
+              {onInterrupt && <button type="button" className="hub-danger" aria-haspopup="dialog" onClick={() => interruptDialog.current?.showModal()}>
+                Interrompre la partie
+              </button>}
+              <button type="button" className="result-primary" disabled={!canRestart} onClick={onRestart}>
+                Lancer la prochaine partie
+              </button>
             </div>
-          )}
-        </fieldset>
-        {!isFinal && isHost && panel === "ranking" && (
-          <button type="button" className="result-primary" disabled={!canStartNext} onClick={startNext}>
-            Lancer la manche suivante
-          </button>
-        )}
-        {isFinal && <div className="result-actions">
-          {isHost && panel === "ranking" && (
-            <button type="button" className="result-primary" disabled={!canRestart} onClick={onRestart}>Nouvelle partie</button>
-          )}
-          <button type="button" className={isHost && panel === "ranking" ? undefined : "result-primary"} onClick={onLeave}>
-            Quitter la table
-          </button>
-        </div>}
+          ) : <button type="button" className="result-primary" onClick={onLeave}>Quitter la table</button>)}
+        </div>
       </section>
+      {isFinal && onInterrupt && <dialog className="hub-management game-settings" ref={interruptDialog} aria-labelledby={interruptTitle}>
+        <InterruptConfirmation titleId={interruptTitle} onCancel={() => interruptDialog.current?.close()} onConfirm={() => {
+          interruptDialog.current?.close();
+          onInterrupt();
+        }} />
+      </dialog>}
     </main>
   );
 }

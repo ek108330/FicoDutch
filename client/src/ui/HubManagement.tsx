@@ -11,6 +11,24 @@ export type HubManagementOptions = {
 type Props = HubManagementOptions & { titleId: string; onBack: () => void; onClose: () => void };
 type Confirmation = { kind: "remove"; playerId: string } | { kind: "interrupt" };
 
+export function InterruptConfirmation({ titleId, onCancel, onConfirm }: {
+  titleId: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const description = useId();
+  return (
+    <section aria-labelledby={titleId} aria-describedby={description}>
+      <h2 id={titleId}>Interrompre la partie ?</h2>
+      <p id={description}>Le Hub sera fermé et tous les joueurs retourneront à l’accueil.</p>
+      <div className="hub-management-actions">
+        <button type="button" autoFocus onClick={onCancel}>Annuler</button>
+        <button type="button" className="hub-danger" onClick={onConfirm}>Confirmer l’interruption</button>
+      </div>
+    </section>
+  );
+}
+
 export default function HubManagement({ members, onRemove, onInterrupt, titleId, onBack, onClose }: Props) {
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const description = useId();
@@ -18,23 +36,25 @@ export default function HubManagement({ members, onRemove, onInterrupt, titleId,
   const target = confirmation?.kind === "remove"
     ? guests.find(({ id }) => id === confirmation.playerId)
     : undefined;
-  const interrupting = confirmation?.kind === "interrupt";
+  if (confirmation?.kind === "interrupt") return (
+    <InterruptConfirmation titleId={titleId} onCancel={() => setConfirmation(null)} onConfirm={() => {
+      onClose();
+      onInterrupt?.();
+    }} />
+  );
 
   return (
     <>
-      {target || interrupting ? (
+      {target ? (
         <section aria-labelledby={titleId} aria-describedby={description}>
-          <h2 id={titleId}>{target ? `Retirer ${target.pseudo} ?` : "Interrompre la partie ?"}</h2>
-          <p id={description}>{target
-            ? target.isBot ? "Ce bot quittera la table." : "Ce joueur retournera à l’accueil."
-            : "Le Hub sera fermé et tous les joueurs retourneront à l’accueil."}</p>
+          <h2 id={titleId}>Retirer {target.pseudo} ?</h2>
+          <p id={description}>{target.isBot ? "Ce bot quittera la table." : "Ce joueur retournera à l’accueil."}</p>
           <div className="hub-management-actions">
             <button type="button" autoFocus onClick={() => setConfirmation(null)}>Annuler</button>
             <button type="button" className="hub-danger" onClick={() => {
               onClose();
-              if (target) onRemove(target.id);
-              else onInterrupt?.();
-            }}>{target ? "Confirmer le retrait" : "Confirmer l’interruption"}</button>
+              onRemove(target.id);
+            }}>Confirmer le retrait</button>
           </div>
         </section>
       ) : (

@@ -4,7 +4,6 @@ import { discardDrawn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expe
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
 const waiting = (page: Page) => page.getByRole("heading", { name: "En attente de la prochaine manche" });
-const showRanking = (page: Page) => page.locator(".result-screen").getByRole("heading", { level: 1 });
 
 async function playTurn(page: Page, announceDutch = false) {
   await expectLocalTurn(page, 18_000);
@@ -48,12 +47,11 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await expect(host.getByText("En attente de la prochaine manche · ChloeEntree")).toBeVisible();
     await expect(waiting(newcomer)).toBeVisible();
     await expect(newcomer.getByRole("region", { name: "Main de BobEntree" })).toHaveCount(0);
-    await showRanking(host).click();
-    await expect(host.getByRole("row", { name: /ChloeEntree/ })).toHaveCount(0);
+    await expect(host.getByRole("region", { name: "Main de ChloeEntree" })).toHaveCount(0);
     await host.screenshot({ path: testInfo.outputPath("02-classement-et-joueuse-en-attente.png") });
 
     await host.getByRole("button", { name: "Lancer la manche suivante" }).click();
-    await expect(newcomer.getByRole("heading", { name: "Manche 2" })).toBeVisible();
+    await expect(newcomer.getByRole("region", { name: "Distribution des cartes" })).toBeVisible();
     await join(late).click();
     await expect(late.getByText("Tu entreras en jeu après la manche 2.")).toBeVisible();
     await expect(newcomer.getByRole("region", { name: "Mémorisation" })).toHaveText("Mémorisation", { timeout: 9_000 });
@@ -80,10 +78,9 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await playTurn(guest);
     await playTurn(newcomer);
     await expect(newcomer.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
-    await showRanking(newcomer).click();
-    const newScore = newcomer.getByRole("row", { name: /ChloeEntree/ });
-    await expect(newScore.getByRole("cell", { name: "72 (+26)", exact: true })).toBeVisible();
-    await expect(newcomer.getByRole("row", { name: /DanaEntree/ })).toHaveCount(0);
+    const newScore = newcomer.getByRole("region", { name: "Main de ChloeEntree" });
+    await expect(newScore.locator(".result-total")).toHaveText("72 (+26)");
+    await expect(newcomer.getByRole("region", { name: "Main de DanaEntree" })).toHaveCount(0);
     await newcomer.screenshot({ path: testInfo.outputPath("05-score-herite-portrait.png") });
     await expect(late.getByRole("heading", { name: "La partie est terminée" })).toBeVisible();
     await late.getByRole("button", { name: "Quitter la table" }).click();

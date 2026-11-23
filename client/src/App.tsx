@@ -106,11 +106,11 @@ function App() {
       if (round?.hubId === update.id && update.gameStarted) {
         let state = round.state;
         if (update.gameNumber > round.gameNumber) {
-          state = { ...prepareGame(update), phase: "transition", phaseDeadline: receivedAt + GAME_CONFIG.round.transitionMs };
+          state = { ...prepareGame(update), phase: "dealing", phaseDeadline: receivedAt + GAME_CONFIG.round.dealingMs };
           pausedAt.current = null;
         } else if (state.roundNumber === 1 && state.phase === "memorization" &&
             state.phaseDeadline === null && memorizationDeadline !== undefined) {
-          state = { ...state, phaseDeadline: memorizationDeadline };
+          state = { ...state, phase: "dealing", phaseDeadline: memorizationDeadline - GAME_CONFIG.round.memorizationMs };
         }
         if (update.hostPause) {
           pausedAt.current ??= receivedAt;
@@ -325,11 +325,13 @@ function App() {
     clearTable();
   }
 
+  const interrupt = currentHub?.gameStarted && networkReady && currentHub.hostId === playerId
+    ? () => socket.emit("hub:interrupt", { hubId: currentHub.id }) : undefined;
   const management = currentHub && networkReady && currentHub.hostId === playerId && !currentHub.gameFinished &&
     !hostRound?.state.result?.gameWinnerIds.length ? {
     members: currentHub.players,
     onRemove: (playerId: string) => socket.emit("hub:remove-guest", { hubId: currentHub.id, playerId }),
-    onInterrupt: currentHub.gameStarted ? () => socket.emit("hub:interrupt", { hubId: currentHub.id }) : undefined,
+    onInterrupt: interrupt,
   } : undefined;
 
   function canJoinHub(hub: Hub) {
@@ -369,6 +371,7 @@ function App() {
           updateHostRound={updateHostRound}
           onLeave={leaveHub}
           onRestart={restartGame}
+          onInterrupt={interrupt}
           restarting={restarting}
           settings={settings}
           playSound={playSound}
@@ -384,9 +387,9 @@ function App() {
     const isHost = currentHub?.hostId === playerId;
     const previewHub = hubs.find(({ id }) => id === previewHubId);
     return (
-      <main className={`home-page${currentHub ? "" : " home-page--welcome"}`}>
+      <main className="home-page">
         <header className="top-bar">
-          <div className="brand"><img src="/ficodutch-logo.png" alt="" width="144" height="96" /> <span>FicoDutch</span></div>
+          <div className="brand"><img src="/ficodutch-logo.png" alt="" width="30" height="20" /> <span>FicoDutch</span></div>
           <div className="header-actions">
             <span className="version">Version {GAME_CONFIG.version}</span>
             {settings}
