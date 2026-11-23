@@ -126,7 +126,7 @@ function finishDiscard(state: GameState, player: GamePlayer, turn: Turn, discard
   const prepared = player.isBot ? {
     ...state, cardMotion: recordCardMove(state, { kind: "bot-discard", playerId: player.id, slot, face: getCardFace(discarded) }, now),
   } : state;
-  const next = presentDiscard(prepared, [...state.discardPile, discarded]);
+  const next = presentDiscard(prepared, [...state.discardPile, discarded], now);
   const power = startPower(next, player.id, discarded);
   if (!power) return moveToNextPlayer(next, turn, now, true);
 
@@ -212,7 +212,7 @@ export function expireTurn(state: GameState, turnNumber: number, now: number): G
 
 function skipTurn(state: GameState, turn: Turn, now: number): GameState {
   const next = turn.drawnCard
-    ? presentDiscard(state, [...state.discardPile, turn.drawnCard])
+    ? presentDiscard(state, [...state.discardPile, turn.drawnCard], now)
     : state;
   return moveToNextPlayer(next, turn, now, !!(turn.drawnCard || turn.power));
 }

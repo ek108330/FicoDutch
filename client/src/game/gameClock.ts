@@ -6,5 +6,7 @@ export function resumeGameClock(state: GameState, pausedFor: number): GameState 
     ...state,
     phaseDeadline: state.phaseDeadline === null ? null : state.phaseDeadline + pausedFor,
     turn: state.turn && { ...state.turn, deadline: state.turn.deadline + pausedFor },
+    reaction: state.reaction.presentedAt === null ? state.reaction
+      : { ...state.reaction, presentedAt: state.reaction.presentedAt + pausedFor },
   };
 }

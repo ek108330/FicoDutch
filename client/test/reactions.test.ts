@@ -17,7 +17,7 @@ function setup(hands: Card[][], reference: Card, deck: Card[], variants: Partial
     ...state,
     drawPile: deck,
     players: state.players.map((player, index) => ({ ...player, cards: hands[index] })),
-  }, [reference]);
+  }, [reference], 0);
 }
 
 function attempt(state: GameState, playerId: string, position: number, reference = state.reaction.reference) {
@@ -88,8 +88,9 @@ test("la carte de référence reste visible après un recyclage de la défausse"
   );
   const attempt = { kind: "reaction", position: 0, reference: start.reaction.reference, handVersion: 0 };
   const changed = playTurn(start, "bob", 1, attempt, 1_000);
-  assert.deepEqual(playTurn(start, "bob", 1, attempt, 61_000),
-    { ...changed, cardMotion: { ...changed.cardMotion!, at: 61_000 } });
+  assert.deepEqual(playTurn(start, "bob", 1, attempt, 61_000), {
+    ...changed, reaction: { ...changed.reaction, presentedAt: 61_000 }, cardMotion: { ...changed.cardMotion!, at: 61_000 },
+  });
   assert.equal(changed.discardPile.at(-1)?.id, "b-8");
   assert.equal(playTurn(changed, "alice", 1,
     { kind: "draw", source: "discard", reference: start.reaction.reference }, 1_001), changed);
@@ -145,7 +146,7 @@ test("la pose infinie autorise deux réussites consécutives du même joueur", (
   const twice = attempt(infinite, "bob", 0);
   assert.equal(twice.discardPile.at(-1)?.rank, "7");
   assert.equal(twice.players[1].cards.length, 1);
-  const reset = presentDiscard(once, [...once.discardPile, card("normal", "8")]);
+  const reset = presentDiscard(once, [...once.discardPile, card("normal", "8")], 1_000);
   assert.equal(getTurnView(reset, "bob", 1_000)?.reaction.canAttempt, true);
 });
 

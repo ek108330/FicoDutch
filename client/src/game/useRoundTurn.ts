@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { HubPlayer } from "../../../shared/hubTypes";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { useHubPeers } from "../network/useHubPeers";
 import type { GameState } from "./gameTypes";
 import { getRoundResultView, type RoundResultView } from "./hands";
-import { getBotStep, playBotStep } from "./bot";
+import { getBotReactionDelay, getBotStep, playBotStep } from "./bot";
 import { getMemorizedCards, memorizeCard, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
@@ -125,6 +125,7 @@ export function useRoundTurn({
 }: Options) {
   const { connectedPeers, hostConnected, send } = peers;
   const [received, setReceived] = useState<ReceivedView | null>(null);
+  const botReactions = useRef({ round: 0, reference: 0, delays: new Map<string, number>() });
   const isHost = playerId === hostId;
   const hostDeadline = hostRound ? getDeadline(hostRound, firstDeadline) : null;
   const hostRoundNumber = hostRound?.roundNumber;
@@ -145,10 +146,24 @@ export function useRoundTurn({
 
   useEffect(() => {
     if (!isHost || paused || !hostRound) return;
-    const step = getBotStep(hostRound);
+    const reactions = botReactions.current;
+    if (reactions.round !== hostRound.roundNumber || reactions.reference !== hostRound.reaction.reference) {
+      reactions.round = hostRound.roundNumber;
+      reactions.reference = hostRound.reaction.reference;
+      reactions.delays.clear();
+    }
+    const time = performance.now();
+    const step = getBotStep(hostRound, time, (id) => {
+      const existing = reactions.delays.get(id);
+      if (existing !== undefined) return existing;
+      const delay = getBotReactionDelay();
+      reactions.delays.set(id, delay);
+      return delay;
+    });
     if (!step) return;
-    const motionEnd = hostRound.cardMotion?.move.kind === "swap" ? hostRound.cardMotion.at + 1_100 : 0;
-    const delay = Math.max(step.delay, motionEnd - performance.now());
+    const motionEnd = step.action.kind !== "reaction" && hostRound.cardMotion?.move.kind === "swap"
+      ? hostRound.cardMotion.at + 1_100 : 0;
+    const delay = Math.ceil(Math.max(step.delay, motionEnd - time));
     const timer = window.setTimeout(() => updateHostRound(hubId, (state) =>
       state === hostRound ? playBotStep(state, step, performance.now()) : state
     ), delay);

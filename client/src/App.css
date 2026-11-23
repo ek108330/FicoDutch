@@ -25,6 +25,29 @@ input {
   color: var(--ink);
 }
 
+#root:has(.home-page--welcome) {
+  width: 100%;
+  border-inline: 0;
+}
+
+.home-page--welcome {
+  background: linear-gradient(180deg, rgb(8 15 13 / 10%) 46%, #0a1412 100%),
+    url("./assets/accueil-cartes.jpg") center 45% / cover no-repeat, #0a1412;
+}
+
+.home-page--welcome .top-bar { background: rgb(8 24 20 / 86%); }
+
+.home-page--welcome .home-content { align-items: safe end; }
+
+@media (orientation: portrait) {
+  .home-page--welcome {
+    background-image: linear-gradient(180deg, #0a1412 8%, transparent 18% 49%, #0a1412 72%),
+      url("./assets/accueil-cartes.jpg");
+    background-position: center, center clamp(62px, 12dvh, 96px);
+    background-size: auto, 110% auto;
+  }
+}
+
 .top-bar,
 .header-actions,
 .brand {
@@ -47,8 +70,12 @@ input {
   color: #f5d46b;
 }
 
-.brand svg {
+.brand img {
   flex-shrink: 0;
+  width: 48px;
+  height: auto;
+  border: 1px solid rgb(245 212 107 / 40%);
+  border-radius: 6px;
 }
 
 .header-actions {
@@ -207,6 +234,10 @@ input {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffefa;
+}
+
+@media (orientation: portrait), (max-height: 500px) {
+  .home-page--welcome .hub-list { max-height: min(200px, 30dvh); }
 }
 
 .hub-list .hub-item {
@@ -501,7 +532,7 @@ input {
 @media (max-width: 360px) {
   .top-bar { padding-inline: 8px; gap: 4px; }
   .brand { gap: 5px; font-size: 1.03rem; }
-  .brand svg { width: 20px; }
+  .brand img { width: 36px; }
   .header-actions { gap: 4px; }
 }
 
@@ -1562,7 +1593,7 @@ input {
 .game-table .turn-panel[data-joker] {
   min-width: 0;
   padding: 3px 6px;
-  color: #352a16;
+  color: #24190c;
   font-size: 0.71rem;
 }
 
@@ -1719,7 +1750,7 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
 }
 
 .card-face.joker-face {
-  color: #352a16;
+  color: #24190c;
   font-size: clamp(0.75rem, 2.6dvh, 1.25rem);
 }
 

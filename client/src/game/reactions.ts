@@ -24,6 +24,7 @@ export function matchesDiscard(card: CardRank, reference: CardRank, plusMinusOne
 export function presentDiscard(
   state: GameState,
   discardPile: Card[],
+  now: number,
   notice: ReactionNotice | null = null
 ): GameState {
   return {
@@ -31,6 +32,7 @@ export function presentDiscard(
     discardPile,
     reaction: {
       reference: state.reaction.reference + 1,
+      presentedAt: now,
       notice,
     },
   };
@@ -81,7 +83,7 @@ export function reactToDiscard(
     cardMotion: recordCardMove(state, { kind: "reaction", playerId, slot, face: getCardFace(card) }, now),
     players: state.players.map((entry) => entry === player ? remaining : entry),
     turn: state.turn ? { ...state.turn, power: updatePowerAfterReaction(state.turn.power, card.id) } : null,
-  }, [...state.discardPile, card], { playerId, outcome: "played" });
+  }, [...state.discardPile, card], now, { playerId, outcome: "played" });
 
   return remaining.cards.length ? next : finishRound(next, now, playerId);
 }

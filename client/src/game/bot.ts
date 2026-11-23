@@ -6,7 +6,13 @@ import { canReactToDiscard, matchesDiscard } from "./reactions.ts";
 import { playTurn, type TurnAction } from "./turn.ts";
 
 const unknownPoints = 7;
+const MIN_REACTION_MS = 500;
+const MAX_REACTION_MS = 4_000;
 type BotStep = { playerId: string; action: TurnAction; delay: number };
+
+export function getBotReactionDelay(random = Math.random) {
+  return MIN_REACTION_MS + Math.floor(random() * (MAX_REACTION_MS - MIN_REACTION_MS + 1));
+}
 
 function knownPoints(bot: GamePlayer, player: GamePlayer, position: number) {
   if (!bot.botMemory?.length) return undefined;
@@ -62,22 +68,28 @@ function playPower(state: GameState, bot: GamePlayer, opponents: GamePlayer[], w
   return selected.length ? chooseCard(target.player, target.position) : chooseCard(bot, worst);
 }
 
-export function getBotStep(state: GameState): BotStep | null {
+export function getBotStep(state: GameState, now: number, reactionDelay: (playerId: string) => number = () => getBotReactionDelay()): BotStep | null {
   const { turn } = state;
   if (state.phase !== "playing" || !turn) return null;
 
   const bots = state.players.filter(({ isBot, hasLeft }) => isBot && !hasLeft);
   const discard = state.discardPile.at(-1);
-  if (discard) {
+  const { reference, presentedAt } = state.reaction;
+  if (discard && presentedAt !== null && now <= presentedAt + MAX_REACTION_MS) {
+    let nextReaction: BotStep | undefined;
+    let nextReactionAt = Infinity;
     for (const bot of bots) {
       if (!canReactToDiscard(state, bot.id)) continue;
       const position = bot.cards.findIndex((card) => matchesDiscard(card.rank, discard.rank, state.variants.plusMinusOne) &&
         !isPowerTargetLocked(turn.power, card.id, state.dutch?.announcerId));
-      if (position >= 0) return {
-        playerId: bot.id, delay: 1_050,
-        action: { kind: "reaction", reference: state.reaction.reference, position, handVersion: bot.handVersion },
-      };
+      if (position < 0) continue;
+      const at = presentedAt + reactionDelay(bot.id);
+      const delay = Math.max(0, at - now);
+      if (at >= nextReactionAt || (turn.finalReaction && now + delay >= turn.deadline)) continue;
+      nextReactionAt = at;
+      nextReaction = { playerId: bot.id, delay, action: { kind: "reaction", reference, position, handVersion: bot.handVersion } };
     }
+    if (nextReaction) return nextReaction;
   }
 
   const bot = turn.finalReaction ? undefined : bots.find(({ id }) => id === state.currentPlayerId);
@@ -86,9 +98,9 @@ export function getBotStep(state: GameState): BotStep | null {
   const opponents = state.players.filter(({ id, hasLeft }) => id !== playerId && !hasLeft)
     .sort((a, b) => a.cards.length - b.cards.length || opponentScore(bot, a) - opponentScore(bot, b) || a.totalScore - b.totalScore);
   const worst = worstPosition(bot);
-  if (turn.power) return { playerId, action: playPower(state, bot, opponents, worst, turn.power), delay: 850 };
+  if (turn.power) return { playerId, action: playPower(state, bot, opponents, worst, turn.power), delay: 1_350 };
   if (!turn.drawnCard) return {
-    playerId, delay: 800,
+    playerId, delay: 1_250,
     action: state.drawPile.length || state.discardPile.length >= 2 ? { kind: "draw", source: "deck" } : { kind: "skip-empty" },
   };
 
@@ -98,11 +110,11 @@ export function getBotStep(state: GameState): BotStep | null {
   const expectedScore = take ? handPoints - getCardValue(bot.cards[worst]) + drawnPoints : handPoints;
   if (!state.dutch && !turn.dutchArmed && opponents.length && expectedScore <= (bot.cards.length <= 2 ? 10 : 6) &&
       opponents.every((opponent) => opponentScore(bot, opponent) >= expectedScore + 5)) {
-    return { playerId, action: { kind: "dutch-intent", enabled: true }, delay: 750 };
+    return { playerId, action: { kind: "dutch-intent", enabled: true }, delay: 1_150 };
   }
 
   return {
-    playerId, delay: 950,
+    playerId, delay: 1_500,
     action: take ? { kind: "replace", position: worst, handVersion: bot.handVersion } : { kind: "discard" },
   };
 }

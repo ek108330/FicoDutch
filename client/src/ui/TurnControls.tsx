@@ -73,7 +73,6 @@ export function TurnPanel({
           remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : TURN_DURATION_MS}
           label={view.finalReaction ? "Temps pour réagir" : "Temps restant"} />}
         {giving ? <>
-          <strong className="sr-only" role="status">{turnLabel}</strong>
           <div className="joker-heading">
             <h2 aria-label={powerLabels["give-card"].title}>Joker+</h2>
             <button type="button" aria-label="Passer le pouvoir" title="Passer le pouvoir" onClick={() => act({ kind: "power-pass" })}>

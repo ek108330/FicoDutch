@@ -53,7 +53,7 @@ export function createRound(
     discardPile: [],
     currentPlayerId: null,
     turn: null,
-    reaction: { reference: 0, notice: null },
+    reaction: { reference: 0, presentedAt: null, notice: null },
     dutch: null,
     result: null,
     variants: { ...variants },

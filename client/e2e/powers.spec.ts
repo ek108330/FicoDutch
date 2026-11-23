@@ -140,7 +140,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
 test("joker ajoute une septième carte cachée", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(45_000);
   await fixDeckOrder(host);
-  const guest = await browser.newPage({ baseURL, viewport: { width: 393, height: 702 }, hasTouch: true, isMobile: true });
+  const guest = await browser.newPage({ baseURL, viewport: { width: 393, height: 702 }, hasTouch: true, isMobile: true, colorScheme: "dark" });
   const alice = "AliceJoker";
   const bob = "BobJoker";
 
@@ -155,10 +155,11 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await playSpecialCard(guest, 1, "Joker+");
 
     const panel = guest.locator(".turn-panel[data-joker]");
-    await expect(panel.locator(".turn-player-row")).toHaveCount(0);
-    await expect(panel.getByRole("heading", { name: "Pouvoir du Joker+" })).toHaveCSS("color", "rgb(53, 42, 22)");
-    await expect(panel.getByText("Glisse sur un joueur.", { exact: true })).toHaveCSS("color", "rgb(53, 42, 22)");
-    await expect(guest.locator(".discard-slot .joker-face")).toHaveCSS("color", "rgb(53, 42, 22)");
+    await expect(panel).toHaveText("Joker+Glisse sur un joueur.");
+    await expect(panel.getByRole("heading", { name: "Pouvoir du Joker+" })).toHaveCSS("color", "rgb(36, 25, 12)");
+    await expect(panel.getByText("Glisse sur un joueur.", { exact: true })).toHaveCSS("color", "rgb(36, 25, 12)");
+    await expect(guest.locator(".discard-slot .joker-face")).toHaveCSS("color", "rgb(36, 25, 12)");
+    await expect(host.locator(".discard-slot .joker-face")).toHaveCSS("color", "rgb(36, 25, 12)");
     const firstLine = (await panel.locator(".joker-heading").boundingBox())!;
     const secondLine = (await panel.locator(".joker-instruction").boundingBox())!;
     expect(firstLine.y + firstLine.height).toBeLessThan(secondLine.y);

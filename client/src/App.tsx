@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GAME_CONFIG, hubStatusLabels } from "./config/gameConfig";
-import { Plus, Settings, Spade } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
@@ -384,9 +384,9 @@ function App() {
     const isHost = currentHub?.hostId === playerId;
     const previewHub = hubs.find(({ id }) => id === previewHubId);
     return (
-      <main className="home-page">
+      <main className={`home-page${currentHub ? "" : " home-page--welcome"}`}>
         <header className="top-bar">
-          <div className="brand"><Spade size={24} aria-hidden="true" /> <span>FicoDutch</span></div>
+          <div className="brand"><img src="/ficodutch-logo.png" alt="" width="144" height="96" /> <span>FicoDutch</span></div>
           <div className="header-actions">
             <span className="version">Version {GAME_CONFIG.version}</span>
             {settings}
