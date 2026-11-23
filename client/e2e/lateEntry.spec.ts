@@ -78,7 +78,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await playTurn(guest);
     await playTurn(newcomer);
     await expect(newcomer.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
-    const newScore = newcomer.getByRole("region", { name: "Main de ChloeEntree" });
+    const newScore = newcomer.getByRole("table", { name: "Classement cumulé" }).getByRole("row", { name: /ChloeEntree/ });
     await expect(newScore.locator(".result-total")).toHaveText("72 (+26)");
     await expect(newcomer.getByRole("region", { name: "Main de DanaEntree" })).toHaveCount(0);
     await newcomer.screenshot({ path: testInfo.outputPath("05-score-herite-portrait.png") });

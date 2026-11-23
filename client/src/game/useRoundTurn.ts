@@ -3,7 +3,7 @@ import type { HubPlayer } from "../../../shared/hubTypes";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { useHubPeers } from "../network/useHubPeers";
 import type { GameState } from "./gameTypes";
-import { getRoundResultView, type RoundResultView } from "./hands";
+import { getRoundLeaders, getRoundResultView, type RoundResultView } from "./hands";
 import { getBotReactionDelay, getBotStep, playBotStep } from "./bot";
 import { getMemorizedCards, memorizeCard, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
@@ -14,7 +14,7 @@ import {
 import type { GameVariants } from "./variants";
 
 type SetupPlayers = Array<{ id: string; pseudo: string; cardCount: number }>;
-type RoundView = { roundNumber: number; clockVersion: number; remainingMs: number | null } & (
+type RoundView = { roundNumber: number; clockVersion: number; remainingMs: number | null; leaderIds?: string[] } & (
   | { phase: "waiting" }
   | { phase: "dealing"; players: SetupPlayers; sixCards: boolean }
   | { phase: "memorization"; players: SetupPlayers; sixCards: boolean; memorized: MemorizedCard[] }
@@ -65,6 +65,7 @@ function projectRound(
     roundNumber: state.roundNumber,
     clockVersion,
     remainingMs: deadline === null ? null : Math.max(0, Math.min(phaseLength[state.phase], deadline - now)),
+    leaderIds: getRoundLeaders(state),
   };
   if (state.phase === "playing") {
     const turn = getTurnView(state, viewer, now);

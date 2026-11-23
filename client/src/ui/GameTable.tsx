@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import { Megaphone } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { Crown, Megaphone } from "lucide-react";
 import { emojis } from "../../../shared/hubSocial.json";
+import { GAME_CONFIG } from "../config/gameConfig";
 import type { CardFace } from "../game/cards";
 import type { CardTarget, PowerKind } from "../game/gameTypes";
 import { getHandLayout, type HandLayout } from "../game/handLayout";
@@ -9,7 +10,7 @@ import { canTargetCard, sameTarget, type PowerView } from "../game/powers";
 import { TURN_DURATION_MS, type TurnView } from "../game/turn";
 import PlayingCard, { CardFaceMark } from "./PlayingCard";
 import DrawnCard from "./DrawnCard";
-import { animateDeal, animatePublicMove, flyToDiscard } from "./cardAnimations";
+import { animateDeal, animatePublicMove, dealCardSpacing, flyToDiscard } from "./cardAnimations";
 import type { TableEmoji } from "../network/useTableEmojis";
 import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
@@ -31,6 +32,7 @@ type GameTableProps = {
   activePlayerId?: string;
   opponentClock?: { turn: number; remaining: number };
   dealingUntil?: number;
+  leaderIds?: readonly string[];
   protectedPlayerId?: string;
   tableEmojis?: ReadonlyMap<string, TableEmoji>;
   onReplace?: (position: number) => void;
@@ -84,6 +86,7 @@ export default function GameTable({
   activePlayerId,
   opponentClock,
   dealingUntil,
+  leaderIds,
   protectedPlayerId,
   tableEmojis,
   onReplace,
@@ -102,7 +105,9 @@ export default function GameTable({
   const center = useRef<HTMLDivElement>(null);
   const table = useRef<HTMLDivElement>(null);
   const lastMotion = useRef(0);
+  const lastDealSound = useRef(-1);
   const dealing = dealingUntil !== undefined;
+  const dealCardCount = dealing ? players.reduce((count, player) => count + player.cardCount, 0) : 0;
   const publicMove = cardMotion?.move.kind === "reaction" && cardMotion.move.playerId === localPlayerId ? undefined : cardMotion;
   const move = publicMove?.move;
   useLayoutEffect(() => {
@@ -119,6 +124,28 @@ export default function GameTable({
       stop?.();
     };
   }, [dealingUntil]);
+
+  useEffect(() => {
+    if (dealingUntil === undefined) {
+      lastDealSound.current = -1;
+      return;
+    }
+    const start = dealingUntil - GAME_CONFIG.round.dealingMs;
+    const spacing = dealCardSpacing(dealCardCount);
+    const lateBy = Math.min(spacing, 125);
+    const now = performance.now();
+    const timers: number[] = [];
+    for (let index = lastDealSound.current + 1; index < dealCardCount; index++) {
+      const at = start + index * spacing;
+      if (at < now - lateBy) continue;
+      timers.push(window.setTimeout(() => {
+        if (index <= lastDealSound.current || performance.now() > at + lateBy) return;
+        lastDealSound.current = index;
+        playSound("deal");
+      }, at - now));
+    }
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [dealingUntil, dealCardCount, playSound]);
 
   useLayoutEffect(() => {
     if (!publicMove || !table.current || publicMove.id <= lastMotion.current) return;
@@ -177,7 +204,14 @@ export default function GameTable({
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
             <div className="player-name">
               <span className="player-name-label">
-                {name}
+                <span className="player-name-text">
+                  {name}
+                  {leaderIds?.includes(player.id) && (
+                    <span className="leader-crown" role="img" aria-label="En tête du classement" title="En tête du classement">
+                      <Crown size={13} aria-hidden="true" />
+                    </span>
+                  )}
+                </span>
                 {giveToPlayer && (
                   <button type="button" className="gift-recipient-name" aria-label={`Donner une carte à ${player.pseudo}`}
                     onClick={(event) => { if (event.detail === 0) power.choosePlayer(player.id); }} />

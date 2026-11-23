@@ -102,12 +102,14 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expect(faceUpHands(host)).toHaveCount(0);
     const lookClock = (page: Page) => page.getByRole("progressbar", { name: "Temps de consultation de la carte" });
     await expect(lookClock(host)).toHaveAttribute("aria-valuemax", "10");
+    await expect(host.locator(".playing-card.face-down[data-look-card]")).toHaveCSS("background-color", "rgb(242, 206, 103)");
     await expectClockFromTop(lookClock(host));
     await expect(guest.getByRole("button", { name: /Terminer le pouvoir|Passer le pouvoir/ })).toHaveCount(0);
     await hideOwn.locator(".power-card-turn").evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     await guest.screenshot({ path: testInfo.outputPath("07-huit-carte-retournee.png") });
+    await host.screenshot({ path: testInfo.outputPath("07-huit-surlignage-observateur.png") });
     // Certains navigateurs tactiles n’émettent pas de clic après un appui.
     await hideOwn.evaluate((element) => {
       element.addEventListener("click", (event) => event.stopImmediatePropagation(), { once: true });
@@ -121,6 +123,7 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await expect(host.getByRole("button", { name: "Retourner la carte 1 de BobPouvoir, Dame de pique" })).toBeVisible();
     await expect(faceUpHands(guest)).toHaveCount(0);
     await expect(lookClock(guest)).toBeVisible();
+    await expect(guest.locator(".playing-card.face-down[data-look-card]")).toHaveCSS("background-color", "rgb(242, 206, 103)");
     await expect.poll(async () => Number(await lookClock(guest).getAttribute("aria-valuenow"))).toBeLessThan(10);
     await guest.screenshot({ path: testInfo.outputPath("08-neuf-carte-cachee-observateur.png") });
     await host.setViewportSize({ width: 844, height: 390 });

@@ -45,7 +45,6 @@ export default function RoundScreen({
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
   const [memory, setMemory] = useState<Memorization>(emptySelection);
-  const dealtRound = useRef(0);
   const visibleMemory = useRef(0);
   const paused = pause !== null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
@@ -72,13 +71,6 @@ export default function RoundScreen({
   const { choose: chooseEmoji, receive: receiveEmoji, visible: tableEmojis } = useTableEmojis({
     playerId, hostId, roundNumber, clockVersion, enabled: emojisEnabled, now, hostRound, members, send, onShow: soundEmoji,
   });
-
-  useEffect(() => {
-    if (paused || !connectionReady || turn.waitingForClock || dealtRound.current === roundNumber ||
-        (phase !== "dealing" && phase !== "memorization")) return;
-    dealtRound.current = roundNumber;
-    playSound("deal");
-  }, [connectionReady, paused, phase, playSound, roundNumber, turn.waitingForClock]);
 
   useEffect(() => {
     const count = canSelect ? revealed.length : 0;
@@ -160,7 +152,7 @@ export default function RoundScreen({
       return (
         <main className="game-screen table-screen">
           {gameActions()}
-          <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion} playSound={playSound}
+          <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion} playSound={playSound} leaderIds={scene.leaderIds}
             players={scene.result.players.map(({ id, pseudo, cards, handLayout }) => ({ id, pseudo, cardCount: cards.length, handLayout }))}
             controls={<section className="round-panel"><strong>Manche {roundNumber}</strong></section>} />
         </main>
@@ -218,6 +210,7 @@ export default function RoundScreen({
         players={scene.phase === "playing" ? scene.turn.players : scene.players}
         memorization={memorization}
         dealingUntil={phase === "dealing" ? deadline ?? undefined : undefined}
+        leaderIds={scene.leaderIds}
         activePlayerId={turnControls?.view.playerId}
         opponentClock={turnControls && turnControls.view.playerId !== playerId &&
           !turnControls.view.finalReaction && !power?.lookTarget

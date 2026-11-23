@@ -4,7 +4,7 @@ import { GAME_CONFIG } from "../src/config/gameConfig.ts";
 import type { CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import { resumeGameClock } from "../src/game/gameClock.ts";
-import { finishRound, getRoundResultView, rankPlayers } from "../src/game/hands.ts";
+import { finishRound, getRoundLeaders, getRoundResultView, rankPlayers } from "../src/game/hands.ts";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "../src/game/roundCycle.ts";
 import { beginPlay, playTurn } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
@@ -35,6 +35,16 @@ test("au seuil exact, le plus petit total remporte la partie et les égalités s
   assert.equal(startNextRound(result, 1, members, 1_100), result);
   assert.equal(toggleNextVariant(result, 1, "sixCards", 1_100), result);
   assert.equal(finishRound(result, 1_100), result);
+});
+
+test("les couronnes distinguent tous les joueurs à égalité en tête à partir de la deuxième manche", () => {
+  const result = completedRound([22, 29, 21], ["A", "A", "2"], 100);
+  assert.deepEqual(getRoundLeaders(result), []);
+  const next = startNextRound(result, 1, members, 1_100);
+  assert.deepEqual(getRoundLeaders(next), ["alice", "charlie"]);
+  const withDeparture = { ...next, players: next.players.map((player) =>
+    player.id === "alice" ? { ...player, hasLeft: true } : player) };
+  assert.deepEqual(getRoundLeaders(withDeparture), ["charlie"]);
 });
 
 test("en illimité les résultats durent soixante secondes et les variantes s'appliquent à la manche suivante", () => {

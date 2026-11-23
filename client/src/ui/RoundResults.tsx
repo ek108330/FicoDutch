@@ -31,28 +31,20 @@ function ResultHands({ result }: { result: RoundResultView }) {
   const winnerNames = new Intl.ListFormat("fr").format(winners.map(({ pseudo }) => pseudo));
 
   return (
-    <div role="region" aria-label="Résultats de manche et classement cumulé">
+    <section aria-labelledby="round-detail-title">
+      <h2 id="round-detail-title" className="result-section-title">Détail de la manche</h2>
       <p className="sr-only">{winnerNames} {winners.length > 1 ? "remportent" : "remporte"} la manche.</p>
       <div className="result-hands">
-        {rankPlayers(result.players).map(({ rank, player: { id, pseudo, cards, roundScore, totalScore, previousRank, penaltyPoints } }) => (
+        {result.players.map(({ id, pseudo, cards, roundScore, penaltyPoints }) => (
           <section key={id} className="result-hand" data-winner={result.winnerIds.includes(id)} aria-label={`Main de ${pseudo}`}>
             <div className="result-player-heading">
-              <RankingPosition rank={rank} previousRank={previousRank} />
-              <h2 title={pseudo}>{pseudo}</h2>
+              <h3 title={pseudo}>{pseudo}</h3>
               <PlayerBadges id={id} result={result} />
+              <span className="sr-only">Points de la manche </span>
+              <span className="result-points">{penaltyPoints > 0 ? (
+                <>{roundScore - penaltyPoints} <span className="result-penalty">+{penaltyPoints}</span></>
+              ) : roundScore}</span>
             </div>
-            <dl className="result-scores">
-              <div>
-                <dt>Manche</dt>
-                <dd className="result-points">{penaltyPoints > 0 ? (
-                  <>{roundScore - penaltyPoints} <span className="result-penalty">+{penaltyPoints}</span></>
-                ) : roundScore}</dd>
-              </div>
-              <div>
-                <dt>Total</dt>
-                <dd className="result-total">{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></dd>
-              </div>
-            </dl>
             {cards.length ? (
               <div className="result-cards">
                 {cards.map((face, index) => <PlayingCard key={index} face={face} index={index} />)}
@@ -61,7 +53,7 @@ function ResultHands({ result }: { result: RoundResultView }) {
           </section>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -91,6 +83,26 @@ function RankingPosition({ rank, previousRank }: { rank: number; previousRank?: 
     {change !== 0 && <span className="rank-movement" data-direction={change > 0 ? "up" : "down"}
       role="img" aria-label={label} title={label}><Icon size={13} strokeWidth={2.8} aria-hidden="true" /></span>}
   </span>;
+}
+
+function Ranking({ result }: { result: RoundResultView }) {
+  return (
+    <table className="score-ranking" aria-label="Classement cumulé">
+      <caption className="result-section-title">Classement général</caption>
+      <thead>
+        <tr><th scope="col">Rang</th><th scope="col">Joueur</th><th scope="col">Total</th></tr>
+      </thead>
+      <tbody>
+        {rankPlayers(result.players).map(({ rank, player: { id, pseudo, totalScore, roundScore, previousRank } }) => (
+          <tr key={id}>
+            <td><RankingPosition rank={rank} previousRank={previousRank} /></td>
+            <th scope="row"><span className="ranking-player"><span title={pseudo}>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
+            <td className="result-total">{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 export default function RoundResults({
@@ -123,7 +135,10 @@ export default function RoundResults({
         {!isFinal && waitingPlayers.length > 0 && (
           <p>En attente de la prochaine manche · {new Intl.ListFormat("fr").format(waitingPlayers)}</p>
         )}
-        <ResultHands result={result} />
+        <div className="result-details">
+          <ResultHands result={result} />
+          <Ranking result={result} />
+        </div>
         <div className="result-footer">
           <fieldset className="result-variants" disabled={!isHost || isFinal || seconds === 0}>
             <legend>{isFinal ? "Variantes de la partie" : "Variantes"}</legend>

@@ -18,7 +18,7 @@ const tones: Record<GameSound, readonly [start: number, end: number, seconds: nu
   swap: [335, 670, 0.44, 0.17],
   gift: [430, 580, 0.25, 0.17],
   penalty: [260, 115, 0.32, 0.21],
-  deal: [220, 400, 0.25, 0.17],
+  deal: [550, 300, 0.038, 0.13],
   emoji: [720, 900, 0.12, 0.12],
   dutch: [392, 1_045, 0.52, 0.2],
 };

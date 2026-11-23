@@ -33,6 +33,12 @@ export function rankPlayers<Player extends { totalScore: number }>(players: read
   return sorted.map((player) => ({ player, rank: sorted.findIndex(({ totalScore }) => totalScore === player.totalScore) + 1 }));
 }
 
+export function getRoundLeaders(state: GameState) {
+  if (state.roundNumber < 2) return [];
+  return rankPlayers(state.players.filter(({ hasLeft }) => !hasLeft))
+    .filter(({ rank }) => rank === 1).map(({ player }) => player.id);
+}
+
 export function finishRound(state: GameState, now: number, emptyHandPlayerId: string | null = null): GameState {
   if (state.phase !== "playing") return state;
   const baseScores = state.players.map(({ id, cards }) => ({

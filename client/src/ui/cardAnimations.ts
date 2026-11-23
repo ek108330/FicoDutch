@@ -8,6 +8,7 @@ const flightDuration: Record<Flight, number> = {
 };
 const arrivalOffset = 0.83;
 const flightEasing = "ease-in-out";
+const dealFlightTime = 310;
 
 export const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const discardCovers = new WeakMap<Element, HTMLElement>();
@@ -17,19 +18,22 @@ function placeAt(element: HTMLElement, { x, y, width, height }: DOMRect) {
   document.body.append(element);
 }
 
+export function dealCardSpacing(cardCount: number) {
+  return Math.min(140, (GAME_CONFIG.round.dealingMs - dealFlightTime - 120) / Math.max(1, cardCount - 1));
+}
+
 export function animateDeal(table: HTMLElement, deadline: number) {
   const deck = table.querySelector(".deal-deck")?.getBoundingClientRect();
   if (!deck || reducedMotion()) return;
   const deckX = deck.x + deck.width / 2;
   const deckY = deck.y + deck.height / 2;
   const cards = Array.from(table.querySelectorAll<HTMLElement>("[data-deal-order]"));
-  const flightTime = 310;
   const dealingTime = GAME_CONFIG.round.dealingMs;
-  const spacing = Math.min(140, (dealingTime - flightTime - 120) / Math.max(1, cards.length - 1));
+  const spacing = dealCardSpacing(cards.length);
   const elapsed = Math.max(0, performance.now() - (deadline - dealingTime));
   const flights = cards.flatMap((card) => {
     const delay = Number(card.dataset.dealOrder) * spacing;
-    if (elapsed >= delay + flightTime) return [];
+    if (elapsed >= delay + dealFlightTime) return [];
     const destination = card.getBoundingClientRect();
     const { offsetWidth: width, offsetHeight: height } = card;
     const transform = card.parentElement ? getComputedStyle(card.parentElement).transform : "none";
@@ -48,9 +52,9 @@ export function animateDeal(table: HTMLElement, deadline: number) {
       { transform: `rotate(-9deg) scale(${scale})`, opacity: 0 },
       { transform: `translate(${x * 0.5}px, ${y * 0.5}px) rotate(${angle * 0.45 - 8}deg)`, opacity: 1, offset: 0.45 },
       { transform: `translate(${x}px, ${y}px) rotate(${angle}deg)`, opacity: 1 },
-    ], { delay, duration: flightTime, easing: "ease-out", fill: "both" });
+    ], { delay, duration: dealFlightTime, easing: "ease-out", fill: "both" });
     const reveal = card.animate([{ opacity: 0 }, { opacity: 1 }],
-      { delay: delay + flightTime - 1, duration: 1, easing: "steps(1, end)", fill: "backwards" });
+      { delay: delay + dealFlightTime - 1, duration: 1, easing: "steps(1, end)", fill: "backwards" });
     flight.currentTime = reveal.currentTime = elapsed;
     void flight.finished.then(() => flying.remove(), () => flying.remove());
     return [{ flying, flight, reveal }];
