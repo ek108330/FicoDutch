@@ -5,6 +5,7 @@ import type { CardTarget, GameState, Power, PowerKind, SelectedCard, Turn } from
 
 export const POWER_DURATION_MS = 60_000;
 export const LOOK_DURATION_MS = 10_000;
+export const BLIND_SWAP_PREVIEW_MS = 500;
 
 export type PowerAction =
   | { kind: "power-card"; target: CardTarget; handVersion: number }
@@ -15,6 +16,7 @@ export type PowerAction =
 
 export type PowerView = {
   kind: PowerKind;
+  pendingSwap?: true;
   exchangeTargets?: CardTarget[];
   lookTarget?: CardTarget;
   selection: {
@@ -112,6 +114,11 @@ function swapCards(state: GameState, first: SelectedCard, second: SelectedCard, 
   };
 }
 
+export function resolveBlindSwap(state: GameState, power: Power | null, now: number): GameState | null {
+  if (power?.kind !== "blind-swap" || !power.pendingSwap || power.selected.length !== 2) return null;
+  return swapCards(state, power.selected[0], power.selected[1], now);
+}
+
 function giveCard(state: GameState, actorId: string, recipient: unknown, now: number): GameState | null {
   const target = state.players.find(({ id }) => id === recipient);
   if (!target || target.id === actorId) return null;
@@ -137,7 +144,7 @@ export function applyPowerAction(
   now: number
 ): { state: GameState; complete: boolean } | null {
   const { power } = turn;
-  if (!power) return null;
+  if (!power || power.pendingSwap) return null;
 
   const looking = isLookPower(power.kind) && power.selected.length === 1;
   if (action.kind === "power-pass") return looking ? null : { state, complete: true };
@@ -165,23 +172,21 @@ export function applyPowerAction(
       power.selected.some(({ cardId }) => cardId === card.id)) return null;
 
   const selected = [...power.selected, { playerId: player.id, cardId: card.id }];
-  if (power.kind === "blind-swap" && selected.length === 2) {
-    const next = swapCards(state, selected[0], selected[1], now);
-    return next && { state: next, complete: true };
-  }
-  const deadline = isLookPower(power.kind) ? Math.min(turn.deadline, now + LOOK_DURATION_MS) : turn.deadline;
-  return { state: { ...state, turn: { ...turn, deadline, power: { ...power, selected } } }, complete: false };
+  const pendingSwap = power.kind === "blind-swap" && selected.length === 2 ? true : undefined;
+  const deadline = pendingSwap ? now + BLIND_SWAP_PREVIEW_MS
+    : isLookPower(power.kind) ? Math.min(turn.deadline, now + LOOK_DURATION_MS) : turn.deadline;
+  return { state: { ...state, turn: { ...turn, deadline, power: { ...power, selected, pendingSwap } } }, complete: false };
 }
 
 export function isPowerTargetLocked(power: Power | null, cardId: string, protectedId?: string) {
-  return power !== null && (isLookPower(power.kind) || (power.kind === "look-and-swap" && power.selected.length === 2 &&
+  return power !== null && (power.pendingSwap || isLookPower(power.kind) || (power.kind === "look-and-swap" && power.selected.length === 2 &&
     power.selected.every(({ playerId }) => playerId !== protectedId))) &&
     power.selected.some((selected) => selected.cardId === cardId);
 }
 
 export function updatePowerAfterReaction(power: Power | null, cardId: string) {
   if (power?.kind !== "blind-swap" && power?.kind !== "look-and-swap") return power;
-  if (power.kind === "look-and-swap" && power.selected.length === 2) return power;
+  if (power.pendingSwap || (power.kind === "look-and-swap" && power.selected.length === 2)) return power;
   return { ...power, selected: power.selected.filter((selected) => selected.cardId !== cardId) };
 }
 
@@ -193,16 +198,15 @@ export function getPowerView(state: GameState, power: Power, canSee: boolean): P
   const targets = available.map(({ target }) => target);
   const exchangeTargets = power.kind === "blind-swap" || power.kind === "look-and-swap" ? targets : undefined;
   const lookTarget = isLookPower(power.kind) ? targets[0] : undefined;
-  if (!canSee) return { kind: power.kind, exchangeTargets, lookTarget, selection: null };
+  const publicView = { kind: power.kind, pendingSwap: power.pendingSwap, exchangeTargets, lookTarget };
+  if (!canSee) return { ...publicView, selection: null };
 
   const remaining = powerCardCount(power.kind) - power.selected.length;
   const revealed = power.kind !== "blind-swap" && remaining === 0
     ? available.map(({ target, card }) => ({ target, face: getCardFace(card) }))
     : [];
   return {
-    kind: power.kind,
-    exchangeTargets,
-    lookTarget,
+    ...publicView,
     selection: {
       targets,
       remaining,

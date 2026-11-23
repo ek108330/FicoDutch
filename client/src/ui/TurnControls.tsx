@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowDownUp, X } from "lucide-react";
 import type { PowerKind } from "../game/gameTypes";
-import { powerCardCount, type PowerView } from "../game/powers";
+import { BLIND_SWAP_PREVIEW_MS, powerCardCount, type PowerView } from "../game/powers";
 import { FINAL_REACTION_MS, TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
 import { CardBackMark, CardFaceMark } from "./PlayingCard";
 import { describeCardFace } from "./cardLabels";
@@ -29,18 +29,35 @@ function PowerControls({ power, act }: {
   act: TurnControlsProps["act"];
 }) {
   const selected = power.selection?.targets.length ?? 0;
-  const completedSelection = powerCardCount(power.kind) > 0 && power.selection?.remaining === 0;
-  const instruction = selected === 1 && powerCardCount(power.kind) === 2
-    ? "Choisis la deuxième carte."
-    : powerLabels[power.kind].instruction;
-
-  if (power.lookTarget || completedSelection) return null;
+  const valetPair = power.kind === "look-and-swap" && power.selection?.remaining === 0;
+  const canSwap = valetPair && power.selection?.canSwap === true;
+  const swapTap = useTapAction(canSwap ? () => act({ kind: "power-swap" }) : undefined);
+  const cancelTap = useTapAction(valetPair
+    ? () => act({ kind: "power-pass" })
+    : !power.lookTarget && !power.pendingSwap ? () => act({ kind: "power-pass" }) : undefined);
+  let instruction = powerLabels[power.kind].instruction;
+  if (power.lookTarget) instruction = "Retourne la carte pour terminer.";
+  else if (power.pendingSwap) instruction = "Échange en cours.";
+  else if (valetPair) instruction = canSwap ? "Échange les cartes ou annule." : "La protection Dutch empêche l’échange.";
+  else if (selected === 1 && powerCardCount(power.kind) === 2) instruction = "Choisis la deuxième carte.";
 
   return (
-    <>
+    <div className="power-controls">
+      <div className="power-heading">
+        <h2 aria-label={powerLabels[power.kind].title}>{power.kind === "give-card" ? "Joker+" : powerLabels[power.kind].title}</h2>
+        {!power.lookTarget && !power.pendingSwap && <div className="turn-decision">
+          {valetPair && <button type="button" className="turn-swap" aria-label="Échanger les cartes" disabled={!canSwap}
+            title={canSwap ? "Échanger les deux cartes retournées" : "Échange bloqué par la protection Dutch"} {...swapTap}>
+            <ArrowDownUp size={16} aria-hidden="true" />
+          </button>}
+          <button type="button" className="turn-cancel" aria-label={valetPair ? "Annuler l’échange" : "Passer le pouvoir"}
+            title={valetPair ? "Laisser les cartes en place" : "Passer le pouvoir"} {...cancelTap}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>}
+      </div>
       <p>{instruction}</p>
-      <button type="button" aria-label="Passer le pouvoir" onClick={() => act({ kind: "power-pass" })}>Passer</button>
-    </>
+    </div>
   );
 }
 
@@ -50,12 +67,7 @@ export function TurnPanel({
   remaining: number;
   piles: ReactNode;
 }) {
-  const { power } = view;
-  const giving = canPlay && power?.kind === "give-card";
-  const valetPair = canPlay && power?.kind === "look-and-swap" && power.selection?.remaining === 0;
-  const canSwap = valetPair && power.selection?.canSwap === true;
-  const swapTap = useTapAction(canSwap ? () => act({ kind: "power-swap" }) : undefined);
-  const cancelTap = useTapAction(valetPair ? () => act({ kind: "power-pass" }) : undefined);
+  const power = canPlay ? view.power : null;
   const showCenter = canPlay || view.finalReaction;
   const turnLabel = view.finalReaction ? "Dernières réactions" : `${view.playerName} joue`;
   const notice = view.reaction.notice;
@@ -68,38 +80,12 @@ export function TurnPanel({
   return (
     <section className="turn-layout" aria-label="Tour de jeu">
       {piles}
-      {showCenter ? <div className="round-panel turn-panel" data-local-turn={canPlay || undefined} data-joker={giving || undefined}>
-        {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}`}
-          remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : TURN_DURATION_MS}
+      {showCenter ? <div className="round-panel turn-panel" data-local-turn={canPlay || undefined} data-power={power?.kind}>
+        {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}:${!!power?.pendingSwap}`}
+          remaining={remaining} duration={view.finalReaction ? FINAL_REACTION_MS : power?.pendingSwap ? BLIND_SWAP_PREVIEW_MS : TURN_DURATION_MS}
           label={view.finalReaction ? "Temps pour réagir" : "Temps restant"} />}
-        {giving ? <>
-          <div className="joker-heading">
-            <h2 aria-label={powerLabels["give-card"].title}>Joker+</h2>
-            <button type="button" aria-label="Passer le pouvoir" title="Passer le pouvoir" onClick={() => act({ kind: "power-pass" })}>
-              <X size={14} aria-hidden="true" />
-            </button>
-          </div>
-          <p className="joker-instruction">{powerLabels["give-card"].instruction}</p>
-        </> : <div className="turn-player-row">
-          <strong className="turn-player" role="status">{turnLabel}</strong>
-          {valetPair && <div className="turn-decision">
-            <button type="button" className="turn-swap" aria-label="Échanger les cartes" disabled={!canSwap}
-              title={canSwap ? "Échanger les deux cartes retournées" : "Échange bloqué par la protection Dutch"} {...swapTap}>
-              <ArrowDownUp size={18} aria-hidden="true" />
-            </button>
-            <button type="button" className="turn-cancel" aria-label="Annuler l’échange"
-              title="Laisser les cartes en place" {...cancelTap}>
-              <X size={18} aria-hidden="true" />
-            </button>
-          </div>}
-        </div>}
-        {!giving && canPlay && power && (
-          <div className="turn-choices">
-            <h2 className="power-title">{powerLabels[power.kind].title}</h2>
-            {valetPair && !canSwap && <p>La protection Dutch empêche l’échange.</p>}
-            <PowerControls power={power} act={act} />
-          </div>
-        )}
+        {power ? <PowerControls power={power} act={act} />
+          : <strong className="turn-player" role="status">{turnLabel}</strong>}
       </div> : <strong className="sr-only" role="status">{turnLabel}</strong>}
       {feedback && <p className="sr-only" aria-live="polite">{feedback}</p>}
     </section>

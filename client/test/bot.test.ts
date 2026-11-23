@@ -8,7 +8,7 @@ import type { GameState, PowerKind } from "../src/game/gameTypes.ts";
 import { presentDiscard } from "../src/game/reactions.ts";
 import { startNextRound } from "../src/game/roundCycle.ts";
 import { finishRound } from "../src/game/hands.ts";
-import { beginPlay, getTurnView } from "../src/game/turn.ts";
+import { beginPlay, expireTurn, getTurnView } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 
 const members = [
@@ -65,7 +65,9 @@ test("un bot cible le joueur le plus proche de la victoire et apprend seulement 
   const selecting = step(swing, 2_000);
   assert.deepEqual(nextBot(selecting)?.action,
     { kind: "power-card", target: { playerId: "alice", position: 0 }, handVersion: 0 });
-  const swapped = step(selecting, 3_000);
+  const pending = step(selecting, 3_000);
+  assert.equal(nextBot(pending, 3_499), null);
+  const swapped = expireTurn(pending, 1, 3_500);
   assert.equal(swapped.players[0].cards[2].rank, "2");
   assert.equal(swapped.players[1].cards[0].rank, "Q");
 });

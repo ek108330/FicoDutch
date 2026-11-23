@@ -13,6 +13,7 @@ type Props = {
   roundNumber: number;
   remaining: number;
   isHost: boolean;
+  canEditVariants: boolean;
   canStartNext: boolean;
   waitingPlayers: string[];
   toggleVariant: (key: keyof GameVariants) => void;
@@ -90,14 +91,18 @@ function Ranking({ result }: { result: RoundResultView }) {
     <table className="score-ranking" aria-label="Classement cumulé">
       <caption className="result-section-title">Classement général</caption>
       <thead>
-        <tr><th scope="col">Rang</th><th scope="col">Joueur</th><th scope="col">Total</th></tr>
+        <tr>
+          <th scope="col" className="ranking-rank">Rang</th><th scope="col">Joueur</th>
+          <th scope="col" className="ranking-round-score">Dernière manche</th><th scope="col" className="result-total">Total</th>
+        </tr>
       </thead>
       <tbody>
         {rankPlayers(result.players).map(({ rank, player: { id, pseudo, totalScore, roundScore, previousRank } }) => (
           <tr key={id}>
             <td><RankingPosition rank={rank} previousRank={previousRank} /></td>
             <th scope="row"><span className="ranking-player"><span title={pseudo}>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
-            <td className="result-total">{totalScore} <span className="ranking-round-score">({signedScore.format(roundScore)})</span></td>
+            <td className="ranking-round-score">{signedScore.format(roundScore)}</td>
+            <td className="result-total">{totalScore}</td>
           </tr>
         ))}
       </tbody>
@@ -106,7 +111,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, settings, roundNumber, remaining, isHost, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
+  result, settings, roundNumber, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
   onRestart, onInterrupt, canRestart,
 }: Props) {
   const interruptDialog = useRef<HTMLDialogElement>(null);
@@ -115,7 +120,6 @@ export default function RoundResults({
   const isFinal = gameWinners.length > 0;
   const seconds = Math.ceil(remaining / 1_000);
   const winnerNames = new Intl.ListFormat("fr").format(gameWinners.map(({ pseudo }) => pseudo));
-  const activeVariants = variantKeys.filter((key) => result.nextVariants[key]);
 
   return (
     <main className="game-screen result-screen" data-final={isFinal || undefined}>
@@ -140,19 +144,15 @@ export default function RoundResults({
           <Ranking result={result} />
         </div>
         <div className="result-footer">
-          <fieldset className="result-variants" disabled={!isHost || isFinal || seconds === 0}>
-            <legend>{isFinal ? "Variantes de la partie" : "Variantes"}</legend>
-            {isFinal ? (
-              <p>{activeVariants.length ? new Intl.ListFormat("fr").format(activeVariants.map((key) => VARIANT_LABELS[key])) : "Aucune"}</p>
-            ) : (
-              <div className="result-variant-tiles">
-                {variantKeys.map((key) => (
-                  <button key={key} type="button" aria-pressed={result.nextVariants[key]} onClick={() => toggleVariant(key)}>
-                    {VARIANT_LABELS[key]}
-                  </button>
-                ))}
-              </div>
-            )}
+          <fieldset className="result-variants" disabled={!canEditVariants}>
+            <legend>{isFinal ? "Variantes de la prochaine partie" : "Variantes de la prochaine manche"}</legend>
+            <div className="result-variant-tiles">
+              {variantKeys.map((key) => (
+                <button key={key} type="button" aria-pressed={result.nextVariants[key]} onClick={() => toggleVariant(key)}>
+                  {VARIANT_LABELS[key]}
+                </button>
+              ))}
+            </div>
           </fieldset>
           {!isFinal && isHost && (
             <button type="button" className="result-primary" disabled={!canStartNext} onClick={startNext}>

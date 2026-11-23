@@ -178,7 +178,7 @@ for (const count of [4, 5, 6]) {
           }).map((face) => face.textContent));
           expect(clippedFaces, `Valeurs de carte à ${width} × ${height}`).toEqual([]);
           await expect(host.getByRole("region", { name: "Main de Invite5" }).getByRole("img", { name: /Annonce Dutch/ })).toBeVisible();
-          const variants = host.getByRole("group", { name: "Variantes", exact: true }).getByRole("button");
+          const variants = host.getByRole("group", { name: "Variantes de la prochaine manche", exact: true }).getByRole("button");
           const rows = await variants.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
           expect(rows).toHaveLength(4);
           expect(new Set(rows).size).toBe(1);

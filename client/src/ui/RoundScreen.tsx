@@ -46,6 +46,7 @@ export default function RoundScreen({
   const [now, setNow] = useState(() => performance.now());
   const [memory, setMemory] = useState<Memorization>(emptySelection);
   const visibleMemory = useRef(0);
+  const heardDutch = useRef<string>(null);
   const paused = pause !== null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
     hostRound, peers, updateHostRound, now, paused, clockVersion });
@@ -67,6 +68,13 @@ export default function RoundScreen({
   const feedback = useCardFeedback(
     !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playSound,
   );
+  const announcement = !paused && !turn.waitingForClock && connectionReady ? turn.announcement : undefined;
+  const announcementId = announcement ? `${roundNumber}:${announcement.id}` : null;
+  useEffect(() => {
+    if (!announcementId || heardDutch.current === announcementId) return;
+    heardDutch.current = announcementId;
+    playSound("dutch");
+  }, [announcementId, playSound]);
   const soundEmoji = useCallback(() => playSound("emoji"), [playSound]);
   const { choose: chooseEmoji, receive: receiveEmoji, visible: tableEmojis } = useTableEmojis({
     playerId, hostId, roundNumber, clockVersion, enabled: emojisEnabled, now, hostRound, members, send, onShow: soundEmoji,
@@ -166,6 +174,7 @@ export default function RoundScreen({
         roundNumber={roundNumber}
         remaining={turn.remaining}
         isHost={playerId === hostId}
+        canEditVariants={playerId === hostId && !restarting}
         canStartNext={turn.canStartNext}
         waitingPlayers={hostRound ? members.filter(({ id }) => !hostRound.players.some((player) => player.id === id))
           .map(({ pseudo }) => pseudo) : []}
@@ -213,9 +222,10 @@ export default function RoundScreen({
         leaderIds={scene.leaderIds}
         activePlayerId={turnControls?.view.playerId}
         opponentClock={turnControls && turnControls.view.playerId !== playerId &&
-          !turnControls.view.finalReaction && !power?.lookTarget
+          !turnControls.view.finalReaction && !power?.lookTarget && !power?.pendingSwap
           ? { turn: turnControls.view.number, remaining: turn.remaining } : undefined}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
+        dutchAnnouncement={announcement?.pseudo}
         dutchControl={turnControls?.canPlay && turnControls.view.canAnnounceDutch ? {
           armed: turnControls.view.dutchArmed,
           toggle: () => turn.act({ kind: "dutch-intent", enabled: !turnControls.view.dutchArmed }),

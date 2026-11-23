@@ -33,7 +33,10 @@ test("au seuil exact, le plus petit total remporte la partie et les égalités s
   assert.deepEqual(rankPlayers(result.players).map(({ player, rank }) => [player.id, rank]),
     [["alice", 1], ["charlie", 1], ["bob", 3]]);
   assert.equal(startNextRound(result, 1, members, 1_100), result);
-  assert.equal(toggleNextVariant(result, 1, "sixCards", 1_100), result);
+  const nextVariants = toggleNextVariant(result, 1, "sixCards");
+  assert.equal(nextVariants.result?.nextVariants.sixCards, true);
+  assert.equal(nextVariants.variants.sixCards, false);
+  assert.deepEqual(nextVariants.result?.gameWinnerIds, result.result?.gameWinnerIds);
   assert.equal(finishRound(result, 1_100), result);
 });
 
@@ -52,10 +55,9 @@ test("en illimité les résultats durent soixante secondes et les variantes s'ap
   const deadline = finishedAt + GAME_CONFIG.round.resultsMs;
   assert.ok(!result.result?.gameWinnerIds.length);
   assert.equal(result.phaseDeadline, deadline);
-  assert.equal(toggleNextVariant(result, 2, "sixCards", 1_100), result);
-  assert.equal(toggleNextVariant(result, 1, "sixCards", deadline), result);
-  const sixCards = toggleNextVariant(result, 1, "sixCards", 1_150);
-  const jokers = toggleNextVariant(sixCards, 1, "jokerPlus", 1_200);
+  assert.equal(toggleNextVariant(result, 2, "sixCards"), result);
+  const sixCards = toggleNextVariant(result, 1, "sixCards");
+  const jokers = toggleNextVariant(sixCards, 1, "jokerPlus");
   assert.equal(jokers.variants.sixCards, false);
   assert.equal(jokers.result?.nextVariants.sixCards, true);
   assert.equal(advanceRoundSetup(jokers, 1, members, deadline - 1), jokers);

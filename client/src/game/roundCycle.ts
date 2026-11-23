@@ -7,10 +7,10 @@ import { rankPlayers } from "./hands.ts";
 
 type RoundMember = Pick<HubPlayer, "id" | "pseudo" | "connected">;
 
-export function toggleNextVariant(state: GameState, roundNumber: number, key: keyof GameVariants, now: number): GameState {
-  const { result, phaseDeadline } = state;
+export function toggleNextVariant(state: GameState, roundNumber: number, key: keyof GameVariants): GameState {
+  const { result } = state;
   if (state.phase !== "results" || state.roundNumber !== roundNumber || !result ||
-      phaseDeadline === null || now >= phaseDeadline || !Object.hasOwn(result.nextVariants, key)) return state;
+      !Object.hasOwn(result.nextVariants, key)) return state;
   return {
     ...state,
     result: { ...result, nextVariants: { ...result.nextVariants, [key]: !result.nextVariants[key] } },

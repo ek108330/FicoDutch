@@ -312,10 +312,11 @@ function App() {
   function restartGame() {
     const hub = hubRef.current;
     const round = hostRoundRef.current;
+    const result = round?.state.result;
     if (restarting || !readyRef.current || !hub?.gameFinished || hub.hostPause ||
-        round?.hubId !== hub.id || round.gameNumber !== hub.gameNumber || !round.state.result?.gameWinnerIds.length) return;
+        round?.hubId !== hub.id || round.gameNumber !== hub.gameNumber || !result?.gameWinnerIds.length) return;
 
-    const request: RestartHubRequest = { hubId: hub.id, gameNumber: hub.gameNumber, variants: round.state.variants };
+    const request: RestartHubRequest = { hubId: hub.id, gameNumber: hub.gameNumber, variants: result.nextVariants };
     setRestarting(true);
     socket.timeout(5_000).emit("hub:restart", request, () => setRestarting(false));
   }

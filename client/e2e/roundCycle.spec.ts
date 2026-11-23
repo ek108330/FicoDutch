@@ -60,7 +60,10 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
       await expectClockFromTop(page.getByRole("progressbar", { name: "Temps avant la manche suivante" }));
       await expect(page.getByRole("timer")).toHaveCount(0);
       await expect(hand(page, "AliceManches").locator(".result-points")).toHaveText("27");
-      await expect(ranking(page).getByRole("row", { name: /AliceManches/ }).locator(".result-total")).toHaveText("27 (+27)");
+      const alice = ranking(page).getByRole("row", { name: /AliceManches/ });
+      await expect(alice.locator(".result-total")).toHaveText("27");
+      await expect(alice.locator(".ranking-round-score")).toHaveText("+27");
+      await expect(page.getByRole("group", { name: "Variantes de la prochaine manche" }).getByRole("button")).toHaveCount(4);
       await expect(hand(page, "AliceManches").locator(".result-cards .face-up")).toHaveCount(4);
       await expect(hand(page, "AliceManches")).toHaveCSS("background-color", "rgb(243, 222, 154)");
       await expect(page.getByRole("heading", { name: "AliceManches" })).toHaveCSS("color", "rgb(39, 50, 36)");
@@ -99,13 +102,16 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
       await expect(page.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
       await expect(page.getByText("BobManches remporte la partie.")).toBeVisible();
       await expect(page.getByText("Seuil de 50 points atteint.")).toBeVisible();
-      await expect(page.getByRole("group", { name: "Variantes de la partie" })).toHaveText(/6 cartes/);
-      await expect(sixCards(page)).toHaveCount(0);
+      await expect(page.getByRole("group", { name: "Variantes de la prochaine partie" }).getByRole("button")).toHaveCount(4);
+      await expect(sixCards(page)).toHaveAttribute("aria-pressed", "true");
+      expect(await ranking(page).getByRole("columnheader").allTextContents()).toEqual(["Rang", "Joueur", "Dernière manche", "Total"]);
       const alice = ranking(page).getByRole("row", { name: /AliceManches/ });
       const bob = ranking(page).getByRole("row", { name: /BobManches/ });
-      await expect(alice.locator(".result-total")).toHaveText("79 (+52)");
+      await expect(alice.locator(".result-total")).toHaveText("79");
+      await expect(alice.locator(".ranking-round-score")).toHaveText("+52");
       await expect(alice.getByRole("img", { name: "Perd 1 place" })).toHaveCSS("color", "rgb(255, 157, 150)");
-      await expect(bob.locator(".result-total")).toHaveText("71 (+25)");
+      await expect(bob.locator(".result-total")).toHaveText("71");
+      await expect(bob.locator(".ranking-round-score")).toHaveText("+25");
       await expect(bob.getByRole("img", { name: "Gagne 1 place" })).toHaveCSS("color", "rgb(154, 230, 173)");
       await expect(hand(page, "BobManches").locator(".result-cards .face-up")).toHaveCount(6);
       await expect(ranking(page).locator("tbody tr").first()).toContainText("BobManches");
@@ -118,6 +124,11 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     await expect(guest.getByRole("button", { name: "Lancer la prochaine partie" })).toHaveCount(0);
     await expect(guest.getByRole("button", { name: "Interrompre la partie", exact: true })).toHaveCount(0);
     await expect(startOver).toBeEnabled();
+    const infinite = (page: Page) => page.getByRole("button", { name: "Pose infinie", exact: true });
+    await expect(infinite(guest)).toBeDisabled();
+    await expect(infinite(host)).toHaveAttribute("aria-pressed", "false");
+    await infinite(host).click();
+    await expect(infinite(guest)).toHaveAttribute("aria-pressed", "true");
     await host.setViewportSize({ width: 320, height: 568 });
     await expectScreenFits(host);
     const interruptBox = (await interrupt.boundingBox())!;
@@ -140,13 +151,13 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     await guest.screenshot({ path: testInfo.outputPath("07-nouvelle-partie-memorisation.png") });
     await finishWithDutch(guest, host);
     for (const page of [host, guest]) {
-      const totals = ranking(page).locator(".result-total");
-      await expect(totals).toHaveCount(2);
-      for (const total of await totals.all()) {
-        const parts = (await total.innerText()).match(/^(\d+) \(\+(\d+)\)$/);
-        expect(parts?.[1]).toBe(parts?.[2]);
-        expect(parts).not.toBeNull();
+      const scores = ranking(page).locator("tbody tr");
+      await expect(scores).toHaveCount(2);
+      for (const row of await scores.all()) {
+        const total = await row.locator(".result-total").innerText();
+        await expect(row.locator(".ranking-round-score")).toHaveText(`+${total}`);
       }
+      await expect(infinite(page)).toHaveAttribute("aria-pressed", "true");
     }
     await host.screenshot({ path: testInfo.outputPath("08-scores-reinitialises.png") });
     await interrupt.click();
@@ -175,7 +186,7 @@ test("la table couronne les deux joueurs à égalité au début de la manche sui
     await expectLocalTurn(guest);
     await drawDeck(guest).click();
     await discardDrawn(guest);
-    await expect(ranking(last).getByRole("cell", { name: "22 (+22)", exact: true })).toHaveCount(2);
+    await expect(ranking(last).getByRole("cell", { name: "22", exact: true })).toHaveCount(2);
     await next(host).click();
     for (const page of [host, guest, last]) {
       await expect(crowns(page)).toHaveCount(2);

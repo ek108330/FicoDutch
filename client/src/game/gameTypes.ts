@@ -32,10 +32,10 @@ export type PublicCardMove = { kind: "swap"; targets: [CardTarget, CardTarget] }
   { kind: "bot-discard"; playerId: string; slot?: number; face: CardFace };
 export type PowerKind = "look-own" | "look-other" | "blind-swap" | "look-and-swap" | "give-card";
 export type SelectedCard = { playerId: string; cardId: string };
-export type Power = { kind: PowerKind; selected: SelectedCard[] };
+export type Power = { kind: PowerKind; selected: SelectedCard[]; pendingSwap?: true };
 export type ReactionNotice = { playerId: string; outcome: "played" | "penalty" | "empty-pile" };
 export type ReactionState = { reference: number; presentedAt: number | null; notice: ReactionNotice | null };
-export type Dutch = { announcerId: string; remainingPlayerIds: string[] };
+export type Dutch = { announcerId: string; remainingPlayerIds: string[]; announcedAt?: number };
 export type RoundResult = {
   emptyHandPlayerId: string | null;
   dutchAnnouncerId: string | null;

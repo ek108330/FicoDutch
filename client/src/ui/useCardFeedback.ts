@@ -6,7 +6,7 @@ export type GameSound = FeedbackKind | "tap" | "slide" | "flip" | "select" | "sw
 export type PlayGameSound = (sound: GameSound) => void;
 export type CardFeedback = { kind: FeedbackKind; pile: "deck" | "discard"; id: number };
 const soundKey = "ficodutch-game-sound";
-const tones: Record<GameSound, readonly [start: number, end: number, seconds: number, peak: number]> = {
+const tones: Record<Exclude<GameSound, "dutch">, readonly [start: number, end: number, seconds: number, peak: number]> = {
   draw: [360, 490, 0.17, 0.16],
   discard: [295, 180, 0.16, 0.17],
   power: [480, 720, 0.21, 0.16],
@@ -20,8 +20,32 @@ const tones: Record<GameSound, readonly [start: number, end: number, seconds: nu
   penalty: [260, 115, 0.32, 0.21],
   deal: [550, 300, 0.038, 0.13],
   emoji: [720, 900, 0.12, 0.12],
-  dutch: [392, 1_045, 0.52, 0.2],
 };
+
+function playTrumpet(context: AudioContext) {
+  const notes = [[523.25, 0, 0.15], [659.25, 0.17, 0.15], [783.99, 0.34, 0.36]];
+  for (const [pitch, offset, length] of notes) {
+    const start = context.currentTime + offset;
+    const oscillator = context.createOscillator();
+    const brass = context.createBiquadFilter();
+    const gain = context.createGain();
+    oscillator.type = "sawtooth";
+    oscillator.frequency.setValueAtTime(pitch * 0.98, start);
+    oscillator.frequency.exponentialRampToValueAtTime(pitch, start + 0.026);
+    brass.type = "lowpass";
+    brass.Q.value = 2.4;
+    brass.frequency.setValueAtTime(1_350, start);
+    brass.frequency.linearRampToValueAtTime(2_700, start + 0.04);
+    brass.frequency.exponentialRampToValueAtTime(1_600, start + length);
+    gain.gain.setValueAtTime(0.001, start);
+    gain.gain.linearRampToValueAtTime(0.32, start + 0.022);
+    gain.gain.setValueAtTime(0.25, start + length * 0.6);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + length);
+    oscillator.connect(brass).connect(gain).connect(context.destination);
+    oscillator.start(start);
+    oscillator.stop(start + length + 0.01);
+  }
+}
 
 export function useGameAudio() {
   const [sound, setSound] = useState(() => localStorage.getItem(soundKey) !== "off");
@@ -56,10 +80,13 @@ export function useGameAudio() {
 
   const playSound = useCallback<PlayGameSound>((kind) => {
     const context = audio.current;
-    const tone = tones[kind];
-    if (!sound || !context || context.state !== "running" || !Array.isArray(tone)) return;
+    if (!sound || !context || context.state !== "running") return;
+    if (kind === "dutch") {
+      playTrumpet(context);
+      return;
+    }
     const start = context.currentTime;
-    const [from, to, seconds, peak] = tone;
+    const [from, to, seconds, peak] = tones[kind];
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     oscillator.type = "triangle";
@@ -90,7 +117,6 @@ export function useCardFeedback(view: TurnView | null, roundNumber: number, cloc
       return;
     }
     const before = prior.view;
-    if (view.dutch && !before.dutch) playSound("dutch");
     const faces = view.power?.selection?.revealed.length ?? 0;
     const previousFaces = before.power?.selection?.revealed.length ?? 0;
     const newMove = view.cardMotion && view.cardMotion.id !== before.cardMotion?.id;

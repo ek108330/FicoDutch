@@ -22,6 +22,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await discardDrawn(guest);
 
     for (const page of [host, guest]) {
+      await expect(page.getByRole("alert").filter({ hasText: "Dutch !" })).toHaveText("Dutch !BobDutch");
       await expect(page.locator(".player-name").getByRole("img", { name: "BobDutch a annoncé Dutch" })).toBeVisible();
       await expect(announce(page)).toHaveCount(0);
     }
@@ -40,13 +41,13 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await expect(host.locator(".position-top .face-up")).toHaveAttribute("aria-label", "Carte 1 Dame de pique");
     await expect(host.getByRole("button", { name: "Échanger les cartes" })).toBeDisabled();
     await expect(host.getByRole("button", { name: "Échanger les cartes" })).toHaveCSS("color", "rgb(84, 69, 43)");
-    await expect(host.getByRole("button", { name: "Annuler l’échange" })).toHaveCSS("color", "rgb(39, 50, 36)");
-    await expect(host.getByText("La protection Dutch empêche l’échange.")).toHaveCSS("color", "rgb(39, 50, 36)");
+    await expect(host.getByRole("button", { name: "Annuler l’échange" })).toHaveCSS("color", "rgb(36, 25, 12)");
+    await expect(host.getByText("La protection Dutch empêche l’échange.")).toHaveCSS("color", "rgb(36, 25, 12)");
     await expect(host.getByText("La protection Dutch empêche l’échange.")).toBeVisible();
     await expect(guest.locator(".player-cards .face-up")).toHaveCount(0);
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("03-protection-valet.png") });
-    await host.locator(".turn-player-row").getByRole("button", { name: "Annuler l’échange" }).click();
+    await host.locator(".power-heading").getByRole("button", { name: "Annuler l’échange" }).click();
 
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();
@@ -68,10 +69,11 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
   await host.setViewportSize({ width: 390, height: 844 });
   await host.addInitScript(() => {
     localStorage.setItem("ficodutch-game-sound", "on");
-    const ramp = AudioParam.prototype.exponentialRampToValueAtTime;
-    AudioParam.prototype.exponentialRampToValueAtTime = function (value, time) {
-      if (value === 1_045) document.documentElement.dataset.dutchSound = "heard";
-      return ramp.call(this, value, time);
+    const startTone = OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start = function (when) {
+      const data = document.documentElement.dataset;
+      if (this.type === "sawtooth") data.dutchNotes = String(Number(data.dutchNotes ?? 0) + 1);
+      return startTone.call(this, when);
     };
   });
   const guest = await browser.newPage({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } });
@@ -115,7 +117,13 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
     const announced = host.getByRole("img", { name: "BobGeste a annoncé Dutch" });
     await expect(announced).toBeVisible();
     await expect(announced).toHaveCSS("animation-name", "dutch-announcement");
-    await expect(host.locator("html")).toHaveAttribute("data-dutch-sound", "heard");
+    await expect(host.locator("html")).toHaveAttribute("data-dutch-notes", "3");
+    const banner = host.getByRole("alert").filter({ hasText: "Dutch !" });
+    await expect(banner).toHaveText("Dutch !BobGeste");
+    await expect(banner.locator("svg")).toHaveCSS("animation-name", "dutch-megaphone");
+    await banner.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
     await host.screenshot({ path: testInfo.outputPath("02-annonce-dutch.png") });
     await expectLocalTurn(host);
     await drawDeck(host).click();
@@ -131,6 +139,7 @@ test("glisser la carte, annoncer Dutch et réagir après le dernier tour", async
     await expect(host.getByRole("button", { name: "Remplacer la carte 4", exact: true })).toHaveAttribute("data-drop-target", "true");
     await host.mouse.up();
     await expect(activeTurn(guest)).toHaveText("Dernières réactions");
+    await expect(banner).toHaveCount(0);
     await expect(guest.getByRole("progressbar", { name: "Temps pour réagir" })).toHaveAttribute("aria-valuemax", "3");
     await expectClockFromTop(guest.getByRole("progressbar", { name: "Temps pour réagir" }));
     await expect(discard(guest)).toHaveAccessibleName("Défausse, 7 de pique");

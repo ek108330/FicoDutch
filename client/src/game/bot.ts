@@ -92,7 +92,7 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
     if (nextReaction) return nextReaction;
   }
 
-  const bot = turn.finalReaction ? undefined : bots.find(({ id }) => id === state.currentPlayerId);
+  const bot = turn.finalReaction || turn.power?.pendingSwap ? undefined : bots.find(({ id }) => id === state.currentPlayerId);
   if (!bot) return null;
   const playerId = bot.id;
   const opponents = state.players.filter(({ id, hasLeft }) => id !== playerId && !hasLeft)

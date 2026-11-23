@@ -3,7 +3,7 @@ import test from "node:test";
 import { getCardFace, type Card, type CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import type { CardTarget, GameState } from "../src/game/gameTypes.ts";
-import { LOOK_DURATION_MS, POWER_DURATION_MS } from "../src/game/powers.ts";
+import { BLIND_SWAP_PREVIEW_MS, LOOK_DURATION_MS, POWER_DURATION_MS } from "../src/game/powers.ts";
 import { beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 
@@ -52,20 +52,31 @@ for (const [rank, valid, invalid, ownerIndex] of [["8", own, other, 0], ["9", ot
   });
 }
 
-test("le 10 échange deux positions de la même main sans révéler de carte", () => {
+test("le 10 surligne les deux cibles pendant 500 ms puis échange sans révéler de carte", () => {
   const initial = activate(startWithCard("10"));
   const first = choose(initial, own);
   assert.deepEqual(getTurnView(first, "alice", 1_100)?.power?.selection?.revealed, []);
   assert.equal(getTurnView(first, "bob", 1_100)?.power?.selection, null);
   assert.deepEqual(getTurnView(first, "bob", 1_100)?.power?.exchangeTargets, [own]);
   assert.equal(choose(first, own), first);
-  const result = choose(first, { ...own, position: 1 });
+  const second = { ...own, position: 1 };
+  const highlighted = choose(first, second);
+  const deadline = 1_100 + BLIND_SWAP_PREVIEW_MS;
+  assert.equal(highlighted.turn?.deadline, 1_600);
+  assert.equal(highlighted.players, initial.players);
+  assert.equal(highlighted.cardMotion, undefined);
+  assert.deepEqual(getTurnView(highlighted, "bob", 1_100)?.power?.exchangeTargets, [own, second]);
+  assert.deepEqual(getTurnView(highlighted, "alice", 1_100)?.power?.selection?.revealed, []);
+  assert.equal(getTurnView(highlighted, "bob", 1_100)?.power?.selection, null);
+  assert.equal(playTurn(highlighted, "alice", 1, { kind: "power-pass" }, 1_200), highlighted);
+  assert.equal(expireTurn(highlighted, 1, deadline - 1), highlighted);
+  const result = expireTurn(highlighted, 1, deadline);
   assert.equal(result.players[0].cards[0], initial.players[0].cards[1]);
   assert.equal(result.players[0].cards[1], initial.players[0].cards[0]);
   assert.equal(result.currentPlayerId, "bob");
   assert.equal(result.turn?.power, null);
-  assert.deepEqual(getTurnView(result, "charlie", 1_150)?.cardMotion?.move,
-    { kind: "swap", targets: [own, { ...own, position: 1 }] });
+  assert.deepEqual(getTurnView(result, "charlie", deadline)?.cardMotion?.move,
+    { kind: "swap", targets: [own, second] });
   assert.equal(getTurnView(result, "charlie", 3_000)?.cardMotion, null);
 });
 
@@ -100,10 +111,12 @@ test("le Valet révèle ses deux cibles puis permet de garder les cartes ou de l
 test("l’échange du dernier tour est publié même quand la manche se termine", () => {
   const playing = startWithCard("10");
   const finalTurn = { ...playing, dutch: { announcerId: "charlie", remainingPlayerIds: ["alice"] } };
-  const state = choose(choose(activate(finalTurn), own), other);
+  const highlighted = choose(choose(activate(finalTurn), own), other);
+  const deadline = highlighted.turn!.deadline;
+  const state = expireTurn(highlighted, 1, deadline);
   assert.equal(state.turn?.finalReaction, true);
   assert.equal(expireTurn(state, 1, state.turn!.deadline).phase, "results");
-  assert.deepEqual(getCardMotionView(state, 1_150)?.move, { kind: "swap", targets: [own, other] });
+  assert.deepEqual(getCardMotionView(state, deadline)?.move, { kind: "swap", targets: [own, other] });
   assert.equal(getCardMotionView(state, 3_000), null);
 });
 

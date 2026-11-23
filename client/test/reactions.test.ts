@@ -160,9 +160,11 @@ test("une réaction prioritaire retire une cible en attente et invalide la posit
   assert.equal(getTurnView(reacted, "alice", 1_001)?.power?.selection?.remaining, 2);
   assert.equal(choose(reacted, "bob", 0, 0), reacted);
   const retargeted = choose(choose(reacted, "bob", 0), "alice", 0);
-  assert.equal(retargeted.players[0].cards[0].id, "b-2");
-  assert.equal(retargeted.players[1].cards[0].id, "a-4");
-  assert.equal(retargeted.discardPile.at(-1)?.id, "b-10");
+  assert.equal(attempt(retargeted, "bob", 0), retargeted);
+  const swapped = expireTurn(retargeted, 1, retargeted.turn!.deadline);
+  assert.equal(swapped.players[0].cards[0].id, "b-2");
+  assert.equal(swapped.players[1].cards[0].id, "a-4");
+  assert.equal(swapped.discardPile.at(-1)?.id, "b-10");
 });
 
 test("un Valet aux deux cibles validées garde la priorité sur ces cartes", () => {

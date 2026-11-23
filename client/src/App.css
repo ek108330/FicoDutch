@@ -1499,25 +1499,11 @@ input {
 
 .turn-panel[data-local-turn] {
   background: #f3de9a;
-  color: #273224;
+  color: #24190c;
 }
 
 .turn-panel[data-local-turn] .perimeter-clock-track { stroke: #c2a363; }
 .turn-panel[data-local-turn] .perimeter-clock-progress { stroke: #735116; }
-
-.turn-choices {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 2px 8px;
-  margin-top: 2px;
-  font-size: clamp(0.68rem, 2.8vw, 0.8rem);
-  overflow-wrap: anywhere;
-}
-
-.turn-panel .turn-choices p { margin: 0; }
-.turn-panel .turn-choices button { padding: 2px 6px; }
 
 .turn-layout .table-piles { grid-area: piles; }
 
@@ -1526,7 +1512,7 @@ input {
   overflow-wrap: anywhere;
 }
 
-.turn-player-row {
+.power-heading {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1543,8 +1529,8 @@ input {
   display: grid;
   flex: none;
   place-items: center;
-  width: 32px;
-  height: 30px;
+  width: 26px;
+  height: 24px;
   padding: 0;
   touch-action: manipulation;
 }
@@ -1552,7 +1538,7 @@ input {
 .turn-panel[data-local-turn] button {
   border-color: #806025;
   background: #fff1c1;
-  color: #273224;
+  color: #24190c;
 }
 
 .turn-panel[data-local-turn] button:disabled {
@@ -1563,29 +1549,9 @@ input {
 
 .turn-panel[data-local-turn] button:focus-visible { outline-color: #654318; }
 
-.game-table .turn-panel[data-joker] {
-  min-width: 0;
-  padding: 3px 6px;
-  color: #24190c;
-  font-size: 0.71rem;
-}
-
-.joker-heading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.joker-heading h2 { margin: 0; color: inherit; font: inherit; font-weight: 800; }
-.turn-panel .joker-heading button { display: grid; place-items: center; padding: 1px 3px; }
-.turn-panel[data-joker] .joker-instruction { margin: 1px 0 0; white-space: nowrap; }
-
-.turn-choices .power-title {
-  margin: 0;
-  font: inherit;
-  font-weight: 700;
-}
+.power-controls { font-size: clamp(0.68rem, 2.8vw, 0.8rem); }
+.game-table .power-heading h2 { margin: 0; color: inherit; font: inherit; font-weight: 800; }
+.turn-panel .power-controls p { margin: 1px 0 0; color: inherit; overflow-wrap: anywhere; }
 
 .perimeter-clock {
   position: absolute;
@@ -2101,6 +2067,52 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   100% { scale: 1; box-shadow: 0 0 0 12px rgb(255 227 154 / 0%); }
 }
 
+.dutch-banner {
+  position: absolute;
+  z-index: 12;
+  inset: 50% auto auto 50%;
+  translate: -50% -50%;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: min(66%, 230px);
+  padding: clamp(10px, 3vmin, 18px);
+  border: 2px solid #ffe18a;
+  border-radius: 20px;
+  background: #123b2a;
+  box-shadow: 0 0 0 5px rgb(255 225 138 / 30%), 0 8px 34px #092619;
+  color: #ffe18a;
+  line-height: 1.05;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.dutch-banner svg {
+  width: clamp(46px, 15vmin, 88px);
+  height: auto;
+  transform: rotate(-12deg);
+}
+
+.dutch-banner strong { font-size: clamp(1.8rem, 8vmin, 3rem); }
+.dutch-banner span { font-weight: 750; color: #fff8dd; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dutch-banner { animation: dutch-banner-entry 400ms ease-out both; }
+  .dutch-banner svg { animation: dutch-megaphone 680ms 110ms ease-out 2; }
+}
+
+@keyframes dutch-banner-entry {
+  0% { scale: 0.35; opacity: 0; }
+  62% { scale: 1.1; opacity: 1; }
+  100% { scale: 1; }
+}
+
+@keyframes dutch-megaphone {
+  30% { transform: rotate(12deg) scale(1.13); }
+  62% { transform: rotate(-19deg); }
+}
+
 .round-panel button[aria-pressed="true"] {
   background: #f3de9a;
   color: #243428;
@@ -2378,8 +2390,10 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 }
 
 .score-ranking thead th { color: #f3de9a; font-size: 0.72rem; }
-.score-ranking th:first-child { width: 3.6em; }
-.score-ranking :is(th, td):last-child { width: 6.8em; text-align: right; white-space: nowrap; }
+.score-ranking .ranking-rank { width: 3.3em; }
+.score-ranking .ranking-round-score { padding-inline-end: 8px; text-align: right; }
+.score-ranking thead .ranking-round-score { width: 6rem; font-size: 0.67rem; font-weight: 700; white-space: nowrap; }
+.score-ranking .result-total { width: 3.2em; text-align: right; white-space: nowrap; }
 
 .ranking-player {
   display: flex;
@@ -2436,26 +2450,16 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   opacity: 1;
 }
 
-.result-variants p {
-  margin: 0;
-  font-size: 0.88rem;
-}
-
 @media (orientation: portrait) and (max-height: 680px) {
   .round-results .result-tools .settings-trigger { width: 32px; height: 32px; }
   .score-ranking :is(th, td) { padding-block: 1px; }
   .result-summary p { margin: 3px 0; font-size: 0.89rem; line-height: 1.2; }
 
-  .result-screen[data-final] .result-footer {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
-    align-items: center;
-    gap: 6px;
-  }
-
-  .result-screen[data-final] .result-actions { width: auto; margin-inline: 0; }
-  .result-screen[data-final] .result-variants legend { font-size: 0.72rem; }
-  .result-screen[data-final] .result-variants :is(legend, p) { line-height: 1.2; }
+  .result-variants legend { font-size: 0.72rem; }
+  .round-results .result-variants button { min-height: 26px; }
+  .result-hands { gap: 4px; }
+  .result-hand { padding-block: 3px; }
+  .result-cards { margin-top: 3px; }
 
   .round-results :is(.result-primary, .result-actions button) {
     min-height: 32px;
@@ -2464,7 +2468,17 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
     line-height: 1.2;
   }
 
-  .result-screen[data-final] .result-actions button { padding-inline: 4px; font-size: 0.82rem; }
+  .result-screen[data-final] .result-actions { margin-top: 4px; gap: 4px; }
+  .result-screen[data-final] .result-actions button { min-height: 27px; padding-block: 3px; font-size: 0.82rem; }
+}
+
+@media (orientation: portrait) and (max-height: 600px) {
+  .result-screen[data-final] .round-results { padding-block: 5px; }
+  .result-screen[data-final] .result-tools .settings-trigger { width: 26px; height: 26px; }
+  .result-screen[data-final] .result-summary p { margin-block: 1px; }
+  .result-screen[data-final] .result-details { row-gap: 3px; }
+  .result-screen[data-final] .result-variants { margin-top: 3px; padding-block: 1px 3px; }
+  .result-screen[data-final] .result-actions button { min-height: 25px; }
 }
 
 @media (orientation: landscape) and (min-width: 585px) and (max-height: 450px) {
@@ -2659,28 +2673,12 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .turn-layout .turn-panel { padding: 2px 7px; }
   .turn-panel .turn-decision button { width: 28px; height: 24px; }
 
-  .turn-panel:has(.turn-choices) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 2px 8px;
+  .turn-panel[data-power] {
     max-width: min(100%, 470px);
   }
 
-  .game-table.is-large-table .turn-panel:has(.turn-choices) { max-width: min(60vw, 470px); }
-
-  .turn-panel .turn-choices {
-    display: contents;
-    font-size: 0.72rem;
-  }
-
-  .turn-panel:has(.turn-choices) .turn-player {
-    max-width: 17ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .game-table.is-large-table .turn-panel[data-power] { max-width: min(100%, 470px); }
+  .turn-panel .power-controls { font-size: 0.72rem; }
 
   .game-table .player-name {
     margin-bottom: 5px;
@@ -2798,9 +2796,6 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
     --card-height: clamp(51px, 15vw, 90px);
   }
 
-  .game-table:is([data-player-count="5"], [data-player-count="6"]) .turn-panel:has(.turn-choices) {
-    max-width: clamp(110px, 40vw, 230px);
-  }
 }
 
 @media (orientation: portrait) and (max-height: 760px) {
@@ -2858,15 +2853,12 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   }
 
   .game-table.is-large-table[data-player-count="6"] .player-cards { --hand-gap: 3px; }
-  .game-table.is-large-table[data-player-count="6"] .position-bottom .player-cards { --card-height: 36px; }
+  .game-table.is-large-table[data-player-count="6"] .position-bottom .player-cards { --card-height: 35px; }
 
   .game-table[data-player-count="6"] .turn-layout {
-    grid-template-rows: auto 23px;
+    grid-template-rows: auto 40px;
   }
 
-  .game-table.is-large-table[data-player-count="6"] .turn-panel:has(.turn-choices) {
-    max-width: 35vw;
-  }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
@@ -2927,16 +2919,14 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
 @media (orientation: portrait) and (max-height: 600px) {
   .game-screen.table-screen .game-table[data-player-count="6"] {
-    padding-top: 27px;
+    padding-top: 24px;
     row-gap: 1px;
   }
 
   .table-screen .game-table.is-large-table[data-player-count="6"] .player-cards { --hand-gap: 2px; }
-
-  .table-screen .game-table[data-player-count="6"] .turn-panel[data-joker] {
-    padding-inline: 4px;
-    font-size: 0.65rem;
-  }
+  .table-screen .game-table[data-player-count="6"] .turn-panel[data-power] { padding: 0 4px; line-height: 1.12; }
+  .table-screen .game-table[data-player-count="6"] .power-controls { font-size: 0.68rem; }
+  .table-screen .game-table[data-player-count="6"] .turn-decision button { height: 18px; }
 
   .table-screen .game-table.is-large-table[data-player-count="6"] .table-piles :is(.pile-card, .deck-placeholder, .discard-placeholder) {
     width: 32px;
@@ -2976,8 +2966,8 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .table-screen .turn-layout .pile-card .joker-face { font-size: 0.68rem; }
 
-  .table-screen .turn-layout .turn-panel[data-joker] { padding: 1px 6px; line-height: 1; }
-  .table-screen .joker-heading button { height: 16px; padding: 0 2px; }
+  .table-screen .turn-layout .turn-panel[data-power] { padding: 0 6px; line-height: 1.16; }
+  .table-screen .turn-panel .turn-decision button { width: 22px; height: 18px; }
 }
 
 @media (orientation: landscape) and (max-height: 370px) {

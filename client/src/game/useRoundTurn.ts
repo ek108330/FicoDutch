@@ -111,6 +111,7 @@ function acceptRoundView(current: ReceivedView | null, view: RoundView, received
     if (previous.phase === "playing" && view.phase === "playing") {
       if (view.turn.number < previous.turn.number) return current;
       sameStage = view.turn.number === previous.turn.number && view.turn.power?.kind === previous.turn.power?.kind &&
+        view.turn.power?.pendingSwap === previous.turn.power?.pendingSwap &&
         view.turn.finalReaction === previous.turn.finalReaction;
     }
     if (sameStage && previous.clockVersion === view.clockVersion && current.deadline !== null && deadline !== null) {
@@ -225,6 +226,9 @@ export function useRoundTurn({
   const deadline = isHost ? hostDeadline : received?.deadline ?? null;
   const remaining = scene ? Math.max(0, Math.min(phaseLength[scene.phase], (deadline ?? now) - now)) : 0;
   const view = scene?.phase === "playing" ? scene.turn : null;
+  const dutch = view?.dutch;
+  const announcementMs = (dutch?.announcementMs ?? 0) - (isHost ? 0 : Math.max(0, now - (received?.receivedAt ?? now)));
+  const announcement = announcementMs > 0 ? view?.players.find(({ id }) => id === dutch?.announcerId) : undefined;
   const waitingForClock = !isHost && (!received || clockVersion > received.view.clockVersion);
   const canPlay = !paused && !waitingForClock && view?.playerId === playerId && !view.finalReaction && remaining > 0 && (isHost || hostConnected);
   const canReact = !paused && !waitingForClock && !!view?.reaction.canAttempt &&
@@ -272,7 +276,7 @@ export function useRoundTurn({
   }
 
   function toggleVariant(key: keyof GameVariants) {
-    if (!paused && isHost) updateHostRound(hubId, (state) => toggleNextVariant(state, roundNumber, key, performance.now()));
+    if (!paused && isHost) updateHostRound(hubId, (state) => toggleNextVariant(state, roundNumber, key));
   }
 
   function startNext() {
@@ -280,6 +284,6 @@ export function useRoundTurn({
       startNextRound(state, roundNumber, currentMembers, performance.now()));
   }
 
-  return { scene, deadline, view, finalMotion, remaining, canPlay, canReact, receive, memorize, act, react,
+  return { scene, deadline, view, finalMotion, announcement, remaining, canPlay, canReact, receive, memorize, act, react,
     canStartNext, toggleVariant, startNext, waitingForClock };
 }

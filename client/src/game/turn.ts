@@ -4,11 +4,12 @@ import type { HandLayout } from "./handLayout";
 import type { GameState, GamePlayer, PublicCardMove, ReactionNotice, Turn } from "./gameTypes";
 import { changeHand, finishRound, recordCardMove } from "./hands.ts";
 import { getHandLayout } from "./handLayout.ts";
-import { applyPowerAction, getPowerView, POWER_DURATION_MS, startPower, type PowerAction, type PowerView } from "./powers.ts";
+import { applyPowerAction, getPowerView, POWER_DURATION_MS, resolveBlindSwap, startPower, type PowerAction, type PowerView } from "./powers.ts";
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
 
 export const TURN_DURATION_MS = 60_000;
 export const FINAL_REACTION_MS = 3_000;
+const DUTCH_ANNOUNCEMENT_MS = 2_800;
 const CARD_MOTION_WINDOW_MS = 1_350;
 
 export type TurnAction =
@@ -36,7 +37,7 @@ export type TurnView = {
   cardMotion: CardMotionView | null;
   players: Array<{ id: string; pseudo: string; isBot?: true; cardCount: number; handVersion: number; handLayout?: HandLayout }>;
   reaction: { reference: number; canAttempt: boolean; notice: ReactionNotice | null };
-  dutch: { announcerId: string; lastTurns: number } | null;
+  dutch: { announcerId: string; lastTurns: number; announcementMs: number } | null;
   canAnnounceDutch: boolean;
   dutchArmed: boolean;
 };
@@ -84,7 +85,7 @@ function moveToNextPlayer(state: GameState, turn: Turn, now: number, discarded: 
     .filter(({ hasLeft }) => !hasLeft)
     .map(({ id }) => id);
   const dutch = state.dutch ?? (turn.dutchArmed && currentId
-    ? { announcerId: currentId, remainingPlayerIds: activeOrder }
+    ? { announcerId: currentId, remainingPlayerIds: activeOrder, announcedAt: now }
     : null);
   if (dutch) {
     const remainingPlayerIds = dutch.remainingPlayerIds.filter((id) => id !== currentId && activeOrder.includes(id));
@@ -164,7 +165,7 @@ export function playTurn(
   }
   const { turn } = state;
   if (state.phase !== "playing" || actorId !== state.currentPlayerId ||
-      !turn || turn.finalReaction || turn.number !== turnNumber || now >= turn.deadline) return state;
+      !turn || turn.finalReaction || turn.power?.pendingSwap || turn.number !== turnNumber || now >= turn.deadline) return state;
 
   const player = state.players.find(({ id, hasLeft }) => id === actorId && !hasLeft);
   if (!player) return state;
@@ -207,6 +208,8 @@ export function expireTurn(state: GameState, turnNumber: number, now: number): G
     return state;
   }
   if (turn.finalReaction) return finishRound(state, now);
+  const swapped = resolveBlindSwap(state, turn.power, now);
+  if (swapped) return moveToNextPlayer(swapped, turn, now, true);
   return skipTurn(state, turn, now);
 }
 
@@ -266,8 +269,13 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
       canAttempt: (!turn.finalReaction || now < turn.deadline) && canReactToDiscard(state, viewerId),
       notice: state.reaction.notice,
     },
-    dutch: state.dutch ? { announcerId: state.dutch.announcerId, lastTurns: state.dutch.remainingPlayerIds.length } : null,
-    canAnnounceDutch: !state.dutch && canSeePrivateCards,
+    dutch: state.dutch ? {
+      announcerId: state.dutch.announcerId,
+      lastTurns: state.dutch.remainingPlayerIds.length,
+      announcementMs: state.dutch.announcedAt === undefined ? 0
+        : Math.max(0, Math.min(DUTCH_ANNOUNCEMENT_MS, DUTCH_ANNOUNCEMENT_MS + state.dutch.announcedAt - now)),
+    } : null,
+    canAnnounceDutch: !state.dutch && canSeePrivateCards && !turn.power?.pendingSwap,
     dutchArmed: canSeePrivateCards && turn.dutchArmed,
   };
 }

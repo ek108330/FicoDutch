@@ -47,9 +47,11 @@ test("Dutch est annoncé en fin de tour et laisse exactement un dernier tour à 
   assert.equal(discardFromDeck(cancelled, "alice", 600).dutch, null);
 
   const announced = discardFromDeck(armed, "alice", 600);
-  assert.deepEqual(announced.dutch, { announcerId: "alice", remainingPlayerIds: ["bob", "charlie"] });
+  assert.deepEqual(announced.dutch, { announcerId: "alice", remainingPlayerIds: ["bob", "charlie"], announcedAt: 601 });
   assert.equal(announced.currentPlayerId, "bob");
   assert.equal(getTurnView(announced, "alice", 650)?.reaction.canAttempt, true);
+  assert.ok(getTurnView(announced, "bob", 650)!.dutch!.announcementMs > 2_000);
+  assert.equal(getTurnView(announced, "charlie", 3_500)?.dutch?.announcementMs, 0);
   assert.equal(act(announced, "bob", { kind: "dutch-intent", enabled: true }, 700), announced);
   const last = discardFromDeck(announced, "bob", 800);
   assert.equal(last.currentPlayerId, "charlie");

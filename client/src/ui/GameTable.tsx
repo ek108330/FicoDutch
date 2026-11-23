@@ -38,6 +38,7 @@ type GameTableProps = {
   onReplace?: (position: number) => void;
   onDiscardDrawn?: () => void;
   dutchControl?: { armed: boolean; toggle: () => void };
+  dutchAnnouncement?: string;
   look?: { target: CardTarget; remaining: number };
   reaction?: { scope: string; play: (position: number) => void };
   drawnCard?: CardFace;
@@ -92,6 +93,7 @@ export default function GameTable({
   onReplace,
   onDiscardDrawn,
   dutchControl,
+  dutchAnnouncement,
   look,
   reaction,
   drawnCard,
@@ -181,6 +183,12 @@ export default function GameTable({
           </div>
         ) : piles}
       </div>
+
+      {dutchAnnouncement && <div className="dutch-banner" role="alert">
+        <Megaphone aria-hidden="true" />
+        <strong>Dutch !</strong>
+        <span>{dutchAnnouncement}</span>
+      </div>}
 
       {positionedPlayers.map(({ player, position }) => {
         const dealSeat = dealing ? players.indexOf(player) : undefined;
