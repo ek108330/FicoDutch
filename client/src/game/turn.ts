@@ -6,6 +6,7 @@ import { changeHand, finishRound, recordCardMove } from "./hands.ts";
 import { getHandLayout } from "./handLayout.ts";
 import { applyPowerAction, getPowerView, POWER_DURATION_MS, resolveBlindSwap, startPower, type PowerAction, type PowerView } from "./powers.ts";
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
+import { journalCard, logMatch } from "./matchJournal.ts";
 
 export const TURN_DURATION_MS = 60_000;
 export const FINAL_REACTION_MS = 3_000;
@@ -89,7 +90,8 @@ function moveToNextPlayer(state: GameState, turn: Turn, now: number, discarded: 
     : null);
   if (dutch) {
     const remainingPlayerIds = dutch.remainingPlayerIds.filter((id) => id !== currentId && activeOrder.includes(id));
-    const nextState = { ...state, dutch: { ...dutch, remainingPlayerIds } };
+    const next = { ...state, dutch: { ...dutch, remainingPlayerIds } };
+    const nextState = state.dutch ? next : logMatch(next, now, { kind: "dutch", playerId: dutch.announcerId });
     if (!remainingPlayerIds.length) {
       return discarded ? {
         ...nextState,
@@ -110,31 +112,36 @@ function moveToNextPlayer(state: GameState, turn: Turn, now: number, discarded: 
   };
 }
 
-function draw(state: GameState, turn: Turn): GameState {
+function draw(state: GameState, turn: Turn, playerId: string, now: number): GameState {
   if (turn.drawnCard) return state;
   const drawn = takeFromPile(state.drawPile, state.discardPile);
   if (!drawn) return state;
 
   const { card, ...piles } = drawn;
-  return {
+  return logMatch({
     ...state,
     ...piles,
     turn: { ...turn, drawnCard: card },
-  };
+  }, now, { kind: "look", playerId, cards: [{ playerId, card: journalCard(card) }] });
+}
+
+function recordDiscard(state: GameState, actorId: string, discarded: Card, now: number) {
+  const next = presentDiscard(state, [...state.discardPile, discarded], now);
+  return logMatch(next, now, { kind: "discard", playerId: actorId, card: journalCard(discarded), reference: next.reaction.reference });
 }
 
 function finishDiscard(state: GameState, player: GamePlayer, turn: Turn, discarded: Card, now: number, slot?: number): GameState {
   const prepared = player.isBot ? {
     ...state, cardMotion: recordCardMove(state, { kind: "bot-discard", playerId: player.id, slot, face: getCardFace(discarded) }, now),
   } : state;
-  const next = presentDiscard(prepared, [...state.discardPile, discarded], now);
+  const next = recordDiscard(prepared, player.id, discarded, now);
   const power = startPower(next, player.id, discarded);
   if (!power) return moveToNextPlayer(next, turn, now, true);
 
-  return {
+  return logMatch({
     ...next,
     turn: { ...turn, drawnCard: null, power, deadline: now + POWER_DURATION_MS },
-  };
+  }, now, { kind: "power", playerId: player.id, power: power.kind, stage: "start" });
 }
 
 function replaceCard(state: GameState, player: GamePlayer, turn: Turn, position: unknown, now: number) {
@@ -144,10 +151,11 @@ function replaceCard(state: GameState, player: GamePlayer, turn: Turn, position:
 
   const cards = player.cards.slice();
   cards[position] = turn.drawnCard;
-  return finishDiscard({
+  const next = logMatch({
     ...state,
     players: state.players.map((entry) => entry === player ? changeHand(entry, cards) : entry),
-  }, player, turn, discarded, now, player.isBot ? getHandLayout(player.cards.length, player.handLayout).slots[position] : undefined);
+  }, now, { kind: "replace", playerId: player.id, added: journalCard(turn.drawnCard), removed: journalCard(discarded) });
+  return finishDiscard(next, player, turn, discarded, now, player.isBot ? getHandLayout(player.cards.length, player.handLayout).slots[position] : undefined);
 }
 
 export function playTurn(
@@ -185,7 +193,7 @@ export function playTurn(
   switch (action.kind) {
     case "draw":
       if (!("source" in action)) return state;
-      return action.source === "deck" ? draw(state, turn) : state;
+      return action.source === "deck" ? draw(state, turn, player.id, now) : state;
     case "replace":
       return "position" in action && "handVersion" in action && action.handVersion === player.handVersion
         ? replaceCard(state, player, turn, action.position, now)
@@ -214,8 +222,8 @@ export function expireTurn(state: GameState, turnNumber: number, now: number): G
 }
 
 function skipTurn(state: GameState, turn: Turn, now: number): GameState {
-  const next = turn.drawnCard
-    ? presentDiscard(state, [...state.discardPile, turn.drawnCard], now)
+  const next = turn.drawnCard && state.currentPlayerId
+    ? recordDiscard(state, state.currentPlayerId, turn.drawnCard, now)
     : state;
   return moveToNextPlayer(next, turn, now, !!(turn.drawnCard || turn.power));
 }

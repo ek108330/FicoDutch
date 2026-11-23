@@ -4,6 +4,7 @@ import type { GameState, ReactionNotice } from "./gameTypes";
 import { appendCard, finishRound, recordCardMove, removeCard } from "./hands.ts";
 import { getHandLayout } from "./handLayout.ts";
 import { isPowerTargetLocked, updatePowerAfterReaction } from "./powers.ts";
+import { journalCard, logMatch } from "./matchJournal.ts";
 
 export type ReactionAction = {
   kind: "reaction";
@@ -66,24 +67,30 @@ export function reactToDiscard(
     const drawn = takeFromPile(state.drawPile, state.discardPile);
     const notice: ReactionNotice = { playerId, outcome: drawn ? "penalty" : "empty-pile" };
     const reaction = { ...state.reaction, notice };
-    if (!drawn) return { ...state, reaction };
+    const attempted = logMatch({ ...state, reaction }, now, {
+      kind: "incorrect", playerId, card: journalCard(card), reference: state.reaction.reference,
+    });
+    if (!drawn) return attempted;
 
     const { card: penalty, ...piles } = drawn;
-    return {
-      ...state, ...piles, reaction,
+    return logMatch({
+      ...attempted, ...piles,
       cardMotion: recordCardMove(state, { kind: "penalty", target: { playerId, position: player.cards.length } }, now),
       players: state.players.map((entry) => entry === player ? appendCard(entry, penalty) : entry),
-    };
+    }, now, { kind: "penalty", playerId, card: journalCard(penalty) });
   }
 
   const slot = getHandLayout(player.cards.length, player.handLayout).slots[position];
   const remaining = removeCard(player, position);
-  const next = presentDiscard({
+  const next = logMatch(presentDiscard({
     ...state,
     cardMotion: recordCardMove(state, { kind: "reaction", playerId, slot, face: getCardFace(card) }, now),
     players: state.players.map((entry) => entry === player ? remaining : entry),
     turn: state.turn ? { ...state.turn, power: updatePowerAfterReaction(state.turn.power, card.id) } : null,
-  }, [...state.discardPile, card], now, { playerId, outcome: "played" });
+  }, [...state.discardPile, card], now, { playerId, outcome: "played" }), now, {
+    kind: "reaction", playerId, card: journalCard(card),
+    reference: state.reaction.reference, openedAt: state.reaction.presentedAt,
+  });
 
   return remaining.cards.length ? next : finishRound(next, now, playerId);
 }

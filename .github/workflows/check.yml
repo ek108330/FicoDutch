@@ -32,6 +32,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: client
       - run: npm --prefix client run test:e2e
+      - run: npm --prefix client run test:e2e:accounts
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GAME_CONFIG, hubStatusLabels } from "./config/gameConfig";
-import { Plus, Settings } from "lucide-react";
+import { ChartNoAxesColumn, Plus, Settings } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
@@ -17,13 +17,26 @@ import HubLobby from "./ui/HubLobby";
 import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
+import AccountScreen from "./ui/AccountScreen";
+import { MatchArchive, PublicProfile, RecentMatches } from "./ui/MatchArchive";
+import { matchPath, profilePath, readAccount, readMatch, type AccountSession } from "./network/accountApi";
+import { logDeal, logMatch } from "./game/matchJournal";
+import { matchStatistics } from "./game/matchStatistics";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
 type HostRound = { hubId: string; gameNumber: number; state: GameState };
 
 function prepareGame(hub: Hub) {
-  return createRound(hub.players.map(({ id, pseudo, isBot }) => ({ id, pseudo, isBot, totalScore: 0 })),
+  const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
     hub.variants, hub.endThreshold);
+  return hub.players.some(({ accountId }) => accountId)
+    ? logDeal({ ...state, matchId: `${hub.id}:${hub.gameNumber}` }, performance.now()) : state;
+}
+
+function routeId(path: string, prefix: string) {
+  if (!path.startsWith(prefix)) return undefined;
+  try { return decodeURIComponent(path.slice(prefix.length)); }
+  catch { return undefined; }
 }
 
 function App() {
@@ -38,16 +51,55 @@ function App() {
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [hostRound, setHostRound] = useState<HostRound | null>(null);
   const [restarting, setRestarting] = useState(false);
+  const [accountSession, setAccountSession] = useState<AccountSession>();
+  const [path, setPath] = useState(() => window.location.pathname);
+  const pathRef = useRef(path);
+  const sealed = useRef<string>(null);
+  const shownMatch = useRef<string>(null);
   const hubRef = useRef<CurrentHub | null>(null);
   const sessionRef = useRef(session);
   const readyRef = useRef(false);
   const hostRoundRef = useRef<HostRound | null>(null);
   const pausedAt = useRef<number | null>(null);
   const playerId = session?.playerId;
+  const account = accountSession?.account ?? null;
   const peers = useHubPeers(currentHub, playerId, networkReady);
   const awaitingPeers = !!currentHub && !currentHub.gameStarted &&
     currentHub.players.some(({ id, isBot }) => !isBot && id !== currentHub.hostId && (playerId === currentHub.hostId
       ? !peers.connectedPeers.includes(id) : !peers.hostConnected));
+
+  const navigate = useCallback((destination: string) => {
+    if (destination === pathRef.current) return;
+    window.history.pushState(null, "", destination);
+    pathRef.current = destination;
+    setPath(destination);
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const onHistory = () => {
+      pathRef.current = window.location.pathname;
+      setPath(pathRef.current);
+    };
+    const load = () => void readAccount(controller.signal).then(setAccountSession, () => {
+      if (!controller.signal.aborted) setSessionNotice("Impossible de vérifier la connexion au compte. Réessaie.");
+    });
+    load();
+    window.addEventListener("online", load);
+    window.addEventListener("popstate", onHistory);
+    return () => {
+      controller.abort();
+      window.removeEventListener("online", load);
+      window.removeEventListener("popstate", onHistory);
+    };
+  }, []);
+
+  function changeAccount(next: AccountSession) {
+    setAccountSession(next);
+    setNetworkReady(false);
+    socket.disconnect().connect();
+  }
 
   const storeHostRound = useCallback((round: HostRound | null) => {
     hostRoundRef.current = round;
@@ -71,6 +123,7 @@ function App() {
   }, []);
 
   const clearTable = useCallback(() => {
+    sealed.current = null;
     storeHub(null);
     storeSession(null);
     storeHostRound(null);
@@ -81,7 +134,7 @@ function App() {
     const current = hostRoundRef.current;
     const hub = hubRef.current;
     if (current?.hubId !== hubId || hub?.id !== hubId || current.gameNumber !== hub.gameNumber || !readyRef.current ||
-        pausedAt.current !== null || !socket.connected) return;
+        pausedAt.current !== null || !socket.connected || sealed.current === current.state.matchId) return;
     const state = update(current.state, hub.players);
     if (state !== current.state) storeHostRound({ ...current, state });
   }, [storeHostRound]);
@@ -127,11 +180,16 @@ function App() {
     }
 
     function acceptMembership({ hub, session }: HubMembership, serverTime: number) {
-      storeSession(session);
+      const match = hub.gameStarted && hub.players.some(({ accountId }) => accountId) ? `${hub.id}:${hub.gameNumber}` : undefined;
+      storeSession({ ...session, matchId: match });
       storeReady(true);
       setSessionNotice(null);
       setPreviewHubId(null);
       applyHub(hub, serverTime);
+      if (match && hub.gameFinished && shownMatch.current !== match && pathRef.current === "/") {
+        shownMatch.current = match;
+        navigate(matchPath(match));
+      }
     }
 
     function onConnect() {
@@ -158,6 +216,12 @@ function App() {
             const hostWithoutRound = saved.isHost && !hostRoundRef.current;
             clearTable();
             storeReady(true);
+            const match = saved.matchId;
+            if (match) {
+              void readMatch(match).then(() => {
+                if (!sessionRef.current && pathRef.current === "/") navigate(matchPath(match));
+              }, () => {});
+            }
             setSessionNotice(hostWithoutRound
               ? "Pour reprendre une partie en tant qu’hôte, garde son onglet d’origine ouvert."
               : "La reprise de ce Hub n’est plus disponible.");
@@ -181,6 +245,10 @@ function App() {
         return;
       }
       applyHub(update, serverTime);
+      if (update.gameStarted && sessionRef.current && update.players.some(({ accountId }) => accountId)) {
+        const id = `${update.id}:${update.gameNumber}`;
+        if (sessionRef.current.matchId !== id) storeSession({ ...sessionRef.current, matchId: id });
+      }
     }
 
     function onDisconnect() {
@@ -194,12 +262,24 @@ function App() {
       alert(message);
     }
 
-    function onHubEnded({ hubId, reason }: HubEnd) {
+    function onHubEnded({ hubId, reason, matchId }: HubEnd) {
       if (sessionRef.current?.hubId !== hubId) return;
       clearTable();
+      if (matchId) {
+        shownMatch.current = matchId;
+        navigate(matchPath(matchId));
+        setSessionNotice(null);
+        return;
+      }
       setSessionNotice(reason === "removed"
         ? "L’hôte t’a retiré de la table."
         : "L’hôte a interrompu la partie.");
+    }
+
+    function onMatchReady({ id, hubId }: { id: string; hubId: string }) {
+      if (sessionRef.current?.hubId !== hubId || shownMatch.current === id) return;
+      shownMatch.current = id;
+      navigate(matchPath(id));
     }
 
     socket.on("connect", onConnect);
@@ -207,6 +287,7 @@ function App() {
     socket.on("hubs:update", onHubs);
     socket.on("hub:error", onHubError);
     socket.on("hub:ended", onHubEnded);
+    socket.on("match:ready", onMatchReady);
     socket.on("hub:created", acceptMembership);
     socket.on("hub:joined", acceptMembership);
     window.addEventListener("online", connectToServer);
@@ -220,6 +301,7 @@ function App() {
       socket.off("hubs:update", onHubs);
       socket.off("hub:error", onHubError);
       socket.off("hub:ended", onHubEnded);
+      socket.off("match:ready", onMatchReady);
       socket.off("hub:created", acceptMembership);
       socket.off("hub:joined", acceptMembership);
       window.removeEventListener("online", connectToServer);
@@ -227,7 +309,7 @@ function App() {
       window.clearTimeout(resumeRetry);
       disconnectFromServer();
     };
-  }, [clearTable, storeHostRound, storeHub, storeReady, storeSession]);
+  }, [clearTable, navigate, storeHostRound, storeHub, storeReady, storeSession]);
 
   useEffect(() => {
     if (!networkReady || !currentHub?.hostPause || currentHub.hostId !== playerId ||
@@ -237,12 +319,58 @@ function App() {
     if (others.every(({ id }) => peers.connectedPeers.includes(id))) socket.emit("hub:host-ready");
   }, [currentHub, networkReady, peers.connectedPeers, playerId]);
 
+  const publishMatch = useCallback((status: "finished" | "interrupted") => {
+    const hub = hubRef.current;
+    const round = hostRoundRef.current;
+    const state = round?.state;
+    const id = state?.matchId;
+    if (!hub || !round || !state || !id || round.hubId !== hub.id || round.gameNumber !== hub.gameNumber ||
+        !readyRef.current || !socket.connected || sealed.current === id) return;
+    sealed.current = id;
+    const journal = logMatch(state, performance.now(), { kind: "match-end", status }).journal;
+    socket.timeout(8_000).emit(status === "finished" ? "hub:finish" : "hub:interrupt", {
+      hubId: hub.id, gameNumber: hub.gameNumber, report: matchStatistics(journal, status),
+    }, (error: Error | null, accepted?: boolean) => {
+      if (sealed.current === id) sealed.current = null;
+      if (status === "interrupted" && (error || !accepted) && hubRef.current?.id === hub.id) {
+        window.alert("Le bilan n’a pas pu être enregistré. Réessaie d’interrompre la partie.");
+      }
+    });
+  }, []);
+
   useEffect(() => {
-    if (networkReady && currentHub && !currentHub.gameFinished && hostRound?.hubId === currentHub.id &&
-        hostRound.gameNumber === currentHub.gameNumber && hostRound.state.result?.gameWinnerIds.length) {
+    if (!networkReady || !currentHub || currentHub.gameFinished || hostRound?.hubId !== currentHub.id ||
+        hostRound.gameNumber !== currentHub.gameNumber || !hostRound.state.result?.gameWinnerIds.length) return;
+    if (!hostRound.state.journal) {
       socket.emit("hub:finish", currentHub.gameNumber);
+      return;
     }
-  }, [currentHub, hostRound, networkReady]);
+    publishMatch("finished");
+    const retry = window.setInterval(() => publishMatch("finished"), 5_000);
+    return () => window.clearInterval(retry);
+  }, [currentHub, hostRound, networkReady, publishMatch]);
+
+  const trackedGame = hostRound?.state.matchId;
+  const checkpointActive = networkReady && !!currentHub?.gameStarted && !currentHub.gameFinished;
+  useEffect(() => {
+    if (!trackedGame || !checkpointActive) return;
+    let sentSequence = 0;
+    function checkpoint() {
+      const round = hostRoundRef.current;
+      const journal = round?.state.journal;
+      if (!round || round.state.matchId !== trackedGame || !journal || sentSequence >= journal.entry.sequence ||
+          sealed.current === trackedGame || !socket.connected) return;
+      const sequence = journal.entry.sequence;
+      socket.timeout(6_000).emit("hub:checkpoint", {
+        hubId: round.hubId, gameNumber: round.gameNumber, sequence, report: matchStatistics(journal, "interrupted", true),
+      }, (error: Error | null, accepted?: boolean) => {
+        if (!error && accepted) sentSequence = Math.max(sentSequence, sequence);
+      });
+    }
+    checkpoint();
+    const interval = window.setInterval(checkpoint, 20_000);
+    return () => window.clearInterval(interval);
+  }, [trackedGame, checkpointActive]);
 
   function savePseudo(value: string) {
     setPseudo(value);
@@ -250,7 +378,7 @@ function App() {
   }
 
   function createHub() {
-    const cleanPseudo = pseudo.trim();
+    const cleanPseudo = (account?.name ?? pseudo).trim();
 
     if (cleanPseudo.length < GAME_CONFIG.player.pseudoMinLength) {
       alert("Ton pseudo doit contenir au moins 2 caractères.");
@@ -271,7 +399,7 @@ function App() {
   }
 
   function joinHub(hubId: string) {
-    const cleanPseudo = pseudo.trim();
+    const cleanPseudo = (account?.name ?? pseudo).trim();
 
     if (cleanPseudo.length < GAME_CONFIG.player.pseudoMinLength) {
       alert("Ton pseudo doit contenir au moins 2 caractères.");
@@ -327,7 +455,7 @@ function App() {
   }
 
   const interrupt = currentHub?.gameStarted && networkReady && currentHub.hostId === playerId
-    ? () => socket.emit("hub:interrupt", { hubId: currentHub.id }) : undefined;
+    ? () => hostRound?.state.journal ? publishMatch("interrupted") : socket.emit("hub:interrupt", { hubId: currentHub.id }) : undefined;
   const management = currentHub && networkReady && currentHub.hostId === playerId && !currentHub.gameFinished &&
     !hostRound?.state.result?.gameWinnerIds.length ? {
     members: currentHub.players,
@@ -336,7 +464,8 @@ function App() {
   } : undefined;
 
   function canJoinHub(hub: Hub) {
-    return networkReady && !!pseudo.trim() && (hub.status === "waiting" || hub.status === "in-progress");
+    return networkReady && (accountSession?.enabled ? !!account : !!pseudo.trim()) &&
+      (hub.status === "waiting" || hub.status === "in-progress");
   }
 
   const settings = (
@@ -347,6 +476,18 @@ function App() {
   );
 
   function renderScreen() {
+    const match = routeId(path, "/parties/");
+    const profile = routeId(path, "/joueurs/");
+    const archiveProps = {
+      navigate, backToTable: !!currentHub,
+      ...(currentHub?.gameFinished && { leaveTable: () => { leaveHub(); navigate("/"); } }),
+    };
+    if (profile) return <PublicProfile key={profile} id={profile} {...archiveProps} />;
+    if (path === "/compte" || (accountSession?.enabled && !account && (match || path === "/mes-parties"))) {
+      return <AccountScreen account={account} onChange={changeAccount} navigate={navigate} />;
+    }
+    if (match && accountSession) return <MatchArchive key={match} id={match} {...archiveProps} />;
+    if (path === "/mes-parties" && accountSession) return <RecentMatches {...archiveProps} />;
     if (currentHub?.gameStarted) {
       const { memorizationDeadline } = currentHub;
       if (memorizationDeadline === undefined) {
@@ -375,6 +516,11 @@ function App() {
           onInterrupt={interrupt}
           restarting={restarting}
           settings={settings}
+          archiveControl={currentHub.gameFinished && account && <a className="settings-trigger" aria-label="Statistiques de la partie"
+            href={matchPath(`${currentHub.id}:${currentHub.gameNumber}`)} onClick={(event) => {
+              event.preventDefault();
+              navigate(matchPath(`${currentHub.id}:${currentHub.gameNumber}`));
+            }}><ChartNoAxesColumn size={19} aria-hidden="true" /></a>}
           playSound={playSound}
           clockVersion={currentHub.clockVersion}
           pause={currentHub.hostPause
@@ -414,10 +560,19 @@ function App() {
                 createHub();
               }}>
                 {sessionNotice && <p className="home-notice" role="status">{sessionNotice}</p>}
-                <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
+                {accountSession?.enabled ? <div className="account-links">
+                  {account ? <>
+                    <strong>{account.name}</strong>
+                    <a href={profilePath(account.id)} onClick={(event) => { event.preventDefault(); navigate(profilePath(account.id)); }}>Mon profil</a>
+                    <a href="/mes-parties" onClick={(event) => { event.preventDefault(); navigate("/mes-parties"); }}>Mes parties</a>
+                    <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Mon compte</a>
+                  </> : <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Se connecter ou créer un compte</a>}
+                </div> : accountSession?.enabled === false ? <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
                   value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
-                  onChange={(event) => savePseudo(event.target.value)} />
-                <button className="primary-button" type="submit">
+                  onChange={(event) => savePseudo(event.target.value)} /> : <button type="button" onClick={() => {
+                    void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
+                  }}>Vérifier la connexion</button>}
+                <button className="primary-button" type="submit" disabled={!accountSession || (accountSession.enabled && !account)}>
                   <Plus size={19} aria-hidden="true" /> Créer un Hub
                 </button>
               </form>

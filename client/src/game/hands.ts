@@ -2,6 +2,7 @@ import { GAME_CONFIG } from "../config/gameConfig.ts";
 import { getCardFace, getCardValue, type Card } from "./cards.ts";
 import type { GamePlayer, GameState, PublicCardMove } from "./gameTypes";
 import { addHandSlot, getHandLayout } from "./handLayout.ts";
+import { logMatch } from "./matchJournal.ts";
 
 export function changeHand(player: GamePlayer, cards: Card[]): GamePlayer {
   return { ...player, cards, handVersion: player.handVersion + 1 };
@@ -77,7 +78,7 @@ export function finishRound(state: GameState, now: number, emptyHandPlayerId: st
   const lowestTotal = Math.min(...players.map(({ totalScore }) => totalScore));
   const gameWinnerIds = gameEnded ? players.filter(({ totalScore }) => totalScore === lowestTotal).map(({ id }) => id) : [];
 
-  return {
+  const next: GameState = {
     ...state,
     phase: "results",
     cardMotion: state.cardMotion?.at === now ? state.cardMotion : undefined,
@@ -94,6 +95,11 @@ export function finishRound(state: GameState, now: number, emptyHandPlayerId: st
       nextVariants: { ...state.variants },
     },
   };
+  return logMatch(next, now, {
+    kind: "round-result", announcer: dutchAnnouncerId, dutchPenalty, winners: winnerIds,
+    scores: players.map(({ id, roundScore, totalScore, hasLeft }, index) =>
+      ({ id, score: roundScore, base: baseScores[index].points, total: totalScore, left: hasLeft })),
+  });
 }
 
 export function getRoundResultView(state: GameState) {

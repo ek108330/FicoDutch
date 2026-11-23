@@ -4,6 +4,7 @@ export type HubStatus = "waiting" | "in-progress" | "full" | "finished";
 
 export type HubPlayer = {
   id: string;
+  accountId?: string;
   pseudo: string;
   isHost: boolean;
   isBot?: true;
@@ -42,9 +43,9 @@ export type CreateHubRequest = {
   pseudo: string;
 };
 
-export type HubSession = { hubId: string; playerId: string; token: string; isHost: boolean };
+export type HubSession = { hubId: string; playerId: string; token: string; isHost: boolean; matchId?: string };
 export type HubMembership = { hub: Hub; session: HubSession };
-export type HubEnd = { hubId: string; reason: "removed" | "interrupted" };
+export type HubEnd = { hubId: string; reason: "removed" | "interrupted"; matchId?: string };
 export type HubEmoji = keyof typeof hubSocial.emojis;
 export type LobbyChatContent = { kind: "text"; text: string } | { kind: "emoji"; emoji: HubEmoji };
 export type LobbyChatMessage = LobbyChatContent & { id: string; hubId: string; playerId: string; pseudo: string };

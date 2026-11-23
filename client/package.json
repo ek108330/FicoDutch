@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test:unit": "node --test test/*.test.ts ../server/hubManager.test.js",
+    "test:unit": "node --test test/*.test.ts ../server/*.test.js",
     "test:e2e": "playwright test",
+    "test:e2e:accounts": "playwright test --config playwright.accounts.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {

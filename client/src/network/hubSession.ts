@@ -7,8 +7,8 @@ export function readHubSession(): HubSession | null {
     const value = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null");
     if (value && typeof value.hubId === "string" && typeof value.playerId === "string" &&
         typeof value.token === "string" && typeof value.isHost === "boolean") {
-      const { hubId, playerId, token, isHost } = value;
-      return { hubId, playerId, token, isHost };
+      const { hubId, playerId, token, isHost, matchId } = value;
+      return { hubId, playerId, token, isHost, ...(typeof matchId === "string" && { matchId }) };
     }
   } catch {
     // La partie peut continuer dans l'onglet même si le stockage est indisponible.

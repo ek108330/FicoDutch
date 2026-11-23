@@ -22,7 +22,26 @@ Les tests unitaires couvrent la distribution, la mémorisation, le tour normal, 
 
 Les captures d’écran se trouvent dans `client/test-results/` après chaque exécution. Les scénarios capturent la table sur ordinateur et sur mobile, en portrait et en paysage. Ils vérifient la fin du tour et du pouvoir avec leur délai réel de 60 secondes.
 
-Le workflow GitHub Actions exécute les mêmes vérifications sur les pull requests et les envois sur `main`, avec Chromium sous Linux. Les captures et les traces Playwright sont jointes à l’exécution en cas d’échec.
+Le scénario des comptes, des profils et des bilans utilise une base PostgreSQL embarquée isolée. Lancez `npm.cmd --prefix client run test:e2e:accounts` pour le rejouer. Le workflow GitHub Actions exécute les deux suites de navigateur avec Chromium sous Linux.
+
+## Comptes et bilans
+
+Renseignez `DATABASE_URL` dans les variables d’environnement du service Render avec l’URL de sa base PostgreSQL durable. FicoDutch crée son schéma au démarrage. Les comptes, profils et bilans survivent au redéploiement. Les Hubs en cours restent liés au processus du serveur. Gardez la chaîne de connexion dans les secrets Render.
+
+Pour essayer la persistance sur un poste de développement après installation des dépendances, compilez le client et démarrez le serveur avec une base locale. Le dossier `server/.ficodutch-db/` créé par le serveur est ignoré par Git.
+
+```powershell
+npm.cmd --prefix client run build
+$env:FICODUTCH_LOCAL_DB = ".ficodutch-db"
+$env:SERVE_CLIENT = "1"
+$env:HOST = "127.0.0.1"
+$env:CLIENT_ORIGINS = "http://localhost:3000"
+npm.cmd --prefix server start
+```
+
+Ouvrez ensuite `http://localhost:3000`. Sans configuration de base de données, le jeu conserve l’accès par pseudo.
+
+L’appareil hôte conserve le journal privé et calcule les récompenses. Pendant la partie, il envoie un point de reprise sans données de cartes secrètes au plus une fois toutes les vingt secondes en cas de changement. La clôture enregistre le bilan calculé avant de fermer le Hub. Après une disparition de l’hôte, le bilan récupéré signale les données manquantes. Les bilans sont réservés aux participants connectés. Les profils publics présentent les statistiques et l’historique des confrontations. L’indice compare les participants humains présents du début à la fin d’une partie terminée et repose sur la validation de l’hôte.
 
 ## Préproduction
 
@@ -57,7 +76,7 @@ Les navigateurs tentent d’abord une connexion directe WebRTC. Si elle ne s’�
 
 Un invité retrouve sa place et son état de jeu dans le même onglet après une coupure ou un rechargement. La table continue de jouer et applique le délai normal de chaque tour.
 
-Si l’hôte perd sa connexion, la table se met en pause. L’hôte doit garder son onglet d’origine ouvert pour reprendre. Si la connexion revient dans les deux minutes, le chronomètre de jeu reprend au temps restant. Après deux minutes, le Hub se ferme.
+Si l’hôte perd sa connexion, la table se met en pause. L’hôte doit garder son onglet d’origine ouvert pour reprendre. Si la connexion revient dans les deux minutes, le chronomètre de jeu reprend au temps restant. Après deux minutes, le Hub se ferme et, avec les comptes activés, un bilan partiel est disponible pour les participants.
 
 ## Rejoindre une partie en cours
 
@@ -67,7 +86,7 @@ Si le Hub a une place libre, un nouvel invité peut la réserver et attendre la 
 
 Le bouton **Gérer la table** permet à l’hôte de retirer un invité du Hub. En cours de manche, sa main reste sur la table jusqu’à la prochaine distribution et le jeu passe au joueur suivant si c’était son tour. Le retrait annule la session de l’invité. Il peut rejoindre de nouveau tant que le Hub accepte des joueurs.
 
-En cours de partie, l’hôte peut aussi confirmer l’interruption. Le Hub ferme et renvoie tous les joueurs à l’accueil.
+En cours de partie, l’hôte peut aussi confirmer l’interruption. Avec les comptes activés, le Hub enregistre le bilan avant de se fermer et l’affiche aux participants. En mode pseudo, les joueurs reviennent à l’accueil.
 
 ## Chat et emojis
 

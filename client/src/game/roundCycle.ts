@@ -4,8 +4,9 @@ import type { GameState, GamePlayer } from "./gameTypes";
 import type { GameVariants } from "./variants";
 import type { HubPlayer } from "../../../shared/hubTypes";
 import { rankPlayers } from "./hands.ts";
+import { logDeal } from "./matchJournal.ts";
 
-type RoundMember = Pick<HubPlayer, "id" | "pseudo" | "connected">;
+type RoundMember = Pick<HubPlayer, "id" | "pseudo" | "connected" | "accountId">;
 
 export function toggleNextVariant(state: GameState, roundNumber: number, key: keyof GameVariants): GameState {
   const { result } = state;
@@ -45,13 +46,13 @@ export function startNextRound(
   const previousIds = new Set(state.players.map(({ id }) => id));
   const startingScore = Math.max(...state.players.map(({ totalScore }) => totalScore));
   const arrivals = members.filter(({ id, connected }) => connected && !previousIds.has(id))
-    .map(({ id, pseudo }) => ({ id, pseudo, totalScore: startingScore, scoreHistory: [startingScore] }));
+    .map(({ id, pseudo, accountId }) => ({ id, pseudo, accountId, totalScore: startingScore, scoreHistory: [startingScore] }));
   const participants = [...players, ...arrivals];
   const onlineIds = new Set(members.filter(({ connected }) => connected).map(({ id }) => id));
   if (participants.filter(({ id }) => onlineIds.has(id)).length < GAME_CONFIG.players.min) return state;
   const next = createRound(participants, result.nextVariants, state.endThreshold, roundNumber + 1);
   return {
-    ...next,
+    ...(state.journal ? logDeal({ ...next, matchId: state.matchId, journal: state.journal }, now) : next),
     phase: "dealing",
     phaseDeadline: now + GAME_CONFIG.round.dealingMs,
     openingPlayerId: chooseOpeningPlayer(players, result.winnerIds, random),

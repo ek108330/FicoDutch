@@ -1,6 +1,7 @@
 import { getCardFace, type Card, type CardFace, type CardRank } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
 import { appendCard, changeHand, recordCardMove } from "./hands.ts";
+import { journalCard, logMatch } from "./matchJournal.ts";
 import type { CardTarget, GameState, Power, PowerKind, SelectedCard, Turn } from "./gameTypes";
 
 export const POWER_DURATION_MS = 60_000;
@@ -96,12 +97,13 @@ function resolveCard(state: GameState, selected: SelectedCard) {
     : null;
 }
 
-function swapCards(state: GameState, first: SelectedCard, second: SelectedCard, now: number): GameState | null {
+function swapCards(state: GameState, playerId: string, power: "blind-swap" | "look-and-swap",
+  first: SelectedCard, second: SelectedCard, now: number): GameState | null {
   const a = resolveCard(state, first);
   const b = resolveCard(state, second);
   if (!a || !b) return null;
 
-  return {
+  return logMatch({
     ...state,
     cardMotion: recordCardMove(state, { kind: "swap", targets: [a.target, b.target] }, now),
     players: state.players.map((player) => {
@@ -111,12 +113,15 @@ function swapCards(state: GameState, first: SelectedCard, second: SelectedCard, 
       if (player.id === second.playerId) cards[b.target.position] = a.card;
       return changeHand(player, cards);
     }),
-  };
+  }, now, { kind: "swap", playerId, cards: [
+    { playerId: first.playerId, card: journalCard(a.card) },
+    { playerId: second.playerId, card: journalCard(b.card) },
+  ] }, { kind: "power", playerId, power, stage: "execute" });
 }
 
 export function resolveBlindSwap(state: GameState, power: Power | null, now: number): GameState | null {
-  if (power?.kind !== "blind-swap" || !power.pendingSwap || power.selected.length !== 2) return null;
-  return swapCards(state, power.selected[0], power.selected[1], now);
+  if (power?.kind !== "blind-swap" || !power.pendingSwap || power.selected.length !== 2 || !state.currentPlayerId) return null;
+  return swapCards(state, state.currentPlayerId, power.kind, power.selected[0], power.selected[1], now);
 }
 
 function giveCard(state: GameState, actorId: string, recipient: unknown, now: number): GameState | null {
@@ -126,14 +131,15 @@ function giveCard(state: GameState, actorId: string, recipient: unknown, now: nu
   if (!drawn) return null;
 
   const { card, ...piles } = drawn;
-  return {
+  return logMatch({
     ...state,
     ...piles,
     cardMotion: recordCardMove(state, { kind: "gift", target: { playerId: target.id, position: target.cards.length } }, now),
     players: state.players.map((player) => player.id === target.id
       ? appendCard(player, card)
       : player),
-  };
+  }, now, { kind: "gift", playerId: actorId, recipient: target.id, card: journalCard(card) },
+  { kind: "power", playerId: actorId, power: "give-card", stage: "execute" });
 }
 
 export function applyPowerAction(
@@ -158,7 +164,7 @@ export function applyPowerAction(
     if (power.selected.some(({ playerId }) => playerId === state.dutch?.announcerId && playerId !== actorId)) {
       return null;
     }
-    const next = swapCards(state, power.selected[0], power.selected[1], now);
+    const next = swapCards(state, actorId, power.kind, power.selected[0], power.selected[1], now);
     return next && { state: next, complete: true };
   }
 
@@ -175,7 +181,17 @@ export function applyPowerAction(
   const pendingSwap = power.kind === "blind-swap" && selected.length === 2 ? true : undefined;
   const deadline = pendingSwap ? now + BLIND_SWAP_PREVIEW_MS
     : isLookPower(power.kind) ? Math.min(turn.deadline, now + LOOK_DURATION_MS) : turn.deadline;
-  return { state: { ...state, turn: { ...turn, deadline, power: { ...power, selected, pendingSwap } } }, complete: false };
+  const next: GameState = { ...state, turn: { ...turn, deadline, power: { ...power, selected, pendingSwap } } };
+  if (power.kind === "blind-swap" || selected.length !== powerCardCount(power.kind)) return { state: next, complete: false };
+  const cards = selected.flatMap((entry) => {
+    const resolved = resolveCard(state, entry);
+    return resolved ? [{ playerId: entry.playerId, card: journalCard(resolved.card) }] : [];
+  });
+  const looked = logMatch(next, now, { kind: "look", playerId: actorId, cards });
+  return {
+    state: isLookPower(power.kind) ? logMatch(looked, now, { kind: "power", playerId: actorId, power: power.kind, stage: "execute" }) : looked,
+    complete: false,
+  };
 }
 
 export function isPowerTargetLocked(power: Power | null, cardId: string, protectedId?: string) {

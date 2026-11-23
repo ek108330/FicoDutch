@@ -1,5 +1,6 @@
 import { getCardFace, type CardFace } from "./cards.ts";
 import type { GameState } from "./gameTypes";
+import { journalCard, logMatch } from "./matchJournal.ts";
 
 export type MemorizedCard = {
   position: number;
@@ -32,11 +33,11 @@ export function memorizeCard(
   const chosen = player.memorizedPositions ?? [];
   if (chosen.includes(position) || chosen.length >= memorizationLimit(round.variants.sixCards)) return round;
 
-  return {
+  return logMatch({
     ...round,
     players: round.players.map((entry) => entry === player
       ? { ...player, memorizedPositions: [...chosen, position] } : entry),
-  };
+  }, now, { kind: "look", playerId, cards: [{ playerId, card: journalCard(player.cards[position]) }] });
 }
 
 export function getMemorizedCards(round: GameState, playerId: string): MemorizedCard[] {

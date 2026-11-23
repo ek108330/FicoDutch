@@ -14,10 +14,10 @@ function findPlayerHub(socketId) {
   return null;
 }
 
-function newPlayer(socketId, pseudo, isHost = false) {
+function newPlayer(socketId, pseudo, isHost = false, accountId) {
   return {
     id: randomUUID(), pseudo, isHost, connected: true, connectionVersion: 1,
-    socketId, token: randomBytes(32).toString("base64url"),
+    socketId, token: randomBytes(32).toString("base64url"), accountId,
   };
 }
 
@@ -30,8 +30,8 @@ function getHubStatus(hub) {
 function getPublicHub(hub) {
   return {
     ...hub,
-    players: hub.players.map(({ id, pseudo, isHost, isBot, connected, connectionVersion }) => ({
-      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }),
+    players: hub.players.map(({ id, pseudo, accountId, isHost, isBot, connected, connectionVersion }) => ({
+      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }), ...(accountId && { accountId }),
     })),
     status: getHubStatus(hub),
   };
@@ -73,9 +73,9 @@ function relayLobbyMessage(socketId, request, now = Date.now()) {
   };
 }
 
-function createHub(socketId, pseudo) {
+function createHub(socketId, pseudo, accountId) {
   if (findPlayerHub(socketId)) return null;
-  const host = newPlayer(socketId, pseudo, true);
+  const host = newPlayer(socketId, pseudo, true, accountId);
   const hub = {
     id: randomUUID(),
     name: `Hub de ${pseudo}`,
@@ -96,13 +96,14 @@ function createHub(socketId, pseudo) {
   return membership(hub, host);
 }
 
-function joinHub(hubId, socketId, pseudo) {
+function joinHub(hubId, socketId, pseudo, accountId) {
   const existing = findPlayerHub(socketId);
   if (existing) return existing.hub.id === hubId ? membership(existing.hub, existing.player) : null;
 
   const hub = hubs.get(hubId);
-  if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers) return null;
-  const player = newPlayer(socketId, pseudo);
+  if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers ||
+      (accountId && hub.players.some((player) => player.accountId === accountId))) return null;
+  const player = newPlayer(socketId, pseudo, false, accountId);
   hub.players.push(player);
   return membership(hub, player);
 }
@@ -189,12 +190,12 @@ function expireHostPause(hubId, pauseUntil, now = Date.now()) {
   return true;
 }
 
-function resumeHub(socketId, request, now = Date.now()) {
+function resumeHub(socketId, request, now = Date.now(), accountId) {
   const { hubId, token, hasHostState } = request ?? {};
   if (typeof hubId !== "string" || typeof token !== "string" || token.length !== 43) return null;
   const hub = hubs.get(hubId);
   const player = hub?.players.find((entry) => entry.token === token);
-  if (!player || (hub.hostPause && now >= hub.hostPause.until) ||
+  if (!player || player.accountId !== accountId || (hub.hostPause && now >= hub.hostPause.until) ||
       (player.isHost && hub.gameStarted && hasHostState !== true)) return null;
 
   const current = findPlayerHub(socketId);
@@ -310,6 +311,8 @@ function resolveEncryptedRelay(socketId, request) {
 }
 
 module.exports = {
+  findPlayerHub, getHub: (id) => hubs.get(id),
+  getActiveMatchIds: () => [...hubs.values()].filter((hub) => hub.gameStarted).map((hub) => `${hub.id}:${hub.gameNumber}`),
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
   finishHubGame, restartHubGame, resolveEncryptedRelay,

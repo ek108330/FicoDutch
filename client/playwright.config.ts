@@ -7,6 +7,7 @@ const FICODUTCH_BUILD_REVISION = "abcdef0123456789abcdef0123456789abcdef01";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/accounts.spec.ts",
   workers: process.env.CI ? 2 : undefined,
   use: {
     baseURL: clientUrl,

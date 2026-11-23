@@ -29,6 +29,7 @@ type RoundScreenProps = {
   onInterrupt?: () => void;
   restarting: boolean;
   settings: ReactNode;
+  archiveControl?: ReactNode;
   playSound: PlayGameSound;
   canLeave: boolean;
   clockVersion: number;
@@ -40,7 +41,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, playSound, canLeave, clockVersion, pause,
+  peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, archiveControl, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const [now, setNow] = useState(() => performance.now());
@@ -170,7 +171,7 @@ export default function RoundScreen({
       <RoundResults
         key={roundNumber}
         result={scene.result}
-        settings={settings}
+        settings={<>{archiveControl}{settings}</>}
         roundNumber={roundNumber}
         remaining={turn.remaining}
         isHost={playerId === hostId}

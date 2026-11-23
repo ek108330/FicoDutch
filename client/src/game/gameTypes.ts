@@ -1,6 +1,7 @@
 import type { Card, CardFace } from "./cards";
 import type { HandLayout } from "./handLayout";
 import type { GameVariants } from "./variants";
+import type { MatchJournal } from "./matchJournal";
 
 export type GamePhase =
   | "dealing"
@@ -10,6 +11,7 @@ export type GamePhase =
 
 export type GamePlayer = {
   id: string;
+  accountId?: string;
   pseudo: string;
   isBot?: true;
   botMemory?: BotObservation[];
@@ -55,6 +57,8 @@ export type Turn = {
 };
 
 export type GameState = {
+  matchId?: string;
+  journal?: MatchJournal;
   roundNumber: number;
   phase: GamePhase;
   phaseDeadline: number | null;

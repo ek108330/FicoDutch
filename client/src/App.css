@@ -2974,3 +2974,62 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .table-screen .game-table.is-large-table .table-center { translate: 0 -18px; }
   .table-screen .game-table.is-large-table .position-top { translate: 0 -30px; }
 }
+.archive-screen {
+  width: min(100%, 930px);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: clamp(14px, 4vw, 30px);
+  background: #102f29;
+  color: #f8fff9;
+  text-align: left;
+}
+
+body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidden; }
+.archive-screen :is(h1, h2, h3, p, dl) { margin-block: 0; }
+.archive-screen h1 { color: #fff8e7; font-size: clamp(1.5rem, 6vw, 2.15rem); line-height: 1.15; }
+.archive-screen h2 { margin-block: 17px 9px; color: #f5d783; font-size: 1.12rem; }
+.archive-screen button, .archive-actions a, .archive-back {
+  min-height: 37px;
+  padding: 7px 11px;
+  border: 1px solid #78aa93;
+  border-radius: 8px;
+  background: #1b4b37;
+  color: #f8fff9;
+  font: inherit;
+}
+.archive-screen a { color: #ffdf91; text-underline-offset: 0.18em; }
+.archive-screen :focus-visible { outline: 2px solid #ffdf91; outline-offset: 3px; }
+.archive-header { display: grid; gap: 12px; margin-bottom: 14px; }
+.archive-actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.archive-actions a, .archive-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.archive-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 13px; font-size: 0.86rem; }
+.archive-meta strong { color: #ffdf91; font-size: 1rem; }
+.archive-screen .archive-note { margin-top: 10px; font-size: 0.9rem; }
+.archive-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 136px), 1fr)); gap: 8px; }
+.archive-card, .account-card { padding: 12px; border: 1px solid #6d9580; border-radius: 11px; background: #153e30; }
+.archive-card h2 { margin-top: 0; }
+.archive-card > svg { color: #f4cf75; }
+.archive-awards h3 { margin: 3px 0; font-size: 0.95rem; }
+.archive-awards p { display: flex; flex-wrap: wrap; column-gap: 7px; margin-top: 3px; font-size: 0.88rem; }
+.archive-muted { color: #b8d3c5; }
+.archive-ranking, .profile-numbers, .archive-screen > .archive-card { margin-top: 11px; }
+.archive-ranking table { width: 100%; border-collapse: collapse; }
+.archive-ranking :is(th, td) { text-align: left; padding: 4px; border-bottom: 1px solid #507260; }
+.archive-ranking :is(th, td):last-child { text-align: right; }
+.archive-interactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.archive-interactions dt, .profile-numbers dt { font-weight: 700; }
+.archive-interactions dd, .profile-numbers dd { margin: 3px 0 0; font-size: 0.9rem; }
+.profile-numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; }
+.profile-numbers dd { color: #ffdf91; font-size: 1.04rem; }
+.archive-list, .archive-rating { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
+.archive-list li, .archive-rating li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.archive-rating { max-height: 230px; overflow: auto; }
+.account-card { width: min(100%, 430px); display: grid; gap: 14px; margin: clamp(10px, 7vh, 55px) auto 0; }
+.account-card h1 { display: flex; align-items: center; gap: 8px; }
+.account-card form, .account-card form label { display: grid; gap: 6px; }
+.account-card form { gap: 13px; }
+.account-card input { width: 100%; min-height: 40px; padding: 7px 10px; border-radius: 7px; border: 1px solid #aacbb5; }
+.archive-screen .archive-primary { background: #f3de9a; color: #24190c; font-weight: 750; }
+.archive-error { color: #ffd4c6; }
+.account-links { display: flex; flex-wrap: wrap; gap: 4px 9px; justify-content: center; align-items: center; font-size: 0.84rem; }
+.home-create .account-links a { color: #f3de9a; }

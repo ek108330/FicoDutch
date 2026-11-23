@@ -2,11 +2,12 @@
 import { io } from "socket.io-client";
 import { buildRevision } from "../config/gameConfig";
 
-const SERVER_URL =
+export const SERVER_URL =
   import.meta.env.VITE_SERVER_URL || (import.meta.env.PROD ? window.location.origin : "http://localhost:3000");
 
 export const socket = io(SERVER_URL, {
   autoConnect: false,
+  withCredentials: true,
   auth: { buildRevision },
   reconnection: true,
   reconnectionAttempts: Infinity,
