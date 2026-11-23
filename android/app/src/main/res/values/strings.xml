@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FicoDutch</string>
+    <string name="loading_game">Chargement de FicoDutch</string>
+    <string name="cannot_open_game">FicoDutch est indisponible</string>
+    <string name="network_error">Vérifie ta connexion Internet, puis réessaie.</string>
+    <string name="server_error">Le serveur du jeu ne répond pas. Réessaie dans un instant.</string>
+    <string name="display_error">Mets à jour Android System WebView ou Chrome, puis réessaie.</string>
+    <string name="retry">Réessayer</string>
+</resources>

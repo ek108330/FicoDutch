@@ -1,6 +1,10 @@
 # FicoDutch
 FicoDutch Card Game
 
+## Android
+
+FicoDutch est disponible en APK installable directement sur Android. [Installation et compilation](android/README.md)
+
 ## Tests locaux
 
 Avec Node.js 24, npm et Microsoft Edge installés, lancez ces commandes depuis la racine du dépôt.
