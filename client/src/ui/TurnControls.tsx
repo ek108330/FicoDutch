@@ -98,7 +98,7 @@ export function TurnPiles({ view, canPlay, act, feedback, onGiftSlide }: TurnCon
   feedback: CardFeedback | null;
   onGiftSlide: () => void;
 }) {
-  const canDraw = canPlay && !view.hasDrawn && !view.power;
+  const canDraw = canPlay && !view.hasDrawn && !view.power && (view.deckCount > 0 || view.discardCount >= 2);
   const canDiscard = canPlay && view.hasDrawn && !view.power;
   const giftPending = view.power?.kind === "give-card";
   const deckBack = view.deckCount > 0 || giftPending;
@@ -106,7 +106,8 @@ export function TurnPiles({ view, canPlay, act, feedback, onGiftSlide }: TurnCon
     <>
       <span>Pioche</span>
       <span className={`pile-card deck-slot${deckBack ? " pile-backed" : ""}`}
-        data-gift-pending={giftPending || undefined} data-stacked={view.deckCount > 1 || undefined}>
+        data-gift-pending={giftPending || undefined} data-stacked={view.deckCount > 1 || undefined}
+        data-turn-draw={canDraw || undefined}>
         {feedback?.pile === "deck" && <span key={feedback.id} className="card-feedback feedback-draw" aria-hidden="true" />}
         {deckBack ? <CardBackMark /> : view.discardCount > 1 ? "À refaire" : "Vide"}
       </span>
@@ -136,7 +137,7 @@ export function TurnPiles({ view, canPlay, act, feedback, onGiftSlide }: TurnCon
         className="pile-slot"
         type="button"
         aria-label="Piocher dans la pioche"
-        disabled={!canDraw || (view.deckCount === 0 && view.discardCount < 2)}
+        disabled={!canDraw}
         onClick={() => act({ kind: "draw", source: "deck" })}
       >
         {deckPile}

@@ -14,7 +14,7 @@ type Activity = {
   haters: Set<string>;
   caused: number;
   bestSwap: number;
-  worstSwap: number;
+  worstSwap?: Award;
   stolen: number;
   blocked: number;
 };
@@ -27,7 +27,7 @@ function newActivity(id: string, name: string, firstRound: number): Activity {
     },
     firstRound, rois: new Set(), reactionPoints: 0, quickest: Infinity, penaltyPoints: 0,
     sent: { count: 0, points: 0 }, received: 0, haters: new Set(), caused: 0,
-    bestSwap: 0, worstSwap: 0, stolen: 0, blocked: 0,
+    bestSwap: 0, stolen: 0, blocked: 0,
   };
 }
 
@@ -136,7 +136,10 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
           const player = lookUp(given.playerId)!;
           const gain = given.card.points - received.card.points;
           player.bestSwap = Math.max(player.bestSwap, gain);
-          player.worstSwap = Math.max(player.worstSwap, -gain);
+          if (-gain > (player.worstSwap?.value ?? 0)) {
+            player.worstSwap = { players: [player.player.id], value: -gain,
+              exchange: { opponentId: canonical(received.playerId), given: given.card.id, received: received.card.id } };
+          }
           collect(given.playerId, received.card);
         }
         break;
@@ -202,7 +205,7 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
   add("rivalite", [...pairs.values()]);
   if (!partial) {
     add("meilleur", individual((entry) => entry.bestSwap));
-    add("pire", individual((entry) => entry.worstSwap));
+    add("pire", players.flatMap(({ worstSwap }) => worstSwap ? [worstSwap] : []));
   }
   add("voleur", individual((entry) => entry.stolen));
   add("bourreau", individual((entry) => entry.blocked));

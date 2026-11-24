@@ -39,6 +39,14 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
   const guest = await browser.newPage({ baseURL, hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   try {
     await guest.addInitScript(() => {
+      const tune = AudioParam.prototype.setValueAtTime;
+      AudioParam.prototype.setValueAtTime = function (value, time) {
+        if (value === 880) {
+          const { dataset } = document.documentElement;
+          dataset.testTurnTones = String(Number(dataset.testTurnTones ?? 0) + 1);
+        }
+        return tune.call(this, value, time);
+      };
       const create = AudioContext.prototype.createOscillator;
       AudioContext.prototype.createOscillator = function () {
         const root = document.documentElement;
@@ -59,6 +67,11 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await host.getByRole("button", { name: "Lancer la partie" }).click();
 
     await expectLocalTurn(guest, 20_000);
+    const deck = guest.locator(".deck-slot");
+    await expect(deck).toHaveCSS("animation-name", "turn-draw-pulse");
+    await expect(host.locator(".deck-slot")).not.toHaveAttribute("data-turn-draw");
+    await expect(guest.locator("html")).toHaveAttribute("data-test-turn-tones", "1");
+    await guest.screenshot({ path: testInfo.outputPath("pioche-tour-actif.png") });
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", /^[1-9]\d*$/);
     await guest.setViewportSize({ width: 390, height: 844 });
     const settingsBox = (await guest.locator(".game-actions .settings-trigger").boundingBox())!;
@@ -69,6 +82,8 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await closeSettings(guest);
     const tones = Number(await guest.locator("html").getAttribute("data-test-tones"));
     await drawDeck(guest).click();
+    await expect(deck).not.toHaveAttribute("data-turn-draw");
+    await expect(guest.locator("html")).toHaveAttribute("data-test-turn-tones", "1");
     await expect(guest.locator(".feedback-draw")).toHaveCount(1);
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", String(tones + 1));
     await openSettings(guest);

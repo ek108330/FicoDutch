@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TurnView } from "../game/turn";
 
 type FeedbackKind = "draw" | "discard" | "power" | "reaction";
-export type GameSound = FeedbackKind | "tap" | "slide" | "flip" | "select" | "swap" | "gift" | "penalty" | "deal" | "emoji" | "dutch";
+export type GameSound = FeedbackKind | "tap" | "slide" | "flip" | "select" | "swap" | "gift" | "penalty" | "deal" | "emoji" | "dutch" | "turn";
 export type PlayGameSound = (sound: GameSound) => void;
 export type CardFeedback = { kind: FeedbackKind; pile: "deck" | "discard"; id: number };
 const soundKey = "ficodutch-game-sound";
@@ -20,6 +20,7 @@ const tones: Record<Exclude<GameSound, "dutch">, readonly [start: number, end: n
   penalty: [260, 115, 0.32, 0.21],
   deal: [550, 300, 0.038, 0.13],
   emoji: [720, 900, 0.12, 0.12],
+  turn: [880, 1175, 0.18, 0.095],
 };
 
 function playTrumpet(context: AudioContext) {

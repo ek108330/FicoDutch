@@ -60,7 +60,8 @@ test("les actions validées établissent les treize statistiques et les égalit�
   assert.equal(awards.victime?.length, 3);
   assert.deepEqual(awards.rivalite, [{ players: ["alice", "bob"], value: 2 }]);
   assert.equal(awards.meilleur?.[0].value, 13);
-  assert.equal(awards.pire?.[0].value, 13);
+  assert.deepEqual(awards.pire?.[0], { players: ["alice"], value: 13,
+    exchange: { opponentId: "bob", given: "clubs-K", received: "hearts-K" } });
   assert.deepEqual(awards.voleur, [{ players: ["bob"], value: 1 }]);
   assert.equal(awards.bourreau?.length, 2);
   assert.equal(report.players.find(({ id }) => id === "bob")?.rank, 1);

@@ -22,6 +22,9 @@ export const signOut = () => request<AccountSession>("/session", { method: "DELE
 export const rename = (name: string) => request<AccountSession>("/account", { method: "PATCH", body: JSON.stringify({ name }) });
 export const saveAvatar = (style: number | null) =>
   request<AccountSession>("/account/avatar", { method: "PATCH", body: JSON.stringify({ style }) });
+export const saveAvatarPhoto = (image: string | null) =>
+  request<AccountSession>("/account/avatar/photo", { method: "PUT", body: JSON.stringify({ image }) });
+export const avatarPhotoUrl = (id: string) => `${SERVER_URL}/api/avatars/${encodeURIComponent(id)}`;
 export function guestMatchToken(id: string) {
   try { return sessionStorage.getItem("ficodutch-match:" + id); }
   catch { return null; }

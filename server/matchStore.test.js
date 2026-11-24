@@ -31,13 +31,16 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
       id: seat, name: "Ignored", rounds: 1, wins: index === 0 ? 1 : 0, scoreSum: 41 + index, bestScore: 41 + index,
       rank: index + 1, total: 41 + index, eligible: true, reactions: 4,
     })),
-    awards: { roisNoirs: [{ players: [players[0].id], value: 1 }] },
+    awards: { roisNoirs: [{ players: [players[0].id], value: 1 }],
+      pire: [{ players: [players[0].id], value: 13,
+        exchange: { opponentId: players[1].id, given: "clubs-K", received: "hearts-K" } }] },
   };
   assert.equal(await store.finish(id, "finished", stats), true);
   assert.equal(await store.finish(id, "interrupted", null), true);
   const read = await store.getMatch(id, players[0].accountId);
   assert.equal(read.status, "finished");
   assert.equal(read.players[0].name, "Alice");
+  assert.deepEqual(read.awards.pire, stats.awards.pire);
   assert.deepEqual(read, await store.getMatch(id, players[1].accountId));
   assert.equal(await store.getMatch(id, randomUUID()), undefined);
   let profile = await store.getProfile(players[0].accountId);

@@ -77,7 +77,11 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(page.getByText("Partie interrompue", { exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByText("Partie interrompue", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "La cible dans le dos" })).toBeVisible();
+    await expect(page.getByText("Meilleur échange", { exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath("bilan-invite.png") });
+    await page.getByRole("button", { name: "Revenir à l’accueil", exact: true }).click();
+    await expect(pseudo(page)).toBeVisible();
   } finally { await guest.close(); }
 });
 
@@ -110,6 +114,36 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await host.reload();
     await expect(host.getByLabel("Icône du profil")).toHaveValue("6");
     await host.screenshot({ path: testInfo.outputPath("icone-compte.png") });
+    const picture = await host.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 400;
+      canvas.height = 240;
+      const context = canvas.getContext("2d")!;
+      context.fillStyle = "#256777";
+      context.fillRect(0, 0, 400, 240);
+      context.fillStyle = "#f5d783";
+      context.fillRect(143, 66, 114, 108);
+      return canvas.toDataURL("image/png").split(",")[1];
+    });
+    await host.getByLabel("Photo de profil").setInputFiles({
+      name: "avatar-de-test.png", mimeType: "image/png", buffer: Buffer.from(picture, "base64"),
+    });
+    await host.getByRole("button", { name: "Enregistrer la photo" }).click();
+    await expect(host.getByRole("status")).toHaveText("Photo enregistrée.");
+    await host.reload();
+    const photo = host.locator(".account-avatar-form .player-avatar img");
+    await expect(photo).toHaveJSProperty("naturalWidth", 128);
+    await expect(photo).toHaveJSProperty("naturalHeight", 128);
+    const alpha = await photo.evaluate(async (image: HTMLImageElement) => {
+      const bitmap = await createImageBitmap(await (await fetch(image.src)).blob());
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 128;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(bitmap, 0, 0);
+      return [context.getImageData(0, 0, 1, 1).data[3], context.getImageData(64, 64, 1, 1).data[3]];
+    });
+    expect(alpha).toEqual([0, 255]);
+    await host.screenshot({ path: testInfo.outputPath("photo-circulaire.png"), fullPage: true });
     await host.getByRole("link", { name: "Accueil", exact: true }).click();
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     await join(guest, "AliceCompte");
@@ -126,9 +160,9 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expect(guest.getByRole("button", { name: "6 cartes", exact: true })).toHaveAttribute("aria-pressed", "true");
     await game(host).click();
     await expect(guest.locator(".position-top .player-name-text")).toHaveText("AliceCompt");
-    await expect(guest.locator(".position-top .player-avatar-mini")).toHaveCSS("background-color", "rgb(237, 204, 114)");
-    await guest.screenshot({ path: testInfo.outputPath("icones-en-jeu.png") });
+    await expect(guest.locator(".position-top .player-avatar-mini img")).toHaveJSProperty("naturalWidth", 128);
     await expectLocalTurn(guest, 20_000);
+    await guest.screenshot({ path: testInfo.outputPath("icones-en-jeu.png") });
     await drawDeck(guest).click();
     await guest.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
     await discardDrawn(guest);

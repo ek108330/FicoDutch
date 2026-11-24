@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, UserRound } from "lucide-react";
 import type { Account } from "../../../shared/statistics";
-import { profilePath, rename, saveAvatar, signIn, signOut, type AccountSession } from "../network/accountApi";
+import { profilePath, rename, saveAvatar, saveAvatarPhoto, signIn, signOut, type AccountSession } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
-import { avatarStyles } from "./playerAvatarConfig";
+import { avatarStyles, prepareAvatarPhoto } from "./playerAvatarConfig";
 
 type Props = {
   account: Account | null;
@@ -55,12 +55,32 @@ export default function AccountScreen({ account, onChange, navigate, forStats }:
           const style = new FormData(event.currentTarget).get("avatar");
           void run(() => saveAvatar(style === "auto" ? null : Number(style)), () => setNotice("Icône enregistrée."));
         }}>
-          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} />
+          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} photoId={account.avatarPhotoId} />
           <label>Icône du profil <select name="avatar" defaultValue={account.avatarStyle ?? "auto"}>
             <option value="auto">Automatique</option>
             {avatarStyles.map(({ name, symbol }, i) => <option key={name} value={i}>{symbol} {name}</option>)}
           </select></label>
           <button type="submit" disabled={busy}>Enregistrer l’icône</button>
+        </form>}
+        {account && <form className="account-photo-form" onSubmit={(event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const file = new FormData(form).get("photo");
+          if (file instanceof File) {
+            void run(async () => saveAvatarPhoto(await prepareAvatarPhoto(file)), () => {
+              form.reset();
+              setNotice("Photo enregistrée.");
+            });
+          }
+        }}>
+          <label>Photo de profil <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required
+            aria-describedby="photo-format" /></label>
+          <p id="photo-format">La photo publique est recadrée en cercle et réduite à 128 × 128 px.</p>
+          <div className="archive-actions">
+            <button type="submit" disabled={busy}>Enregistrer la photo</button>
+            {account.avatarPhotoId && <button type="button" disabled={busy}
+              onClick={() => void run(() => saveAvatarPhoto(null), () => setNotice("Photo retirée."))}>Retirer la photo</button>}
+          </div>
         </form>}
         <form onSubmit={submit} key={account?.id ?? String(creating)}>
           {account ? <>

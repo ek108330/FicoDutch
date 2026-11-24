@@ -2,15 +2,21 @@ package io.github.ek108330.ficodutch;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ApplicationInfo;
 import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Process;
+import android.provider.DocumentsContract;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.RenderProcessGoneDetail;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -26,12 +32,14 @@ import android.window.OnBackInvokedDispatcher;
 public final class MainActivity extends Activity {
     private static final String GAME_HOST = "ficodutch-preprod.onrender.com";
     private static final String GAME_URL = "https://" + GAME_HOST + "/";
+    private static final int PICK_AVATAR = 1;
     private FrameLayout browserContainer;
     private View loading;
     private View loadError;
     private TextView errorMessage;
     private WebView browser;
     private OnBackInvokedCallback backCallback;
+    private ValueCallback<Uri[]> photoSelection;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,9 +138,48 @@ public final class MainActivity extends Activity {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            @SuppressWarnings("deprecation")
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams options) {
+                String page = view.getUrl();
+                if (page == null || !isGameUrl(Uri.parse(page)) || !"/compte".equals(Uri.parse(page).getPath())
+                        || options.getMode() != FileChooserParams.MODE_OPEN || options.isCaptureEnabled()) return false;
+                if (photoSelection != null) return false;
+                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("image/*")
+                        .putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/jpeg", "image/png", "image/webp"});
+                photoSelection = callback;
+                try {
+                    startActivityForResult(picker, PICK_AVATAR);
+                } catch (ActivityNotFoundException unavailable) {
+                    finishPhotoSelection(null);
+                }
+                return true;
+            }
+        });
         webView.setWebViewClient(new GameClient());
         return webView;
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_AVATAR) return;
+        Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+        boolean readableDocument = uri != null && "content".equals(uri.getScheme())
+                && DocumentsContract.isDocumentUri(this, uri)
+                && checkUriPermission(uri, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    == PackageManager.PERMISSION_GRANTED;
+        finishPhotoSelection(readableDocument ? new Uri[]{uri} : null);
+    }
+
+    private void finishPhotoSelection(Uri[] result) {
+        ValueCallback<Uri[]> callback = photoSelection;
+        photoSelection = null;
+        if (callback != null) callback.onReceiveValue(result);
     }
 
     private void showError(int message) {
@@ -157,6 +204,7 @@ public final class MainActivity extends Activity {
     }
 
     private void destroyBrowser() {
+        finishPhotoSelection(null);
         if (browser != null) {
             browserContainer.removeView(browser);
             browser.destroy();

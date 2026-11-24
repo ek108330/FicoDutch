@@ -9,10 +9,29 @@ const namePattern = /^[A-Z][A-Za-z0-9]{4,14}$/;
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const hashOptions = { N: 131_072, r: 8, p: 1, maxmem: 144 * 1024 * 1024 };
 const dummySalt = randomBytes(16);
+const pngSignature = Buffer.from("89504e470d0a1a0a", "hex");
 
 function publicAccount(row) {
   return row && { id: row.id, handle: row.handle, name: row.display_name,
-    ...(row.avatar_style != null && { avatarStyle: row.avatar_style }) };
+    ...(row.avatar_style != null && { avatarStyle: row.avatar_style }),
+    ...(row.avatar_photo_id && { avatarPhotoId: row.avatar_photo_id }) };
+}
+
+function readAvatarPhoto(data) {
+  if (typeof data !== "string" || data.length > 96_000 || data.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return null;
+  const png = Buffer.from(data, "base64");
+  if (png.length < 45 || !png.subarray(0, 8).equals(pngSignature) || png.readUInt32BE(8) !== 13 ||
+      png.toString("ascii", 12, 16) !== "IHDR" || png.readUInt32BE(16) !== 128 || png.readUInt32BE(20) !== 128) return null;
+  let hasImage = false;
+  for (let offset = 33; offset + 12 <= png.length;) {
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const size = png.readUInt32BE(offset);
+    offset += 12 + size;
+    if (offset > png.length) return null;
+    if (type === "IDAT") hasImage ||= size > 0;
+    if (type === "IEND") return size === 0 && offset === png.length && hasImage ? png : null;
+  }
+  return null;
 }
 
 function sessionHash(headers) {
@@ -37,7 +56,7 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
     const token = sessionHash(headers);
     if (!token) return null;
     const { rows } = await db.query(`
-      SELECT a.id, a.handle, a.display_name, a.avatar_style, s.expires_at FROM account_sessions s
+      SELECT a.id, a.handle, a.display_name, a.avatar_style, a.avatar_photo_id, s.expires_at FROM account_sessions s
       JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = $1 AND s.expires_at > $2
     `, [token, Date.now()]);
     return rows[0] ? { account: publicAccount(rows[0]), token, expiresAt: Number(rows[0].expires_at) } : null;
@@ -83,7 +102,7 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
     let row;
     try {
       const { rows } = await db.query(
-        "SELECT id, handle, display_name, password_hash, avatar_style FROM accounts WHERE lower(handle) = lower($1)", [handle]);
+        "SELECT id, handle, display_name, password_hash, avatar_style, avatar_photo_id FROM accounts WHERE lower(handle) = lower($1)", [handle]);
       if (register) {
         if (rows.length) return response.status(409).json({ error: "Ce nom est déjà utilisé." });
         const salt = randomBytes(16);
@@ -143,7 +162,7 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
       const { rows } = await withPlayerName(name, () => guestNameInUse(name) ? { rows: [] } : db.query(`
         UPDATE accounts SET display_name = $1 WHERE id = $2
         AND NOT EXISTS (SELECT 1 FROM accounts WHERE lower(handle) = lower($1) AND id <> $2)
-        RETURNING id, handle, display_name, avatar_style
+        RETURNING id, handle, display_name, avatar_style, avatar_photo_id
       `, [name, session.account.id]));
       if (rows.length) return response.json({ enabled: true, account: publicAccount(rows[0]) });
     } catch (error) {
@@ -151,6 +170,22 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
     }
     response.status(409).json({ error: "Ce nom est déjà utilisé." });
   });
+
+  async function publishAvatar(response, account) {
+    let seated = false;
+    for (const socket of await io.in("profile:" + account.id).fetchSockets()) {
+      if (!socket.data.session) continue;
+      socket.data.session.account = account;
+      const current = findPlayerHub(socket.id);
+      if (current?.player.accountId === account.id) {
+        current.player.avatarStyle = account.avatarStyle;
+        current.player.avatarPhotoId = account.avatarPhotoId;
+        seated = true;
+      }
+    }
+    if (seated) broadcastHubs();
+    response.set("Cache-Control", "no-store").json({ enabled: true, account });
+  }
 
   app.patch("/api/account/avatar", requireOrigin, async (request, response) => {
     const session = await readAccount(request.headers);
@@ -160,21 +195,31 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
       return response.status(400).json({ error: "Choisis une icône proposée." });
     }
     const { rows } = await db.query(`
-      UPDATE accounts SET avatar_style = $1 WHERE id = $2 RETURNING id, handle, display_name, avatar_style
+      UPDATE accounts SET avatar_style = $1 WHERE id = $2
+      RETURNING id, handle, display_name, avatar_style, avatar_photo_id
     `, [style, session.account.id]);
-    const account = publicAccount(rows[0]);
-    let seated = false;
-    for (const socket of await io.in("profile:" + account.id).fetchSockets()) {
-      if (!socket.data.session) continue;
-      socket.data.session.account = account;
-      const current = findPlayerHub(socket.id);
-      if (current?.player.accountId === account.id) {
-        current.player.avatarStyle = account.avatarStyle;
-        seated = true;
-      }
-    }
-    if (seated) broadcastHubs();
-    response.set("Cache-Control", "no-store").json({ enabled: true, account });
+    await publishAvatar(response, publicAccount(rows[0]));
+  });
+
+  app.put("/api/account/avatar/photo", requireOrigin, async (request, response) => {
+    const session = await readAccount(request.headers);
+    if (!session) return response.status(401).json({ error: "Connecte-toi pour modifier ta photo." });
+    const image = request.body?.image;
+    const photo = image === null ? null : readAvatarPhoto(image);
+    if (image !== null && !photo) return response.status(400).json({ error: "Envoie une image de profil valide." });
+    const { rows } = await db.query(`
+      UPDATE accounts SET avatar_photo = $1, avatar_photo_id = $2 WHERE id = $3
+      RETURNING id, handle, display_name, avatar_style, avatar_photo_id
+    `, [photo, photo ? randomUUID() : null, session.account.id]);
+    await publishAvatar(response, publicAccount(rows[0]));
+  });
+
+  app.get("/api/avatars/:id", async (request, response) => {
+    if (!uuidPattern.test(request.params.id)) return response.sendStatus(404);
+    const { rows } = await db.query("SELECT avatar_photo FROM accounts WHERE avatar_photo_id = $1", [request.params.id]);
+    if (!rows[0]?.avatar_photo) return response.sendStatus(404);
+    response.set({ "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" })
+      .type("png").send(Buffer.from(rows[0].avatar_photo));
   });
 
   io.use((socket, next) => {

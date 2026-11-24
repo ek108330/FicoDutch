@@ -43,7 +43,7 @@ if (process.env.SERVE_CLIENT === "1") {
       if (path.extname(file) === ".html") response.setHeader("Cache-Control", "no-store");
     },
   }));
-  app.get(["/parties/:id", "/joueurs/:id", "/mes-parties", "/compte", "/bots"], (_request, response) =>
+  app.get(["/parties/:id", "/bilans/:id", "/joueurs/:id", "/joueurs", "/mes-parties", "/mes-stats", "/compte", "/bots"], (_request, response) =>
     response.set("Cache-Control", "no-store").sendFile(path.join(clientFiles, "index.html")));
 }
 
@@ -98,7 +98,8 @@ function checkClientBuild(socket) {
 function accountIdentity(socket) {
   const session = socket.data.session;
   return session && session.expiresAt > Date.now()
-    ? { id: session.account.id, pseudo: session.account.name, avatarStyle: session.account.avatarStyle } : null;
+    ? { id: session.account.id, pseudo: session.account.name, avatarStyle: session.account.avatarStyle,
+      avatarPhotoId: session.account.avatarPhotoId } : null;
 }
 
 async function admit(socket, data, action) {
@@ -170,7 +171,7 @@ io.on("connection", (socket) => {
   socket.on("hub:create", (data) => {
     if (!checkClientBuild(socket)) return;
     void admit(socket, data, (identity) => {
-      const membership = createHub(socket.id, identity.pseudo, identity.id, !!matchStore, identity.avatarStyle);
+      const membership = createHub(socket.id, identity.pseudo, identity.id, !!matchStore, identity.avatarStyle, identity.avatarPhotoId);
       if (!membership) return socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
       socket.emit("hub:created", membership, Date.now());
       broadcastHubs();
@@ -193,7 +194,7 @@ io.on("connection", (socket) => {
         return;
       }
       if (!socket.connected || closing.has(hubId)) return;
-      const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle);
+      const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId);
       if (!membership) {
         socket.emit("hub:error", "Impossible de rejoindre ce Hub. Vérifie qu’il est disponible et que ce compte n’y occupe pas déjà une place.");
         return;

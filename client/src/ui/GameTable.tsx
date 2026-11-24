@@ -29,7 +29,7 @@ export type TablePlayer = {
 type GameTableProps = {
   localPlayerId: string;
   players: TablePlayer[];
-  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number }>;
+  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number; avatarPhotoId?: string }>;
   controls: ReactNode;
   piles?: ReactNode;
   activePlayerId?: string;
@@ -217,7 +217,8 @@ export default function GameTable({
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
             <div className="player-name">
               <span className="player-name-label" title={player.pseudo !== name ? player.pseudo : undefined}>
-                {member?.accountId && <PlayerAvatar id={member.accountId} name={player.pseudo} style={member.avatarStyle} mini />}
+                {member?.accountId && <PlayerAvatar id={member.accountId} name={player.pseudo} style={member.avatarStyle}
+                  photoId={member.avatarPhotoId} mini />}
                 <span className="player-name-text">
                   {name}
                   {leaderIds?.includes(player.id) && (

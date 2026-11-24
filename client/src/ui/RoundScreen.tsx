@@ -49,6 +49,7 @@ export default function RoundScreen({
   const [memory, setMemory] = useState<Memorization>(emptySelection);
   const visibleMemory = useRef(0);
   const heardDutch = useRef<string>(null);
+  const heardTurn = useRef<string>(null);
   const paused = pause !== null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
     hostRound, peers, updateHostRound, now, paused, clockVersion });
@@ -72,6 +73,12 @@ export default function RoundScreen({
   );
   const announcement = !paused && !turn.waitingForClock && connectionReady ? turn.announcement : undefined;
   const announcementId = announcement ? `${roundNumber}:${announcement.id}` : null;
+  const localTurn = turn.canPlay && turn.view ? `${roundNumber}:${turn.view.number}` : null;
+  useEffect(() => {
+    if (!localTurn || heardTurn.current === localTurn) return;
+    heardTurn.current = localTurn;
+    playSound("turn");
+  }, [localTurn, playSound]);
   useEffect(() => {
     if (!announcementId || heardDutch.current === announcementId) return;
     heardDutch.current = announcementId;

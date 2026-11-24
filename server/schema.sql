@@ -8,6 +8,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS accounts_handle ON accounts (lower(handle));
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_display_name ON accounts (lower(display_name));
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_demo_bot boolean NOT NULL DEFAULT false;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_style smallint CHECK (avatar_style BETWEEN 0 AND 7);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_photo_id uuid;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_photo bytea;
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_avatar_photo ON accounts (avatar_photo_id) WHERE avatar_photo_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS account_sessions (
   token_hash text PRIMARY KEY,

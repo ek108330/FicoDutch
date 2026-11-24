@@ -21,7 +21,8 @@ export type MatchPlayer = {
 export type AwardId = "shuriken" | "luckyLuke" | "boulet" | "cible" | "pyromane" | "roisNoirs" |
   "distributeur" | "victime" | "rivalite" | "meilleur" | "pire" | "voleur" | "bourreau";
 
-export type Award = { players: string[]; value: number; extra?: number };
+export type Award = { players: string[]; value: number; extra?: number;
+  exchange?: { opponentId: string; given: string; received: string } };
 
 export type MatchStats = {
   status: MatchStatus;
@@ -33,15 +34,17 @@ export type MatchStats = {
 };
 
 export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number; scopeIncomplete?: boolean };
-export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number; rating: number; avatarStyle: number | null };
+export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number; rating: number;
+  avatarStyle: number | null; avatarPhotoId?: string | null };
 
-export type Account = { id: string; handle: string; name: string; avatarStyle?: number };
+export type Account = { id: string; handle: string; name: string; avatarStyle?: number; avatarPhotoId?: string };
 
 export type Profile = {
   demoBot?: boolean;
   id: string;
   name: string;
   avatarStyle?: number;
+  avatarPhotoId?: string;
   rating: number;
   matches: number;
   finished: number;

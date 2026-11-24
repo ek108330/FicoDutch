@@ -12,6 +12,7 @@ const awardIds = [
 const privateAwards = new Set(["roisNoirs", "meilleur", "pire"]);
 const integer = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000;
 const count = (value) => integer(value) ? value : 0;
+const cardIdPattern = /^(?:(?:hearts|diamonds|clubs|spades)-(?:[2-9]|10|[AJQK])|joker-[12])$/;
 
 function cleanReport(raw, seats, status, partial) {
   if (!Array.isArray(raw?.players) || raw.players.length > seats.length || !integer(raw.rounds)) return null;
@@ -44,7 +45,11 @@ function cleanReport(raw, seats, status, partial) {
           new Set(award.players).size !== arity || !award.players.every((id) => ids.has(id)) ||
           !Number.isFinite(award.value) || award.value < 0 || award.value > 1_000_000_000) return [];
       const hiddenValue = partial && (key === "boulet" || key === "distributeur");
-      return [{ players: award.players, value: award.value, ...(!hiddenValue && integer(award.extra) && { extra: award.extra }) }];
+      const exchange = key === "pire" && award.exchange;
+      const validExchange = exchange && ids.has(exchange.opponentId) && exchange.opponentId !== award.players[0] &&
+        [exchange.given, exchange.received].every((card) => typeof card === "string" && cardIdPattern.test(card));
+      return [{ players: award.players, value: award.value, ...(!hiddenValue && integer(award.extra) && { extra: award.extra }),
+        ...(validExchange && { exchange: { opponentId: exchange.opponentId, given: exchange.given, received: exchange.received } }) }];
     });
     if (clean.length) awards[key] = clean;
   }
@@ -223,7 +228,8 @@ function createMatchStore(db) {
 
   async function listPlayers(query, cursor = null) {
     const { rows } = await db.query(`
-      SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rating, a.avatar_style AS "avatarStyle"
+      SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rating,
+        a.avatar_style AS "avatarStyle", a.avatar_photo_id AS "avatarPhotoId"
       FROM accounts a JOIN player_stats s ON a.id = s.account_id
       WHERE lower(a.display_name) LIKE $1 AND
         ($2::int IS NULL OR s.rating < $2 OR (s.rating = $2 AND a.id > $3::uuid))
@@ -235,7 +241,10 @@ function createMatchStore(db) {
   }
 
   async function getProfile(id) {
-    const { rows } = await db.query("SELECT a.display_name, a.is_demo_bot, a.avatar_style, s.* FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1", [id]);
+    const { rows } = await db.query(`
+      SELECT a.display_name, a.is_demo_bot, a.avatar_style, a.avatar_photo_id, s.*
+      FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1
+    `, [id]);
     const row = rows[0];
     if (!row) return null;
     const [history, encounters, rivalry] = await Promise.all([
@@ -264,6 +273,7 @@ function createMatchStore(db) {
     return {
       id, name: row.display_name, demoBot: row.is_demo_bot, rating: row.rating, matches: row.matches, finished: row.finished, interrupted: row.interrupted,
       ...(row.avatar_style != null && { avatarStyle: row.avatar_style }),
+      ...(row.avatar_photo_id && { avatarPhotoId: row.avatar_photo_id }),
       victories: row.victories, rounds: row.rounds, roundWins: row.round_wins, scoreSum: Number(row.score_sum),
       bestScore: row.best_score, dutch: row.dutch, dutchWon: row.dutch_won, reactions: row.reactions, penalties: row.penalties,
       exchanges: row.exchanges, rivals: rivalry.rows,

@@ -6,6 +6,7 @@ export type HubPlayer = {
   id: string;
   accountId?: string;
   avatarStyle?: number;
+  avatarPhotoId?: string;
   pseudo: string;
   isHost: boolean;
   isBot?: true;

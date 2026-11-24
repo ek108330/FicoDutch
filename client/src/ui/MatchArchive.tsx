@@ -4,6 +4,8 @@ import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
   readTableSummary, tableSummaryPath } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
+import { describeCardFace, suits } from "./cardLabels";
+import type { CardRank } from "../game/cards";
 
 type Navigate = (path: string) => void;
 type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () => void };
@@ -13,11 +15,11 @@ const number = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
 const seconds = new Intl.NumberFormat("fr", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const individual = [
   ["shuriken", "Shuriken de la défausse", Swords], ["luckyLuke", "Lucky Lucke", Timer], ["boulet", "Le boulet", TriangleAlert],
-  ["cible", "La cible des échanges et Jokers", Crosshair], ["roisNoirs", "Mr. Roinoir", Crown],
+  ["cible", "La cible dans le dos", Crosshair], ["roisNoirs", "Mr. Roinoir", Crown],
   ["distributeur", "Le distributeur de cartes", Gift],
 ] as const;
 const interactions: [AwardId, string][] = [
-  ["victime", "Victime préférée"], ["rivalite", "Rivalité principale"], ["meilleur", "Meilleur échange"],
+  ["victime", "Victime préférée"], ["rivalite", "Rivalité principale"],
   ["pire", "Pire échange"], ["voleur", "Voleur de victoires"], ["bourreau", "Bourreau des Dutch"],
 ];
 
@@ -63,11 +65,18 @@ function Load<T>({ loader, children }: { loader: Loader<T>; children: (result: T
 function plural(value: number, one: string, many = one + "s") { return `${number.format(value)} ${value === 1 ? one : many}`; }
 function awardValue(id: AwardId, { value, extra }: Award) {
   switch (id) {
-    case "luckyLuke": return `${seconds.format(value / 1_000)} s`;
-    case "cible": return `${plural(value, "action")} / ${plural(extra ?? 0, "hater")}`;
-    case "roisNoirs": return plural(value, "Roi noir", "Rois noirs");
-    default: return extra === undefined ? plural(value, "carte") : `${plural(value, "carte")} / ${plural(extra, "point")}`;
+    case "luckyLuke": return `en ${seconds.format(value / 1_000)} s`;
+    case "cible": return `avec ${plural(value, "action")} de ${plural(extra ?? 0, "adversaire")}`;
+    case "roisNoirs": return `avec ${plural(value, "roi noir", "rois noirs")}`;
+    default: return `avec ${plural(value, "carte")}${extra === undefined ? "" : ` pour ${plural(extra, "point")}`}`;
   }
+}
+
+function exchangeCard(id: string) {
+  if (id.startsWith("joker-")) return "un Joker";
+  const [suit, rank] = id.split("-") as [keyof typeof suits, CardRank];
+  const article = rank === "Q" ? "une" : "un";
+  return `${article} ${describeCardFace({ rank, suit })}`;
 }
 
 function PlayerName({ player, navigate }: { player: MatchPlayer | undefined; navigate: Navigate }) {
@@ -83,8 +92,10 @@ function Interaction({ id, award, roster, navigate }: {
   switch (id) {
     case "victime": return <>{a} a ciblé {b} dans {plural(value, "échange")}.</>;
     case "rivalite": return <>{a} et {b} ont effectué {plural(value, "échange")} entre leurs mains.</>;
-    case "meilleur": return <>{a} a allégé sa main de {plural(value, "point")} en un échange.</>;
-    case "pire": return <>{a} a pris {plural(value, "point")} de plus en un échange.</>;
+    case "pire": return award.exchange
+      ? <>{a} a donné {exchangeCard(award.exchange.given)} à <PlayerName player={roster.get(award.exchange.opponentId)}
+        navigate={navigate} /> contre {exchangeCard(award.exchange.received)}.</>
+      : <>{a} a pris {plural(value, "point")} de plus en un échange.</>;
     case "voleur": return <>{a} a remporté {plural(value, "manche")} après un Dutch adverse.</>;
     case "bourreau": return <>{a} a fait échouer {plural(value, "annonce Dutch", "annonces Dutch")}.</>;
     default: return null;
@@ -128,8 +139,8 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
           <Icon size={23} aria-hidden="true" />
           <h3>{title}</h3>
           {awards?.length ? awards.map((award) => <p key={award.players[0]}>
-            <strong><PlayerName player={roster.get(award.players[0])} navigate={navigate} /></strong>
-            <span>{awardValue(id, award)}</span>
+            <strong><PlayerName player={roster.get(award.players[0])} navigate={navigate} /></strong>{" "}
+            {awardValue(id, award)}.
           </p>) : <p className="archive-muted">Non attribuée</p>}
         </article>;
       })}</div>
@@ -145,6 +156,9 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
         </div>)}
       </dl>
     </section>
+    {match.status === "interrupted" && <button type="button" className="archive-home-button" onClick={() => navigate("/")}>
+      <ArrowLeft size={17} aria-hidden="true" /> Revenir à l’accueil
+    </button>}
   </>;
 }
 
@@ -172,7 +186,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   ];
   return <>
     <div className="profile-identity">
-      <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} />
+      <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} photoId={profile.avatarPhotoId} />
       <h2>{profile.name}</h2>
     </div>
     {profile.demoBot && <p className="archive-muted">Bot de démonstration · historique initial simulé</p>}
@@ -249,7 +263,7 @@ export function PlayersDirectory(props: RouteProps) {
     <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">
       {players.length ? <ul className="archive-list">{players.map((player) => <li key={player.id}>
         <span className="directory-player">
-          <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} mini />
+          <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} mini />
           <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
         </span>
         <span>{player.demoBot && "Bot · "}{plural(player.matches, "partie")} · <strong>{number.format(player.rating)} Elo</strong></span>

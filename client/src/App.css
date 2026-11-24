@@ -1746,6 +1746,16 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   background: #145c3b;
 }
 
+.pile-card.deck-slot[data-turn-draw] {
+  background-color: #786025;
+  border-color: #f5d783;
+}
+
+.deck-slot[data-turn-draw] .card-back-pattern {
+  background-color: inherit;
+  background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgb(255 250 216 / 13%) 6px 12px);
+}
+
 .pile-card.pile-backed {
   border-style: solid;
 }
@@ -1775,10 +1785,16 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
 
 @media (prefers-reduced-motion: no-preference) {
   .pile-card[data-gift-pending] { animation: gift-pulse 1.1s ease-in-out infinite alternate; }
+  .pile-card[data-turn-draw] { animation: turn-draw-pulse 1.35s ease-in-out infinite alternate; }
 
   @keyframes gift-pulse {
     from { outline-color: rgb(255 227 154 / 40%); }
     to { outline-color: #ffe39a; }
+  }
+
+  @keyframes turn-draw-pulse {
+    from { background-color: #145c3b; border-color: #8fcaab; }
+    to { background-color: #92621c; border-color: #f5d783; }
   }
 }
 
@@ -2031,8 +2047,10 @@ button.pile-slot:not(:disabled) .pile-card,
   font-weight: 800;
   line-height: 1;
   font-size: 1.9rem;
+  overflow: hidden;
 }
 
+.player-avatar > img { height: 100%; width: 100%; object-fit: cover; }
 .player-avatar > span:first-child { font-size: 1.55em; }
 .player-avatar-mini { width: 22px; height: 22px; border-width: 1px; font-size: 0.69rem; }
 .player-avatar-mini > span:last-child { display: none; }
@@ -3046,7 +3064,17 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-card > svg { color: #f4cf75; }
 .archive-awards .archive-card > svg { display: block; margin-inline: auto; }
 .archive-awards h3 { margin: 3px 0; font-size: 0.95rem; }
-.archive-awards p { display: flex; flex-wrap: wrap; column-gap: 7px; margin-top: 3px; font-size: 0.88rem; }
+.archive-awards p { margin-top: 5px; font-size: 0.88rem; }
+.archive-screen .archive-home-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 16px auto 0;
+  background: #f3de9a;
+  border-color: #f3de9a;
+  color: #24190c;
+  font-weight: 750;
+}
 .archive-muted { color: #b8d3c5; }
 .archive-ranking, .profile-numbers, .archive-screen > .archive-card { margin-top: 11px; }
 .archive-ranking table { width: 100%; border-collapse: collapse; }
