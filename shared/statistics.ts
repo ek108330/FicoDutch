@@ -37,7 +37,7 @@ export type RatingMovement = { accountId: string; name: string; delta: number };
 export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number;
   games?: number; totalRounds?: number; playerCount?: number; scopeIncomplete?: boolean; ratingMovements?: RatingMovement[] };
 export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number; rating: number;
-  roundWinRate: number; avatarStyle: number | null; avatarPhotoId?: string | null };
+  rounds: number; ratingWeekStart: number | null; roundWinRate: number; avatarStyle: number | null; avatarPhotoId?: string | null };
 
 export type Account = { id: string; handle: string; name: string; avatarStyle?: number; avatarPhotoId?: string };
 

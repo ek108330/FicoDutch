@@ -1,6 +1,7 @@
 const { uuidPattern } = require("./accounts");
 const { createHash } = require("node:crypto");
 const { recordRatedRounds } = require("./roundRating");
+const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
 const seatHash = (token) => typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token)
   ? createHash("sha256").update(token).digest("hex") : null;
 
@@ -222,19 +223,27 @@ function createMatchStore(db) {
       scopeIncomplete: rows.length > 1 && !table };
   }
 
-  async function listPlayers(query, after = null, limit = 30) {
+  async function listPlayers(query, after = null, limit = 30, weekAt = Date.now()) {
     const { rows } = await db.query(`
       WITH ranking AS (
-        SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rn AS rating,
+        SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rounds, s.rn AS rating,
           CASE WHEN s.rounds = 0 THEN 0 ELSE s.round_wins::double precision / s.rounds END AS "roundWinRate",
           a.avatar_style AS "avatarStyle", a.avatar_photo_id AS "avatarPhotoId"
         FROM accounts a JOIN player_stats s ON a.id = s.account_id
+      ), page AS (
+        SELECT * FROM ranking WHERE lower(name) LIKE $1 AND
+          ($2::float8 IS NULL OR (rating, matches, "roundWinRate") < ($2, $3, $4)
+            OR ((rating, matches, "roundWinRate") = ($2, $3, $4) AND id > $5))
+        ORDER BY rating DESC, matches DESC, "roundWinRate" DESC, id LIMIT $6
       )
-      SELECT * FROM ranking WHERE lower(name) LIKE $1 AND
-        ($2::float8 IS NULL OR (rating, matches, "roundWinRate") < ($2, $3, $4)
-          OR ((rating, matches, "roundWinRate") = ($2, $3, $4) AND id > $5))
-      ORDER BY rating DESC, matches DESC, "roundWinRate" DESC, id LIMIT $6
-    `, [query + "%", after?.rating ?? null, after?.matches ?? null, after?.roundWinRate ?? null, after?.id ?? null, limit + 1]);
+      SELECT page.*, (
+        SELECT before_rn FROM round_rating_entries
+        WHERE account_id = page.id AND at BETWEEN $7::bigint AND $8::bigint
+        ORDER BY at, match_id, number LIMIT 1
+      ) AS "ratingWeekStart"
+      FROM page ORDER BY rating DESC, matches DESC, "roundWinRate" DESC, id
+    `, [query + "%", after?.rating ?? null, after?.matches ?? null, after?.roundWinRate ?? null, after?.id ?? null,
+      limit + 1, weekAt === null ? null : weekAt - WEEK_MS, weekAt]);
     const players = rows.slice(0, limit);
     const last = players.at(-1);
     return { players, next: rows.length > players.length ? `${last.rating}/${last.matches}/${last.roundWinRate}/${last.id}` : null };
@@ -354,7 +363,7 @@ function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
     response.set("Cache-Control", "public, max-age=30").json(await store.listBots());
   });
   app.get("/api/podium", async (_request, response) => {
-    const { players } = await store.listPlayers("", null, 3);
+    const { players } = await store.listPlayers("", null, 3, null);
     response.set("Cache-Control", "public, max-age=15").json(players);
   });
   app.post("/api/players/:id/report", async (request, response) => {

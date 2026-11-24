@@ -53,8 +53,8 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.getByRole("button", { name: "Classement", exact: true }).click();
     const directory = page.getByRole("table", { name: "Classement des joueurs" });
     await expect(directory.getByRole("row")).toHaveCount(11);
-    await expect(directory.getByRole("columnheader")).toHaveText(["Nom", "Parties", "Manches gagnées", "Indice RN"]);
-    const ratings = (await directory.locator("tbody td:last-child").allTextContents()).map(Number);
+    await expect(directory.getByRole("columnheader")).toHaveText(["Nom", "Manches", "Manches gagnées", "Indice RN", "RN 7 j"]);
+    const ratings = (await directory.locator("tbody td:nth-last-child(2)").allTextContents()).map(Number);
     const names = await directory.locator("tbody a").allTextContents();
     expect(names.slice(0, 3)).toEqual(podiumNames);
     expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
@@ -145,6 +145,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       const [first, second] = match.players;
       await route.fulfill({ response, json: { ...match, awards: {
         ...match.awards,
+        cible: [first, second].map(({ id }) => ({ players: [id], value: 3, extra: 2 })),
         roisNoirs: [first, second].map(({ id }) => ({ players: [id], value: 2 })),
         rivalite: [{ players: [first.id, second.id], value: 2 }],
         pire: [{ players: [first.id], value: 12, exchange: { opponentId: second.id, given: "spades-K", received: "hearts-Q" } }],
@@ -153,6 +154,8 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.reload();
     const rois = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Mr. Roinoir" }) });
     await expect(rois.locator("p")).toHaveText(/.+ & .+ avec 2 rois noirs\./);
+    const targets = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Cible dans le dos" }) });
+    await expect(targets.locator("p")).toHaveText(/.+ & .+ ont chacun subi 3 actions de 2 adversaires\./);
     const interactions = page.getByRole("region", { name: "Interactions et rivalités" });
     await expect(interactions.locator(".archive-card")).toHaveCount(5);
     const interactionColumns = await interactions.locator(".archive-card").evaluateAll((cards) =>
@@ -291,6 +294,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       await expect(tab.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
       const rating = tab.getByRole("region", { name: "Variations de l’indice RN" });
       await expect(rating.getByRole("article")).toHaveCount(2);
+      await expect(rating.getByRole("heading")).toHaveText(["Gain de RN", "Perte de RN"]);
       await expect(rating.getByRole("article").first()).toContainText("AliceCompte");
       await expect(rating.getByRole("article").first()).toContainText("+2 RN");
       await expect(rating.getByRole("article").last()).toContainText("BobbyCompte");
@@ -320,6 +324,11 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await host.getByRole("button", { name: "Signaler cet historique" }).click();
     await expect(host.getByRole("status")).toHaveText("Signalement transmis pour vérification.");
     await otherDevice.goto("/");
+    await otherDevice.getByRole("button", { name: "Classement", exact: true }).click();
+    const bobbyRow = otherDevice.getByRole("row").filter({ has: otherDevice.getByRole("link", { name: "BobbyMobile" }) });
+    await expect(bobbyRow.getByRole("cell")).toHaveText(["1", "0 %", "48", "-2"]);
+    await otherDevice.screenshot({ path: testInfo.outputPath("classement-rn-sept-jours.png") });
+    await otherDevice.getByRole("link", { name: "Accueil", exact: true }).click();
     await otherDevice.getByRole("button", { name: "Mes stats" }).click();
     await expect(otherDevice.getByRole("heading", { name: "Mes stats" })).toBeVisible();
     await otherDevice.getByRole("link", { name: "Mes parties" }).click();

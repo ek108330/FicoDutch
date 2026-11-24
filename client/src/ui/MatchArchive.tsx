@@ -64,10 +64,10 @@ function Load<T>({ loader, children }: { loader: Loader<T>; children: (result: T
 }
 
 function plural(value: number, one: string, many = one + "s") { return `${number.format(value)} ${value === 1 ? one : many}`; }
-function awardValue(id: AwardId, { value, extra }: Award) {
+function awardValue(id: AwardId, { value, extra }: Award, shared = false) {
   switch (id) {
     case "luckyLuke": return `en ${seconds.format(value / 1_000)} s`;
-    case "cible": return `avec ${plural(value, "action")} de ${plural(extra ?? 0, "adversaire")}`;
+    case "cible": return `${shared ? "ont chacun subi" : "avec"} ${plural(value, "action")} de ${plural(extra ?? 0, "adversaire")}`;
     case "roisNoirs": return `avec ${plural(value, "roi noir", "rois noirs")}`;
     default: return `avec ${plural(value, "carte")}${extra === undefined ? "" : ` pour ${plural(extra, "point")}`}`;
   }
@@ -105,12 +105,16 @@ function Interaction({ id, award, roster, navigate }: {
 }
 
 const ratingDelta = new Intl.NumberFormat("fr", { maximumFractionDigits: 2, signDisplay: "always" });
+function formatRatingChange(delta: number) {
+  if (delta === 0) return "0";
+  return Math.abs(delta) < 0.005 ? `${delta > 0 ? "+" : "−"}<0,01` : ratingDelta.format(delta);
+}
 
 function MatchRatingMovements({ movements, navigate }: { movements: RatingMovement[]; navigate: Navigate }) {
   const changes = movements.map(({ delta }) => delta);
   const extremes = [
-    { title: "Plus fort gain de RN", delta: Math.max(0, ...changes), Icon: ArrowUpRight },
-    { title: "Plus forte perte de RN", delta: Math.min(0, ...changes), Icon: ArrowDownRight },
+    { title: "Gain de RN", delta: Math.max(0, ...changes), Icon: ArrowUpRight },
+    { title: "Perte de RN", delta: Math.min(0, ...changes), Icon: ArrowDownRight },
   ];
   return <section className="archive-awards archive-rating-movements" aria-label="Variations de l’indice RN">
     {extremes.map(({ title, delta, Icon }) => <article className="archive-card" key={title}>
@@ -119,7 +123,7 @@ function MatchRatingMovements({ movements, navigate }: { movements: RatingMoveme
         <strong>{movements.filter((entry) => entry.delta === delta).map(({ accountId, name }, index) =>
           <Fragment key={accountId}>{index > 0 && " & "}<Link path={profilePath(accountId)} navigate={navigate}>{name}</Link></Fragment>,
         )}</strong>
-        <span className="archive-rn-delta">{Math.abs(delta) < 0.005 ? `${delta > 0 ? "+" : "−"}<0,01` : ratingDelta.format(delta)} RN</span>
+        <span className="archive-rn-delta">{formatRatingChange(delta)} RN</span>
       </p> : <p className="archive-muted">{movements.length ? "Aucune variation" : "Aucune manche classée"}</p>}
     </article>)}
   </section>;
@@ -162,10 +166,10 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
         const awards = match.awards[id];
         return <article className="archive-card" key={id}>
           <h3><Icon size={16} aria-hidden="true" />{title}</h3>
-          {awards?.length && id === "roisNoirs" ? <p>
+          {awards?.length && (id === "roisNoirs" || id === "cible") ? <p>
             <strong>{awards.map((award, index) => <Fragment key={award.players[0]}>
               {index > 0 && " & "}<PlayerName player={roster.get(award.players[0])} navigate={navigate} />
-            </Fragment>)}</strong>{" "}{awardValue(id, awards[0])}.
+            </Fragment>)}</strong>{" "}{awardValue(id, awards[0], awards.length > 1)}.
           </p> : awards?.length ? awards.map((award) => <p key={award.players[0]}>
             <strong><PlayerName player={roster.get(award.players[0])} navigate={navigate} /></strong>{" "}
             {awardValue(id, award)}.
@@ -274,9 +278,11 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
     </section>
     {groups.map(([title, rivals]) => <section key={title} className="archive-card">
       <h2>{title}</h2>
-      {rivals.length ? <ul className="archive-list">{rivals.map((rival) => <li key={rival.id}>
+      {rivals.length ? <ul className="archive-list profile-rivals">{rivals.map((rival) => <li key={rival.id}>
         <Link path={profilePath(rival.id)} navigate={navigate}>{rival.name}</Link>
-        <span>RN {Math.round(rival.rating)} · {plural(rival.played, "partie")} · {rival.wins} V / {rival.losses} D / {rival.played - rival.wins - rival.losses} N</span>
+        <span>RN {Math.round(rival.rating)}</span>
+        <span>{plural(rival.played, "partie")}</span>
+        <span>{rival.wins} V / {rival.losses} D / {rival.played - rival.wins - rival.losses} N</span>
       </li>)}</ul> : <p className="archive-muted">Aucun résultat à afficher.</p>}
     </section>)}
   </>;
@@ -347,17 +353,28 @@ export function PlayersDirectory(props: RouteProps) {
     </form>
     <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">
       {players.length ? <table className="directory-ranking" aria-label="Classement des joueurs">
-        <colgroup><col /><col className="directory-matches" /><col className="directory-win-rate" /><col className="directory-rating" /></colgroup>
-        <thead><tr><th scope="col">Nom</th><th scope="col">Parties</th>
-          <th scope="col" title="Taux de victoire des manches">Manches gagnées</th><th scope="col">Indice RN</th></tr></thead>
-        <tbody>{players.map((player) => <tr key={player.id}>
-          <th scope="row"><span className="directory-player">
-            <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} mini />
-            <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
-          </span></th>
-          <td>{number.format(player.matches)}</td><td>{percent.format(player.roundWinRate)}</td>
-          <td><strong>{Math.round(player.rating)}</strong></td>
-        </tr>)}</tbody>
+        <colgroup><col /><col className="directory-rounds" /><col className="directory-win-rate" />
+          <col className="directory-rating" /><col className="directory-rating-week" /></colgroup>
+        <thead><tr><th scope="col">Nom</th><th scope="col" title="Nombre de manches jouées">Manches</th>
+          <th scope="col" title="Taux de victoire des manches">Manches gagnées</th><th scope="col">Indice RN</th>
+          <th scope="col" title="Évolution du RN sur les sept derniers jours">RN 7 j</th></tr></thead>
+        <tbody>{players.map((player) => {
+          const weekStart = player.ratingWeekStart;
+          const change = weekStart == null ? null : player.rating - weekStart;
+          return <tr key={player.id}>
+            <th scope="row"><span className="directory-player">
+              <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} mini />
+              <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
+            </span></th>
+            <td>{number.format(player.rounds)}</td><td>{percent.format(player.roundWinRate)}</td>
+            <td><strong>{Math.round(player.rating)}</strong></td>
+            <td data-change={change == null ? undefined : Math.sign(change)}
+              title={weekStart == null ? "Aucune manche classée ces sept derniers jours" :
+                `RN au début de la période · ${number.format(weekStart)}`}>
+              {change == null ? "—" : formatRatingChange(change)}
+            </td>
+          </tr>;
+        })}</tbody>
       </table> : <p>Aucun joueur trouvé.</p>}
       {(pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages des joueurs">
         {pages.length > 1 && <button type="button" onClick={() => setPages(pages.slice(0, -1))}>Précédent</button>}

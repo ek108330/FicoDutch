@@ -74,6 +74,11 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   const profile = await store.getProfile(azure.accountId);
   assert.equal(profile.ratings.length, 2);
   assert.equal(profile.rating, profile.ratings.at(-1).rating);
+  const week = 7 * 24 * 60 * 60 * 1_000;
+  const readAzure = async (at) => (await store.listPlayers("azure", null, 1, at)).players[0];
+  assert.equal((await readAzure(now + week)).ratingWeekStart, 50);
+  assert.equal((await readAzure(now + week + 1)).ratingWeekStart, profile.ratings[0].rating);
+  assert.equal((await readAzure(now + week + 100_001)).ratingWeekStart, null);
 
   await db.query("UPDATE player_stats SET rn = 50, matches = 4, rounds = 4, round_wins = 1");
   await db.query("UPDATE player_stats SET matches = 6 WHERE account_id = $1", [denis.accountId]);
@@ -81,6 +86,7 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   const { players: podium, next: cursor } = await store.listPlayers("", null, 2);
   assert.deepEqual(podium.map(({ name }) => name), ["Denis", "Celine"]);
   assert.equal(podium[1].roundWinRate, 0.5);
+  assert.equal(podium[1].rounds, 4);
   assert.ok(cursor);
   assert.equal((await store.listPlayers("", podium[1])).players.length, 2);
   await store.reportHistory(denis.accountId, azure.accountId, now);
