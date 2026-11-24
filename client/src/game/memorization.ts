@@ -15,6 +15,19 @@ export type MemorizeRequest = {
   position: number;
 };
 
+export function setMemorizationReady(round: GameState, playerId: string, ready: unknown, now: number, deadline: number): GameState {
+  if (round.phase !== "memorization" || now >= deadline || typeof ready !== "boolean") return round;
+  const player = round.players.find(({ id, isBot, hasLeft }) => playerId === id && !isBot && !hasLeft);
+  if (!player || !!player.memorizationReady === ready ||
+      (ready && player.memorizedPositions?.length !== memorizationLimit(round.variants.sixCards))) return round;
+  return { ...round, players: round.players.map((entry) => entry === player ? { ...player, memorizationReady: ready } : entry) };
+}
+
+export function allPlayersMemorized(round: GameState) {
+  const humans = round.players.filter(({ isBot, hasLeft }) => !isBot && !hasLeft);
+  return round.phase === "memorization" && humans.length > 0 && humans.every(({ memorizationReady }) => memorizationReady);
+}
+
 export function memorizationLimit(sixCards: boolean) {
   return sixCards ? 3 : 2;
 }

@@ -112,7 +112,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     expect(insideFelt).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("table-six-en-jeu-320.png") });
     await page.setViewportSize({ width: 360, height: 640 });
-    await page.getByRole("button", { name: "Quitter la table", exact: true }).click();
+    await (await openSettings(page)).getByRole("button", { name: "Quitter la table", exact: true }).click();
     await expect(ready(page)).toBeVisible();
     await expect(page.getByRole("group", { name: "Totaux" })).toContainText("1 partie");
     await page.reload();
@@ -217,7 +217,11 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     expect(alpha).toEqual([0, 255]);
     await host.screenshot({ path: testInfo.outputPath("photo-circulaire.png"), fullPage: true });
     await host.getByRole("link", { name: "Accueil", exact: true }).click();
+    await expect(host.locator(".home-identity .player-avatar-mini img")).toHaveJSProperty("naturalWidth", 128);
+    await host.screenshot({ path: testInfo.outputPath("avatar-accueil.png") });
     await host.getByRole("button", { name: "Créer un Hub" }).click();
+    await expect(guest.locator(".hub-item").filter({ hasText: "Hub de AliceCompte" })
+      .locator(".hub-name .player-avatar-mini img")).toHaveJSProperty("naturalWidth", 128);
     await join(guest, "AliceCompte");
     await expect(game(host)).toBeEnabled({ timeout: 12_000 });
     const rejected = otherDevice.waitForEvent("dialog").then(async (dialog) => {

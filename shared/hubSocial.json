@@ -6,9 +6,9 @@
     "clap": { "symbol": "👏", "label": "Bravo" },
     "wow": { "symbol": "😮", "label": "Surpris" },
     "heart": { "symbol": "❤️", "label": "Cœur" },
-    "cry": { "symbol": "😢", "label": "En pleurs", "tableOnly": true },
-    "angry": { "symbol": "😡", "label": "Furieux", "tableOnly": true },
-    "heartEyes": { "symbol": "😍", "label": "Yeux en cœur", "tableOnly": true },
-    "shush": { "symbol": "🤫", "label": "Chut", "tableOnly": true }
+    "cry": { "symbol": "😢", "label": "En pleurs" },
+    "angry": { "symbol": "😡", "label": "Furieux" },
+    "heartEyes": { "symbol": "😍", "label": "Yeux en cœur" },
+    "shush": { "symbol": "🤫", "label": "Chut" }
   }
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { openSettings, discardDrawn, drawDeck, fixDeckOrder, openLobby, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
@@ -84,7 +84,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await expect(newcomer.getByRole("region", { name: "Main de DanaEntree" })).toHaveCount(0);
     await newcomer.screenshot({ path: testInfo.outputPath("05-score-herite-portrait.png") });
     await expect(late.getByRole("heading", { name: "La partie est terminée" })).toBeVisible();
-    await late.getByRole("button", { name: "Quitter la table" }).click();
+    await (await openSettings(late)).getByRole("button", { name: "Quitter la table" }).click();
     await expect(hub(late).getByText("Terminée", { exact: true })).toBeVisible();
     await expect(join(late)).toBeDisabled();
   } finally {

@@ -18,7 +18,6 @@ type Props = {
   waitingPlayers: string[];
   toggleVariant: (key: keyof GameVariants) => void;
   startNext: () => void;
-  onLeave: () => void;
   onRestart: () => void;
   onInterrupt?: () => void;
   gameFinished: boolean;
@@ -112,7 +111,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, settings, roundNumber, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
+  result, settings, roundNumber, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext,
   onRestart, onInterrupt, canRestart, gameFinished,
 }: Props) {
   const interruptDialog = useRef<HTMLDialogElement>(null);
@@ -166,7 +165,7 @@ export default function RoundResults({
                 {isFinal ? "Lancer la prochaine partie" : "Lancer la manche suivante"}
               </button>
             </div>
-          ) : isFinal && <button type="button" className="result-primary" onClick={onLeave}>Quitter la table</button>}
+          ) : null}
         </div>
       </section>
       {isHost && onInterrupt && <dialog className="hub-management game-settings" ref={interruptDialog} aria-labelledby={interruptTitle}>

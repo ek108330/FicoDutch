@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openLobby, openManagement,
+import { openSettings, discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openLobby, openManagement,
   openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
 
 async function setConnection(page: Page, online: boolean) {
@@ -105,7 +105,7 @@ test("le bouton quitter donne l’administration au premier humain connecté apr
     await drawDeck(last).click();
     const card = await drawnCard(last).getAttribute("aria-label");
     expect(card).toMatch(/^Carte tirée, /);
-    await host.getByRole("button", { name: "Quitter la table", exact: true }).click();
+    await (await openSettings(host)).getByRole("button", { name: "Quitter la table", exact: true }).click();
     await expect(host.getByText("BobDepart a repris la table.")).toBeVisible();
     const management = await openManagement(successor);
     await expect(management.getByRole("button", { name: "Retirer ChloeDepart" })).toBeVisible();

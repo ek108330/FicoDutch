@@ -19,6 +19,7 @@ export type GamePlayer = {
   handVersion: number;
   handLayout?: HandLayout;
   memorizedPositions?: number[];
+  memorizationReady?: boolean;
   roundScore: number;
   totalScore: number;
   previousRank?: number;

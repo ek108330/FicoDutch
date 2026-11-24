@@ -145,8 +145,8 @@ export function TurnPiles({ view, canPlay, act, feedback, onGiftSlide }: TurnCon
       </button>}
       {canDiscard ? (
         <button className="pile-slot discard-target" type="button" aria-label={discardLabel}
-          aria-description="Au clavier, Entrée ou Espace défausse la carte tirée."
-          onClick={(event) => { if (event.detail === 0) act({ kind: "discard" }); }}>
+          aria-description="Défausse la carte tirée."
+          onClick={() => act({ kind: "discard" })}>
           {discardPile}
         </button>
       ) : <div className="pile-slot" role="img" aria-label={discardLabel}>{discardPile}</div>}

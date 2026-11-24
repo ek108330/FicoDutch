@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const { Server } = require("socket.io");
 const { openDatabase } = require("./database");
 const { mountAccounts } = require("./accounts");
@@ -10,7 +11,7 @@ const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay, findPlayerHub, getHub, getActiveMatchIds,
-  guestNameInUse, withPlayerName, applyRoundRating, nextHumanHost, promoteHost,
+  guestNameInUse, withPlayerName, applyRoundRating, nextHumanHost, promoteHost, privateHubMembers,
 } = require("./hubManager");
 
 const app = express();
@@ -37,6 +38,8 @@ const closing = new Set();
 const recentCheckpoints = new WeakMap();
 const roundBackups = new WeakMap();
 const backupHolders = new WeakMap();
+// Requests are tied to the connected socket and never included in the public directory.
+const privateRequests = new Map();
 
 if (process.env.SERVE_CLIENT === "1") {
   const clientFiles = path.resolve(__dirname, "../client/dist");
@@ -58,7 +61,36 @@ app.get("/", (req, res) => {
 });
 
 function broadcastHubs() {
-  io.emit("hubs:update", getAllHubs(), Date.now());
+  const queues = new Map();
+  for (const [socketId, entry] of privateRequests) {
+    const hub = getHub(entry.hubId);
+    if (canRequestAdmission(hub)) {
+      const queue = queues.get(hub.id) ?? [];
+      queue.push({ id: entry.id, pseudo: entry.identity.pseudo });
+      queues.set(hub.id, queue);
+    } else {
+      privateRequests.delete(socketId);
+      io.to(socketId).emit("hub:admission", { hubId: entry.hubId, status: "closed" });
+    }
+  }
+  const listings = getAllHubs();
+  const now = Date.now();
+  const recipients = [];
+  for (const { view, connections } of privateHubMembers()) {
+    const list = listings.map((item) => item.id === view.id ? view : item);
+    for (const { socketId, isHost } of connections) {
+      const joined = isHost && queues.has(view.id)
+        ? list.map((item) => item.id === view.id ? { ...view, joinRequests: queues.get(view.id) } : item)
+        : list;
+      recipients.push(socketId);
+      io.to(socketId).emit("hubs:update", joined, now);
+    }
+  }
+  io.except(recipients).emit("hubs:update", listings, now);
+}
+
+function canRequestAdmission(hub) {
+  return hub?.isPrivate && !hub.gameStarted && hub.players.length < hub.maxPlayers;
 }
 
 function saveRoundBackup(current, request, now = Date.now()) {
@@ -264,6 +296,7 @@ io.on("connection", (socket) => {
       if (!socket.connected) return;
       const membership = createHub(socket.id, identity.pseudo, identity.id, !!matchStore, identity.avatarStyle, identity.avatarPhotoId, rating);
       if (!membership) return socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
+      privateRequests.delete(socket.id);
       socket.emit("hub:created", membership, Date.now());
       broadcastHubs();
       console.log("Hub créé :", membership.hub.name);
@@ -286,6 +319,19 @@ io.on("connection", (socket) => {
         return;
       }
       if (!socket.connected || closing.has(hubId)) return;
+      if (hub?.isPrivate) {
+        if (!canRequestAdmission(hub) || findPlayerHub(socket.id) ||
+            (identity.id && hub.players.some(({ accountId }) => accountId === identity.id)) ||
+            [...privateRequests].some(([otherSocketId, entry]) => otherSocketId !== socket.id && entry.hubId === hubId &&
+              (identity.id ? entry.identity.id === identity.id : entry.identity.pseudo.toLowerCase() === identity.pseudo.toLowerCase()))) {
+          return socket.emit("hub:error", "Ce Hub privé est indisponible ou une demande existe déjà pour ce pseudo.");
+        }
+        const pending = privateRequests.get(socket.id);
+        if (pending?.hubId !== hubId) privateRequests.set(socket.id, { id: randomUUID(), hubId, identity, rating });
+        socket.emit("hub:admission", { hubId, status: "waiting" });
+        broadcastHubs();
+        return;
+      }
       const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId, rating);
       if (!membership) {
         socket.emit("hub:error", "Impossible de rejoindre ce Hub. Vérifie qu’il est disponible et que ce compte n’y occupe pas déjà une place.");
@@ -300,12 +346,53 @@ io.on("connection", (socket) => {
           throw error;
         }
       }
+      privateRequests.delete(socket.id);
       socket.emit("hub:joined", membership, Date.now());
       broadcastHubs();
     });
     } catch (error) {
       socketError(socket, error);
     }
+  });
+
+  socket.on("hub:cancel-admission", (request) => {
+    const hubId = request?.hubId;
+    if (!hubId || privateRequests.get(socket.id)?.hubId !== hubId) return;
+    privateRequests.delete(socket.id);
+    socket.emit("hub:admission", { hubId, status: "cancelled" });
+    broadcastHubs();
+  });
+
+  socket.on("hub:admission-decision", (request) => {
+    const current = findPlayerHub(socket.id);
+    if (!current?.player.isHost || current.hub.id !== request?.hubId ||
+        !canRequestAdmission(current.hub) || typeof request.accept !== "boolean") return;
+    const match = [...privateRequests].find(([, entry]) => entry.hubId === current.hub.id && entry.id === request.requestId);
+    if (!match) return;
+    const [socketId, entry] = match;
+    const applicant = io.sockets.sockets.get(socketId);
+    if (!applicant) return;
+    const { id, pseudo } = entry.identity;
+    function stillPending() {
+      const authority = findPlayerHub(socket.id);
+      return privateRequests.get(socketId) === entry && applicant.connected && authority?.player.isHost &&
+        authority.hub.id === entry.hubId && canRequestAdmission(authority.hub);
+    }
+
+    async function decide() {
+      if (!stillPending()) return;
+      const identity = id ? accountIdentity(applicant) : entry.identity;
+      const allowed = request.accept && identity && !findPlayerHub(socketId) &&
+        (id ? identity.id === id : !guestNameInUse(pseudo) && !await matchStore?.nameReserved(pseudo));
+      if (!stillPending()) return;
+      privateRequests.delete(socketId);
+      const membership = allowed && joinHub(entry.hubId, socketId, identity.pseudo, identity.id,
+        identity.avatarStyle, identity.avatarPhotoId, entry.rating, true);
+      if (membership) applicant.emit("hub:joined", membership, Date.now());
+      else applicant.emit("hub:admission", { hubId: entry.hubId, status: request.accept ? "closed" : "refused" });
+      broadcastHubs();
+    }
+    void (id ? decide() : withPlayerName(pseudo, decide)).catch((error) => socketError(socket, error));
   });
 
   socket.on("hub:resume", (request, acknowledge) => {
@@ -316,6 +403,7 @@ io.on("connection", (socket) => {
       return;
     }
     const { previousSocketId, ...membership } = resumed;
+    privateRequests.delete(socket.id);
     if (previousSocketId) io.sockets.sockets.get(previousSocketId)?.disconnect(true);
     if (previousSocketId && membership.session.isHost && membership.hub.hostPause) {
       scheduleHostExpiry(membership.hub.id, membership.hub.hostPause.until);
@@ -498,6 +586,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("Déconnexion :", socket.id);
     const current = findPlayerHub(socket.id);
+    const hadRequest = privateRequests.delete(socket.id);
     if (current?.player.isHost && current.hub.gameStarted && !current.hub.gameFinished) {
       void departHost(socket, current, null, false).catch((error) => {
         console.error("Départ de l’hôte non enregistré :", error.code ?? error.name);
@@ -509,9 +598,10 @@ io.on("connection", (socket) => {
     }
     if (current) backupHolders.get(current.hub)?.delete(current.player.id);
     const result = disconnectPlayer(socket.id);
-    if (!result) return;
+    if (!result && !hadRequest) return;
     broadcastHubs();
 
+    if (!result) return;
     const { hubId, pauseUntil } = result;
     if (pauseUntil !== undefined) scheduleHostExpiry(hubId, pauseUntil);
   });

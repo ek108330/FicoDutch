@@ -72,7 +72,18 @@ function membership(hub, player) {
 }
 
 function getAllHubs() {
-  return Array.from(hubs.values()).map(getPublicHub);
+  return Array.from(hubs.values(), (hub) => hub.isPrivate ? {
+    id: hub.id, name: hub.name, creatorAvatar: hub.creatorAvatar, isPrivate: true,
+    gameStarted: hub.gameStarted, gameFinished: hub.gameFinished,
+    players: [], status: getHubStatus(hub),
+  } : getPublicHub(hub));
+}
+
+function privateHubMembers() {
+  return [...hubs.values()].filter(({ isPrivate }) => isPrivate).map((hub) => ({
+    view: getPublicHub(hub),
+    connections: hub.players.filter(({ socketId }) => socketId).map(({ socketId, isHost }) => ({ socketId, isHost })),
+  }));
 }
 
 function relayLobbyMessage(socketId, request, now = Date.now()) {
@@ -108,6 +119,7 @@ function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, av
     id: randomUUID(),
     ...(tracked && { tracked: true }),
     name: `Hub de ${pseudo}`,
+    ...(accountId && { creatorAvatar: { id: accountId, style: avatarStyle, photoId: avatarPhotoId } }),
     hostId: host.id,
     hostPseudo: pseudo,
     players: [host],
@@ -125,12 +137,13 @@ function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, av
   return membership(hub, host);
 }
 
-function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating) {
+function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating, approved = false) {
   const existing = findPlayerHub(socketId);
   if (existing) return existing.hub.id === hubId ? membership(existing.hub, existing.player) : null;
 
   const hub = hubs.get(hubId);
   if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers ||
+      (hub.isPrivate && (!approved || hub.gameStarted)) ||
       (accountId && hub.players.some((player) => player.accountId === accountId))) return null;
   const player = newPlayer(socketId, pseudo, false, accountId, avatarStyle, avatarPhotoId);
   player.rating = rating;
@@ -152,6 +165,8 @@ function updateHubSettings(socketId, settings) {
     jokerPlus: Boolean(settings.variants?.jokerPlus),
   };
   hub.endThreshold = threshold;
+  if (settings.isPrivate === true) hub.isPrivate = true;
+  if (settings.isPrivate === false) delete hub.isPrivate;
   return getPublicHub(hub);
 }
 
@@ -365,7 +380,7 @@ module.exports = {
   guestNameInUse, withPlayerName,
   findPlayerHub, getHub: (id) => hubs.get(id),
   getActiveMatchIds: () => [...hubs.values()].filter((hub) => hub.gameStarted).map((hub) => `${hub.id}:${hub.gameNumber}`),
-  getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
+  getAllHubs, privateHubMembers, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
   finishHubGame, restartHubGame, resolveEncryptedRelay,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, applyRoundRating, nextHumanHost, promoteHost,

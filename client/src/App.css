@@ -181,8 +181,14 @@ input {
   margin-top: 8px;
 }
 
-.primary-button:hover {
+.primary-button:not(:disabled):hover {
   background: #f5d46b;
+}
+
+.primary-button:disabled {
+  background: #e6eee6;
+  color: #40584a;
+  cursor: default;
 }
 
 .start-game-button {
@@ -241,7 +247,7 @@ input {
   overflow-wrap: anywhere;
 }
 
-.hub-info span,
+.hub-info > span,
 .empty-hubs {
   color: var(--muted);
   font-size: 0.8rem;
@@ -341,10 +347,79 @@ input {
 }
 
 .lobby-players,
+.lobby-roster,
 .chat-log {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.home-identity,
+.hub-name,
+.private-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hub-name .player-avatar { flex: 0 0 auto; }
+.private-setting {
+  justify-self: start;
+  min-height: 24px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.private-setting input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: #21573d;
+}
+
+.lobby-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  padding: 0;
+  border: 1px solid #e9b7b1;
+  border-radius: 5px;
+  background: #fff0ef;
+  color: #a12420;
+  cursor: pointer;
+}
+
+.admission-queue {
+  display: grid;
+  gap: 4px;
+  margin: 5px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+}
+
+.admission-queue li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.admission-queue strong { overflow-wrap: anywhere; }
+.admission-queue button {
+  min-height: 28px;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #e6eee6;
+  color: #174833;
+  cursor: pointer;
 }
 
 .lobby-players {
@@ -482,6 +557,16 @@ input {
   width: 34px;
   height: 34px;
   padding: 0;
+}
+
+.lobby-chat .emoji-buttons {
+  flex-wrap: nowrap;
+  gap: clamp(2px, 0.7vw, 5px);
+}
+
+.lobby-chat .emoji-buttons button {
+  width: min(34px, calc((100% - 8 * clamp(2px, 0.7vw, 5px)) / 9));
+  min-width: 0;
 }
 
 .lobby-chat button:disabled {
@@ -1031,17 +1116,6 @@ input {
 .game-actions .settings-trigger {
   border-color: #91bca6;
   background: #123b2a;
-}
-
-.game-leave {
-  min-height: 34px;
-  padding: 4px 8px;
-  border: 1px solid #91bca6;
-  border-radius: 6px;
-  background: #123b2a;
-  color: #fff;
-  font: 600 0.72rem/1.2 var(--sans);
-  cursor: pointer;
 }
 
 .table-options {
@@ -2003,7 +2077,6 @@ button.pile-slot:not(:disabled) {
   cursor: pointer;
 }
 
-button.pile-slot.discard-target { cursor: default; }
 
 button.pile-slot:not(:disabled) .pile-card,
 .game-table button.playing-card:not([aria-pressed], [data-react-only]) {

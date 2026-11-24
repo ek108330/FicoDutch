@@ -5,7 +5,7 @@ import type { useHubPeers } from "../network/useHubPeers";
 import type { GameState } from "./gameTypes";
 import { getRoundLeaders, getRoundResultView, type RoundResultView } from "./hands";
 import { getBotReactionDelay, getBotStep, playBotStep } from "./bot";
-import { getMemorizedCards, memorizeCard, type MemorizedCard, type MemorizeRequest } from "./memorization";
+import { allPlayersMemorized, getMemorizedCards, memorizeCard, setMemorizationReady, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
   beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn, TURN_DURATION_MS,
@@ -172,6 +172,12 @@ export function useRoundTurn({
   }, [hostRound, hubId, isHost, paused, updateHostRound]);
 
   useEffect(() => {
+    if (isHost && !paused && hostRound && allPlayersMemorized(hostRound)) {
+      updateHostRound(hubId, (state) => allPlayersMemorized(state) ? beginPlay(state, performance.now()) : state);
+    }
+  }, [hostRound, hubId, isHost, paused, updateHostRound]);
+
+  useEffect(() => {
     if (paused || hostDeadline === null || hostRoundNumber === undefined || !hostPhase) return;
     const roundNumber = hostRoundNumber;
     const phase = hostPhase;
@@ -205,6 +211,12 @@ export function useRoundTurn({
         currentMembers.some(({ id, connected }) => id === senderId && connected)
         ? memorizeCard(state, senderId, request.position, performance.now(), state.phaseDeadline ?? firstDeadline) : state
       );
+    } else if (!paused && isHost && message.type === "memorization-ready") {
+      const request = message as { clockVersion?: unknown; roundNumber?: unknown; ready?: unknown };
+      if (request.clockVersion !== clockVersion) return;
+      updateHostRound(hubId, (state, currentMembers) => state.roundNumber === request.roundNumber &&
+        currentMembers.some(({ id, connected }) => id === senderId && connected)
+        ? setMemorizationReady(state, senderId, request.ready, performance.now(), state.phaseDeadline ?? firstDeadline) : state);
     } else if (!paused && isHost && message.type === "turn-action") {
       const request = message as Partial<TurnRequest>;
       if (request.clockVersion !== clockVersion) return;
@@ -252,6 +264,15 @@ export function useRoundTurn({
     return true;
   }
 
+  function confirmMemorization(ready: boolean) {
+    const time = performance.now();
+    if (paused || waitingForClock || scene?.phase !== "memorization" || deadline === null || time >= deadline) return false;
+    if (!isHost) return send(hostId, { type: "memorization-ready", roundNumber, clockVersion, ready });
+    updateHostRound(hubId, (state) => state.roundNumber === roundNumber
+      ? setMemorizationReady(state, playerId, ready, time, state.phaseDeadline ?? firstDeadline) : state);
+    return true;
+  }
+
   function dispatch(action: TurnAction) {
     if (!view) return;
     if (isHost) {
@@ -284,6 +305,6 @@ export function useRoundTurn({
       startNextRound(state, roundNumber, currentMembers, performance.now()));
   }
 
-  return { scene, deadline, view, finalMotion, announcement, remaining, canPlay, canReact, receive, memorize, act, react,
+  return { scene, deadline, view, finalMotion, announcement, remaining, canPlay, canReact, receive, memorize, confirmMemorization, act, react,
     canStartNext, toggleVariant, startNext, waitingForClock };
 }

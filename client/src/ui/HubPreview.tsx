@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import type { Hub } from "../../../shared/hubTypes";
 import { hubStatusLabels } from "../config/gameConfig";
 import { VARIANT_LABELS } from "../game/variants";
+import HubName from "./HubName";
 
 type Props = { hub: Hub; canJoin: boolean; onClose: () => void; onJoin: () => void };
 
@@ -18,7 +19,7 @@ export default function HubPreview({ hub, canJoin, onClose, onJoin }: Props) {
 
   return (
     <dialog className="hub-management" ref={dialog} aria-labelledby={title} onClose={onClose}>
-      <h2 id={title}>{hub.name}</h2>
+      <h2 id={title}><HubName hub={hub} /></h2>
       <p>{hubStatusLabels[hub.status]} · {hub.players.length}/{hub.maxPlayers} joueurs</p>
       <p>{hub.endThreshold === null ? "Partie sans limite de points" : `Fin de partie à ${hub.endThreshold} points`}</p>
       {activeVariants.length > 0 && <p>Variantes · {activeVariants.join(", ")}</p>}

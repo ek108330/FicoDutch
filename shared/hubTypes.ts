@@ -20,6 +20,9 @@ export type Hub = {
   id: string;
   tracked?: true;
   name: string;
+  creatorAvatar?: { id: string; style?: number; photoId?: string };
+  isPrivate?: true;
+  joinRequests?: { id: string; pseudo: string }[];
   hostId: string;
   hostPseudo: string;
   players: HubPlayer[];
@@ -48,8 +51,12 @@ export type CreateHubRequest = {
   pseudo: string;
 };
 
+export type HubListing = Hub | (Pick<Hub, "id" | "name" | "creatorAvatar" | "status" |
+  "gameStarted" | "gameFinished"> & { isPrivate: true; players: [] });
+
 export type HubSession = { hubId: string; playerId: string; token: string; isHost: boolean; matchId?: string };
 export type HubMembership = { hub: Hub; session: HubSession };
+export type HubAdmission = { hubId: string; status: "waiting" | "closed" | "refused" | "cancelled" };
 export type HubEnd = { hubId: string; reason: "removed" | "interrupted"; matchId?: string; tableSummary?: boolean };
 export type HubEmoji = keyof typeof hubSocial.emojis;
 export type LobbyChatContent = { kind: "text"; text: string } | { kind: "emoji"; emoji: HubEmoji };

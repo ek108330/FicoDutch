@@ -25,13 +25,12 @@ type RoundScreenProps = {
   hostRound: GameState | null;
   peers: ReturnType<typeof useHubPeers>;
   updateHostRound: UpdateHostRound;
-  onLeave: () => void;
   onRestart: () => void;
   onInterrupt?: () => void;
   restarting: boolean;
   settings: ReactNode;
   playSound: PlayGameSound;
-  canLeave: boolean;
+  connected: boolean;
   clockVersion: number;
   pause: { reason: "host" | "transfer" | "local"; deadline?: number } | null;
 };
@@ -41,7 +40,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, playSound, canLeave, clockVersion, pause,
+  peers, updateHostRound, onRestart, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
@@ -66,7 +65,7 @@ export default function RoundScreen({
   const canSelect = !paused && !turn.waitingForClock && memorizing && connectionReady;
   const finished = !paused && (phase === "results" && deadline === null || phase === "waiting" && gameFinished);
   const ticking = !finished || !!turn.finalMotion;
-  const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && canLeave &&
+  const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && connected &&
     (phase === "memorization" || phase === "playing");
   const feedback = useCardFeedback(
     !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playSound,
@@ -117,17 +116,22 @@ export default function RoundScreen({
   function toggle(position: number) {
     if (!canSelect || deadline === null || performance.now() >= deadline) return;
     const { visible } = localMemory;
+    const known = memorized.some((card) => card.position === position);
     if (visible.includes(position)) {
-      setMemory({ roundNumber, chosen, visible: visible.filter((card) => card !== position) });
+      if (!known) return;
+      const remaining = visible.filter((card) => card !== position);
+      setMemory({ roundNumber, chosen, visible: remaining });
+      if (remaining.length === 0 && memorized.length === limit) turn.confirmMemorization(true);
       return;
     }
     if (!chosen.includes(position) && chosen.length >= limit) return;
-    if (!memorized.some((card) => card.position === position) && !turn.memorize(position)) return;
+    if (!known && !turn.memorize(position)) return;
+    if (known && visible.length === 0 && memorized.length === limit) turn.confirmMemorization(false);
     setMemory({ roundNumber, chosen: chosen.includes(position) ? chosen : [...chosen, position], visible: [...visible, position] });
   }
 
   const toolbar = <div className="table-options">
-    {emojisEnabled && <EmojiButtons label="Emojis de la table" table onChoose={chooseEmoji} />}
+    {emojisEnabled && <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />}
     {settings}
   </div>;
 
@@ -142,7 +146,6 @@ export default function RoundScreen({
             duration={GAME_CONFIG.network.reconnectGracePeriodSeconds * 1_000} label="Délai de reprise" radius={15} />}
           <h1 id="pause-title">{transfer ? "Transfert de la table" : hostPaused ? "Partie en pause" : "Reconnexion à la table"}</h1>
           <p role="status">{transfer ? "Le nouvel hôte reprend la partie." : hostPaused ? "En attente du retour de l’hôte." : "Ta place est conservée."}</p>
-          {canLeave && <button type="button" onClick={onLeave}>Quitter la table</button>}
         </section>
       </main>
     );
@@ -160,7 +163,6 @@ export default function RoundScreen({
               <p>Ton score de départ sera le total le plus élevé à la fin de cette manche.</p>
             </>
           )}
-          {canLeave && <button type="button" className="result-primary" onClick={onLeave}>Quitter la table</button>}
         </section>
       </main>
     );
@@ -191,7 +193,6 @@ export default function RoundScreen({
           .map(({ pseudo }) => pseudo) : []}
         toggleVariant={turn.toggleVariant}
         startNext={turn.startNext}
-        onLeave={onLeave}
         onRestart={onRestart}
         onInterrupt={onInterrupt}
         gameFinished={gameFinished}
@@ -224,9 +225,6 @@ export default function RoundScreen({
 
   return (
     <main className="game-screen table-screen">
-      {canLeave && <div className="game-actions">
-        <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>
-      </div>}
       <GameTable
         localPlayerId={playerId}
         members={membersById}

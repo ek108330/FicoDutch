@@ -7,7 +7,7 @@ import { socket, connectToServer, disconnectFromServer } from "./network/socket"
 import { useHubPeers } from "./network/useHubPeers";
 import { useHostTransfer } from "./network/useHostTransfer";
 import { readHubSession, saveHubSession } from "./network/hubSession";
-import type { Hub, HubEnd, HubMembership, HubSession, RestartHubRequest, StartHubRequest } from "../../shared/hubTypes";
+import type { Hub, HubAdmission, HubEnd, HubListing, HubMembership, HubSession, RestartHubRequest, StartHubRequest } from "../../shared/hubTypes";
 import { createRound } from "./game/createRound";
 import { resumeGameClock } from "./game/gameClock";
 import { applyDepartures } from "./game/turn";
@@ -15,6 +15,8 @@ import type { UpdateHostRound } from "./game/useRoundTurn";
 import GameSettings from "./ui/GameSettings";
 import HubLobby from "./ui/HubLobby";
 import HubPreview from "./ui/HubPreview";
+import HubName from "./ui/HubName";
+import PlayerAvatar from "./ui/PlayerAvatar";
 import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
@@ -53,7 +55,8 @@ function App() {
   const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
   const settingsDialog = useRef<HTMLDialogElement>(null);
   const { sound, toggleSound, playSound } = useGameAudio();
-  const [hubs, setHubs] = useState<Hub[]>([]);
+  const [hubs, setHubs] = useState<HubListing[]>([]);
+  const [pendingAdmission, setPendingAdmission] = useState<string | null>(null);
   const [previewHubId, setPreviewHubId] = useState<string | null>(null);
   const [currentHub, setCurrentHub] = useState<CurrentHub | null>(null);
   const [session, setSession] = useState(readHubSession);
@@ -242,6 +245,7 @@ function App() {
       storeSession({ ...session, matchId: match });
       storeReady(true);
       setSessionNotice(null);
+      setPendingAdmission(null);
       setPreviewHubId(null);
       applyHub(hub, serverTime);
     }
@@ -280,17 +284,17 @@ function App() {
       tryResume();
     }
 
-    function onHubs(updatedHubs: Hub[], serverTime: number) {
+    function onHubs(updatedHubs: HubListing[], serverTime: number) {
       setHubs(updatedHubs);
       const current = hubRef.current;
-      if (!current) return;
+      if (!current || !readyRef.current) return;
       const update = updatedHubs.find(({ id }) => id === current.id);
-      if (!update?.players.some(({ id }) => id === sessionRef.current?.playerId)) {
+      if (!update || !("variants" in update) || !update.players.some(({ id }) => id === sessionRef.current?.playerId)) {
         const saved = sessionRef.current;
         clearTable();
         if (socket.connected) storeReady(true);
         if (!update) recoverMatch(saved);
-        if (current.gameStarted) setSessionNotice(update && update.hostId !== current.hostId
+        if (current.gameStarted) setSessionNotice(update && "hostId" in update && update.hostId !== current.hostId
           ? `${update.hostPseudo} a repris la table.`
           : current.hostPause ? "La partie est terminée. L’hôte n’est pas revenu à temps." : "Le Hub de la partie a été fermé.");
         return;
@@ -308,12 +312,19 @@ function App() {
     function onDisconnect() {
       if (hubRef.current?.gameStarted && hostRoundRef.current) pausedAt.current ??= performance.now();
       storeReady(false);
+      setPendingAdmission(null);
       window.clearTimeout(resumeRetry);
       console.log("FicoDutch déconnecté du serveur");
     }
 
     function onHubError(message: string) {
       alert(message);
+    }
+
+    function onAdmission({ hubId, status }: HubAdmission) {
+      setPendingAdmission((pending) => status === "waiting" ? hubId : pending === hubId ? null : pending);
+      setSessionNotice(status === "closed" ? "La demande d’admission a été clôturée."
+        : status === "refused" ? "L’hôte a refusé la demande d’admission." : null);
     }
 
     function onHubEnded({ hubId, reason, matchId, tableSummary }: HubEnd) {
@@ -337,6 +348,7 @@ function App() {
     socket.on("hubs:update", onHubs);
     socket.on("hub:error", onHubError);
     socket.on("hub:ended", onHubEnded);
+    socket.on("hub:admission", onAdmission);
     socket.on("hub:created", acceptMembership);
     socket.on("hub:joined", acceptMembership);
     window.addEventListener("online", connectToServer);
@@ -350,6 +362,7 @@ function App() {
       socket.off("hubs:update", onHubs);
       socket.off("hub:error", onHubError);
       socket.off("hub:ended", onHubEnded);
+      socket.off("hub:admission", onAdmission);
       socket.off("hub:created", acceptMembership);
       socket.off("hub:joined", acceptMembership);
       window.removeEventListener("online", connectToServer);
@@ -562,9 +575,9 @@ function App() {
     onInterrupt: interrupt,
   } : undefined;
 
-  function canJoinHub(hub: Hub) {
-    return networkReady && (!!account || !!pseudo.trim()) &&
-      (hub.status === "waiting" || hub.status === "in-progress");
+  function canJoinHub(hub: HubListing) {
+    return networkReady && !pendingAdmission && (!!account || !!pseudo.trim()) &&
+      (hub.status === "waiting" || (!hub.isPrivate && hub.status === "in-progress"));
   }
 
   const settings = (
@@ -614,7 +627,6 @@ function App() {
           hostRound={hostRound?.hubId === currentHub.id && hostRound.gameNumber === currentHub.gameNumber ? hostRound.state : null}
           peers={peers}
           updateHostRound={updateHostRound}
-          onLeave={leaveHub}
           onRestart={restartGame}
           onInterrupt={interrupt}
           restarting={restarting}
@@ -624,13 +636,13 @@ function App() {
           pause={currentHub.hostPause
             ? { reason: currentHub.hostPause.transfer ? "transfer" : "host", deadline: currentHub.pauseDeadline }
             : !networkReady ? { reason: "local" } : null}
-          canLeave={networkReady}
+          connected={networkReady}
         />
       );
     }
 
     const isHost = currentHub?.hostId === playerId;
-    const previewHub = hubs.find(({ id }) => id === previewHubId);
+    const previewHub = hubs.find((hub): hub is Hub => hub.id === previewHubId && !hub.isPrivate && "variants" in hub);
     return (
       <main className="home-page">
         <header className="top-bar">
@@ -648,7 +660,9 @@ function App() {
                 hostRound?.hubId !== currentHub.id}
               onStart={() => startGame(currentHub)} onLeave={leaveHub}
               onAddBot={() => socket.emit("hub:add-bot", { hubId: currentHub.id })}
-              onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })} />
+              onUpdate={(variants, endThreshold, isPrivate) => socket.emit("hub:update-settings", { variants, endThreshold, isPrivate })}
+              onRemove={(playerId) => socket.emit("hub:remove-guest", { hubId: currentHub.id, playerId })}
+              onDecision={(requestId, accept) => socket.emit("hub:admission-decision", { hubId: currentHub.id, requestId, accept })} />
           ) : (
             <div className="home-entry-layout">
               <div className="home-panel home-entry">
@@ -666,8 +680,11 @@ function App() {
                       onChange={(event) => savePseudo(event.target.value)} />
                   </label> : !accountSession ? <button type="button" onClick={() => {
                     void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
-                  }}>Vérifier la connexion</button> : <strong>{account?.name}</strong>}
-                  <button className="primary-button" type="submit" disabled={!accountSession}>
+                  }}>Vérifier la connexion</button> : account && <strong className="home-identity">
+                    <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} photoId={account.avatarPhotoId} mini />
+                    {account.name}
+                  </strong>}
+                  <button className="primary-button" type="submit" disabled={!accountSession || !!pendingAdmission}>
                     <Plus size={19} aria-hidden="true" /> Créer un Hub
                   </button>
                   {accountSession?.enabled && !account && <div className="account-links">
@@ -682,14 +699,20 @@ function App() {
                     ) : hubs.map((hub) => (
                       <div className="hub-item" key={hub.id}>
                         <div className="hub-info">
-                          <strong>{hub.name}</strong>
-                          <span>{hub.players.length}/{hub.maxPlayers} joueurs · <span>{hubStatusLabels[hub.status]}</span></span>
+                          <strong><HubName hub={hub} /></strong>
+                          {hub.isPrivate
+                            ? <span>Hub Privé · {hub.gameFinished ? "Terminée" : hub.gameStarted ? "En partie" : "En attente"}</span>
+                            : <span>{hub.players.length}/{hub.maxPlayers} joueurs · <span>{hubStatusLabels[hub.status]}</span></span>}
+                          {pendingAdmission === hub.id && <span role="status">En attente de validation</span>}
                         </div>
                         <div className="hub-actions">
-                          <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
-                            onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>
-                          <button type="button" className="join-button" disabled={!canJoinHub(hub)}
-                            onClick={() => joinHub(hub.id)}>Rejoindre</button>
+                          {!hub.isPrivate && <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
+                            onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>}
+                          {pendingAdmission === hub.id
+                            ? <button type="button" className="join-button"
+                                onClick={() => socket.emit("hub:cancel-admission", { hubId: hub.id })}>Annuler</button>
+                            : <button type="button" className="join-button" disabled={!canJoinHub(hub)}
+                                onClick={() => joinHub(hub.id)}>Rejoindre</button>}
                         </div>
                       </div>
                     ))}
@@ -714,7 +737,7 @@ function App() {
     <>
       {renderScreen()}
       <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
-        onLeave={currentHub?.gameStarted && !currentHub.gameFinished && networkReady ? leaveHub : undefined}
+        onLeave={currentHub?.gameStarted && networkReady ? leaveHub : undefined}
         onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined} />
     </>
   );
