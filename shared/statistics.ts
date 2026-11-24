@@ -36,7 +36,7 @@ export type MatchStats = {
 export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number;
   games?: number; totalRounds?: number; playerCount?: number; scopeIncomplete?: boolean };
 export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number; rating: number;
-  avatarStyle: number | null; avatarPhotoId?: string | null };
+  roundWinRate: number; avatarStyle: number | null; avatarPhotoId?: string | null };
 
 export type Account = { id: string; handle: string; name: string; avatarStyle?: number; avatarPhotoId?: string };
 
@@ -61,6 +61,6 @@ export type Profile = {
   penalties: number;
   exchanges: number;
   ratings: { rating: number; date: number }[];
-  rivals: { id: string; name: string; played: number; wins: number; losses: number }[];
+  rivals: { id: string; name: string; played: number; wins: number; losses: number; rating: number }[];
   encounters: { date: number; opponents: { id: string; name: string; outcome: number }[] }[];
 };

@@ -6,11 +6,13 @@ import { VARIANT_LABELS, type GameVariants } from "../game/variants";
 import PlayingCard from "./PlayingCard";
 import PerimeterClock from "./PerimeterClock";
 import { InterruptConfirmation } from "./HubManagement";
+import type { RoundRating } from "../../../shared/hubTypes";
 
 type Props = {
   result: RoundResultView;
   settings: ReactNode;
   roundNumber: number;
+  ratingChanges?: RoundRating["changes"];
   remaining: number;
   isHost: boolean;
   canEditVariants: boolean;
@@ -87,7 +89,12 @@ function RankingPosition({ rank, previousRank }: { rank: number; previousRank?: 
   </span>;
 }
 
-function Ranking({ result }: { result: RoundResultView }) {
+function Ranking({ result, ratingChanges }: { result: RoundResultView; ratingChanges?: RoundRating["changes"] }) {
+  const changes = new Map(ratingChanges?.map(({ id, before, after }) => {
+    const oldRating = Math.round(before);
+    const newRating = Math.round(after);
+    return [id, `${oldRating} → ${newRating} (${signedScore.format(newRating - oldRating)})`];
+  }));
   return (
     <table className="score-ranking" aria-label="Classement cumulé">
       <caption className="result-section-title">Classement général</caption>
@@ -101,7 +108,9 @@ function Ranking({ result }: { result: RoundResultView }) {
         {rankPlayers(result.players).map(({ rank, player: { id, pseudo, totalScore, roundScore, previousRank } }) => (
           <tr key={id}>
             <td><RankingPosition rank={rank} previousRank={previousRank} /></td>
-            <th scope="row"><span className="ranking-player"><span title={pseudo}>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
+            <th scope="row"><span className="ranking-player"><span title={pseudo}>{pseudo}</span><PlayerBadges id={id} result={result} />
+              {changes.has(id) && <small className="ranking-rn" aria-label={`Indice RN ${changes.get(id)}`}>{changes.get(id)}</small>}
+            </span></th>
             <td className="ranking-round-score">{signedScore.format(roundScore)}</td>
             <td className="result-total">{totalScore}</td>
           </tr>
@@ -112,7 +121,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, settings, roundNumber, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
+  result, settings, roundNumber, ratingChanges, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
   onRestart, onInterrupt, canRestart, gameFinished,
 }: Props) {
   const interruptDialog = useRef<HTMLDialogElement>(null);
@@ -142,7 +151,7 @@ export default function RoundResults({
         )}
         <div className="result-details">
           <ResultHands result={result} />
-          <Ranking result={result} />
+          <Ranking result={result} ratingChanges={ratingChanges} />
         </div>
         <div className="result-footer">
           <fieldset className="result-variants" disabled={!canEditVariants}>

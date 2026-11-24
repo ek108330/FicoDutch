@@ -18,9 +18,9 @@ import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
-import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RecentMatches } from "./ui/MatchArchive";
+import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RatingPodium, RecentMatches } from "./ui/MatchArchive";
 import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, tableSummaryPath, type AccountSession } from "./network/accountApi";
-import { logDeal, logMatch, type MatchJournal } from "./game/matchJournal";
+import { completedRoundsAfter, logDeal, logMatch, type MatchJournal } from "./game/matchJournal";
 import { matchStatistics } from "./game/matchStatistics";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
@@ -343,6 +343,7 @@ function App() {
     const journal = logMatch(state, performance.now(), { kind: "match-end", status }).journal;
     socket.timeout(8_000).emit(status === "finished" ? "hub:finish" : "hub:interrupt", {
       hubId: hub.id, gameNumber: hub.gameNumber, report: matchStatistics(journal, status),
+      rounds: completedRoundsAfter(state.journal, hub.roundRating?.number ?? 0),
       ...(round.previousGames?.length && { table: matchStatistics(journal, "interrupted", false, round.previousGames) }),
     }, (error: Error | null, accepted?: boolean) => {
       if (sealed.current === id) sealed.current = null;
@@ -351,6 +352,28 @@ function App() {
       }
     });
   }, []);
+
+  const roundNumber = hostRound?.state.roundNumber;
+  const roundPhase = hostRound?.state.phase;
+  const pendingRatingMatch = hostRound?.state.matchId;
+  useEffect(() => {
+    if (!networkReady || !pendingRatingMatch) return;
+    let sending = false;
+    function saveRounds() {
+      const hub = hubRef.current;
+      const round = hostRoundRef.current;
+      if (sending || !hub || !round || hub.hostPause || round.state.matchId !== pendingRatingMatch ||
+          pendingRatingMatch !== `${hub.id}:${hub.gameNumber}` || sealed.current === pendingRatingMatch) return;
+      const rounds = completedRoundsAfter(round.state.journal, hub.roundRating?.number ?? 0);
+      if (!rounds.length) return;
+      sending = true;
+      socket.timeout(6_000).emit("hub:rate-rounds", { hubId: hub.id, gameNumber: hub.gameNumber, rounds },
+        () => { sending = false; });
+    }
+    saveRounds();
+    const retry = window.setInterval(saveRounds, 5_000);
+    return () => window.clearInterval(retry);
+  }, [networkReady, pendingRatingMatch, roundNumber, roundPhase]);
 
   useEffect(() => {
     if (!networkReady || !currentHub || currentHub.gameFinished || hostRound?.hubId !== currentHub.id ||
@@ -498,7 +521,7 @@ function App() {
       navigate, backToTable: !!currentHub,
       ...(currentHub?.gameFinished && { leaveTable: () => { leaveHub(); navigate("/"); } }),
     };
-    if (profile) return <PublicProfile key={profile} id={profile} {...archiveProps} />;
+    if (profile) return <PublicProfile key={profile} id={profile} canReport={!!account && account.id !== profile} {...archiveProps} />;
     if (path === "/joueurs") return <PlayersDirectory {...archiveProps} />;
     if (path === "/bots") return <DemoBots {...archiveProps} />;
     if (path === "/mes-stats" && account) return <PublicProfile key={account.id} id={account.id} personal {...archiveProps} />;
@@ -527,6 +550,7 @@ function App() {
           deadline={memorizationDeadline}
           members={currentHub.players}
           gameFinished={currentHub.gameFinished}
+          roundRating={currentHub.roundRating}
           hostRound={hostRound?.hubId === currentHub.id && hostRound.gameNumber === currentHub.gameNumber ? hostRound.state : null}
           peers={peers}
           updateHostRound={updateHostRound}
@@ -612,10 +636,13 @@ function App() {
                   </div>
                 </section>
               </div>
-              {accountSession?.enabled && <nav className="home-stats" aria-label="Statistiques">
-                <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
-                <button type="button" onClick={() => navigate("/joueurs")}>Classement</button>
-              </nav>}
+              {accountSession?.enabled && <>
+                <nav className="home-stats" aria-label="Statistiques">
+                  <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
+                  <button type="button" onClick={() => navigate("/joueurs")}>Classement</button>
+                </nav>
+                <RatingPodium navigate={navigate} />
+              </>}
             </div>
           )}
         </div>

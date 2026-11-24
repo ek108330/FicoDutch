@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GAME_CONFIG } from "../config/gameConfig";
-import type { HubPlayer } from "../../../shared/hubTypes";
+import type { HubPlayer, RoundRating } from "../../../shared/hubTypes";
 import { memorizationLimit } from "../game/memorization";
 import type { CardTarget, GameState } from "../game/gameTypes";
 import { useRoundTurn, type UpdateHostRound } from "../game/useRoundTurn";
@@ -22,6 +22,7 @@ type RoundScreenProps = {
   deadline: number;
   members: HubPlayer[];
   gameFinished: boolean;
+  roundRating?: RoundRating;
   hostRound: GameState | null;
   peers: ReturnType<typeof useHubPeers>;
   updateHostRound: UpdateHostRound;
@@ -40,7 +41,7 @@ type Memorization = { roundNumber: number; chosen: number[]; visible: number[] }
 const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] };
 
 export default function RoundScreen({
-  hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
+  hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound, roundRating,
   peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
@@ -181,6 +182,7 @@ export default function RoundScreen({
         result={scene.result}
         settings={settings}
         roundNumber={roundNumber}
+        ratingChanges={roundRating?.number === roundNumber ? roundRating.changes : undefined}
         remaining={turn.remaining}
         isHost={playerId === hostId}
         canEditVariants={playerId === hostId && !restarting}

@@ -10,7 +10,7 @@ const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay, findPlayerHub, getHub, getActiveMatchIds,
-  guestNameInUse, withPlayerName,
+  guestNameInUse, withPlayerName, applyRoundRating,
 } = require("./hubManager");
 
 const app = express();
@@ -131,6 +131,11 @@ async function persistEnd(socket, request, status, acknowledge) {
   closing.add(hub.id);
   try {
     const id = matchId(hub);
+    const through = request.rounds?.length ? await persistRatings(hub, request.rounds) : hub.roundRating?.number ?? 0;
+    if (through === null || (Number.isSafeInteger(request.report.rounds) && request.report.rounds > through)) {
+      if (typeof acknowledge === "function") acknowledge(false);
+      return;
+    }
     if (!await matchStore.finish(id, status, request.report, Date.now(), request.table)) {
       if (typeof acknowledge === "function") acknowledge(false);
       return;
@@ -146,6 +151,24 @@ async function persistEnd(socket, request, status, acknowledge) {
   } finally {
     closing.delete(hub.id);
   }
+}
+
+async function persistRatings(hub, rounds) {
+  const gameNumber = hub.gameNumber;
+  const saved = await matchStore.recordRounds(matchId(hub), rounds);
+  if (!saved) return null;
+  if (hub.gameNumber === gameNumber && saved.results.length &&
+      saved.through > (hub.roundRating?.number ?? 0)) {
+    for (const { number, changes } of saved.results) {
+      applyRoundRating(hub, number, changes);
+      for (const { accountId, after } of changes) {
+        const bot = demoBots.find(({ id }) => id === accountId);
+        if (bot) bot.rating = after;
+      }
+    }
+    broadcastHubs();
+  }
+  return saved.through;
 }
 
 io.on("connection", (socket) => {
@@ -170,8 +193,10 @@ io.on("connection", (socket) => {
 
   socket.on("hub:create", (data) => {
     if (!checkClientBuild(socket)) return;
-    void admit(socket, data, (identity) => {
-      const membership = createHub(socket.id, identity.pseudo, identity.id, !!matchStore, identity.avatarStyle, identity.avatarPhotoId);
+    void admit(socket, data, async (identity) => {
+      const rating = identity.id ? await matchStore?.getRating(identity.id) : undefined;
+      if (!socket.connected) return;
+      const membership = createHub(socket.id, identity.pseudo, identity.id, !!matchStore, identity.avatarStyle, identity.avatarPhotoId, rating);
       if (!membership) return socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
       socket.emit("hub:created", membership, Date.now());
       broadcastHubs();
@@ -187,6 +212,7 @@ io.on("connection", (socket) => {
       return;
     }
     try { await admit(socket, data, async (identity) => {
+      const rating = identity.id ? await matchStore?.getRating(identity.id) : undefined;
       const hub = getHub(hubId);
       const id = matchStore && hub?.gameStarted ? matchId(hub) : null;
       if (closing.has(hubId) || (id && identity.id && await matchStore.hasSeat(id, identity.id))) {
@@ -194,7 +220,7 @@ io.on("connection", (socket) => {
         return;
       }
       if (!socket.connected || closing.has(hubId)) return;
-      const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId);
+      const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId, rating);
       if (!membership) {
         socket.emit("hub:error", "Impossible de rejoindre ce Hub. Vérifie qu’il est disponible et que ce compte n’y occupe pas déjà une place.");
         return;
@@ -258,6 +284,18 @@ io.on("connection", (socket) => {
     void persistEnd(socket, request, "finished", acknowledge).catch((error) => socketError(socket, error, acknowledge));
   });
 
+  socket.on("hub:rate-rounds", (request, acknowledge) => {
+    const current = findPlayerHub(socket.id);
+    const hub = current?.hub;
+    if (typeof acknowledge !== "function") return;
+    if (!matchStore || !current?.player.isHost || !hub.gameStarted || hub.hostPause || closing.has(hub.id) ||
+        hub.id !== request?.hubId || hub.gameNumber !== request.gameNumber) return acknowledge(null);
+    void persistRatings(hub, request.rounds).then(acknowledge).catch((error) => {
+      console.error("Indice RN non enregistré :", error.code ?? error.name);
+      acknowledge(null);
+    });
+  });
+
   socket.on("hub:restart", async (request, acknowledge) => {
     const hub = findPlayerHub(socket.id)?.hub;
     const previous = hub && { ...hub };
@@ -287,12 +325,16 @@ io.on("connection", (socket) => {
     broadcastHubs();
   });
 
-  socket.on("hub:remove-guest", (request) => {
+  socket.on("hub:remove-guest", async (request) => {
     const { hubId, playerId } = request ?? {};
     const result = removeHubGuest(socket.id, hubId, playerId);
     if (!result) {
       socket.emit("hub:error", "Ce joueur ne peut pas être retiré de la table.");
       return;
+    }
+    const hub = getHub(hubId);
+    if (matchStore && hub?.gameStarted) {
+      await matchStore.recordDeparture(matchId(hub), playerId, "removed").catch((error) => socketError(socket, error));
     }
     if (result.socketId) io.to(result.socketId).emit("hub:ended", { hubId, reason: "removed" });
     broadcastHubs();
@@ -346,9 +388,13 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("hub:leave", () => {
+  socket.on("hub:leave", async () => {
+    const current = findPlayerHub(socket.id);
     const result = removePlayer(socket.id);
     if (result) {
+      if (matchStore && current?.hub.gameStarted && !current.player.isHost) {
+        await matchStore.recordDeparture(matchId(current.hub), current.player.id, "left").catch((error) => socketError(socket, error));
+      }
       socket.emit("hub:left");
       broadcastHubs();
       console.log("Joueur sorti de son Hub :", socket.id);
@@ -374,11 +420,12 @@ async function start() {
     matchStore = createMatchStore(db);
     if (process.env.FICODUTCH_DEMO === "1") {
       const { seedDemoPopulation } = require("./demoPopulation");
-      demoBots = await seedDemoPopulation(db, matchStore);
+      await seedDemoPopulation(db, matchStore);
+      demoBots = await matchStore.listBots();
       console.log(`Population de test disponible : ${demoBots.length} bots, 100 parties simulées.`);
     }
     const readAccount = mountAccounts(app, io, db, acceptsOrigin, broadcastHubs);
-    mountMatchRoutes(app, matchStore, readAccount);
+    mountMatchRoutes(app, matchStore, readAccount, acceptsOrigin);
     setInterval(async () => {
       try {
         for (const id of await matchStore.staleMatches(Date.now() - 120_000, getActiveMatchIds())) {

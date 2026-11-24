@@ -1,5 +1,6 @@
 const { uuidPattern } = require("./accounts");
 const { createHash } = require("node:crypto");
+const { recordRatedRounds } = require("./roundRating");
 const seatHash = (token) => typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token)
   ? createHash("sha256").update(token).digest("hex") : null;
 
@@ -60,22 +61,6 @@ function cleanReport(raw, seats, status, partial) {
   return { status, partial, rounds: raw.rounds, players, awards, ...(unfinished && { unfinished }) };
 }
 
-function ratingUpdates(players, ratings) {
-  const changes = new Map();
-  if (players.length < 2) return changes;
-  for (const player of players) {
-    const rating = ratings.get(player.accountId);
-    const delta = players.reduce((sum, opponent) => {
-      if (opponent === player) return sum;
-      const expected = 1 / (1 + 10 ** ((ratings.get(opponent.accountId) - rating) / 400));
-      const actual = player.rank < opponent.rank ? 1 : player.rank === opponent.rank ? 0.5 : 0;
-      return sum + actual - expected;
-    }, 0);
-    changes.set(player.accountId, Math.max(0, Math.round(rating + 32 * delta / (players.length - 1))));
-  }
-  return changes;
-}
-
 function createMatchStore(db) {
   async function addSeat(source, id, seat, starting = false) {
     await source.query(`
@@ -133,30 +118,24 @@ function createMatchStore(db) {
   async function updateProfiles(tx, id, report, now) {
     const people = report.players.filter(({ accountId }) => accountId).sort((a, b) => a.accountId.localeCompare(b.accountId));
     if (!people.length) return;
-    const ranked = people.filter(({ eligible, rank }) => eligible && rank !== undefined);
     const opponents = people.filter(({ rank }) => rank !== undefined);
-    const { rows } = await tx.query(`
-      SELECT account_id, rating FROM player_stats WHERE account_id = ANY($1::uuid[]) ORDER BY account_id FOR UPDATE
-    `, [people.map(({ accountId }) => accountId)]);
-    const changes = ratingUpdates(ranked, new Map(rows.map(({ account_id, rating }) => [account_id, rating])));
     const finished = report.status === "finished" ? 1 : 0;
     for (const entry of people) {
-      const rating = changes.get(entry.accountId) ?? null;
       await tx.query(`
-        UPDATE player_stats SET rating = COALESCE($2, rating), matches = matches + 1,
-          finished = finished + $3, interrupted = interrupted + $4, victories = victories + $5,
-          rounds = rounds + $6, round_wins = round_wins + $7, score_sum = score_sum + $8,
-          best_score = LEAST(best_score, $9), dutch = dutch + $10, dutch_won = dutch_won + $11,
-          reactions = reactions + $12, penalties = penalties + $13, exchanges = exchanges + $14
+        UPDATE player_stats SET matches = matches + 1,
+          finished = finished + $2, interrupted = interrupted + $3, victories = victories + $4,
+          rounds = rounds + $5, round_wins = round_wins + $6, score_sum = score_sum + $7,
+          best_score = LEAST(best_score, $8), dutch = dutch + $9, dutch_won = dutch_won + $10,
+          reactions = reactions + $11, penalties = penalties + $12, exchanges = exchanges + $13
         WHERE account_id = $1
-      `, [entry.accountId, rating, finished, 1 - finished, entry.rank === 1 ? 1 : 0,
+      `, [entry.accountId, finished, 1 - finished, entry.rank === 1 ? 1 : 0,
         entry.rounds, entry.wins, entry.scoreSum, entry.bestScore, entry.dutch, entry.dutchWon,
         entry.reactions, entry.penalties, entry.exchanges]);
       const encounters = entry.rank === undefined ? [] : opponents.filter((other) => other !== entry)
         .map((other) => ({ id: other.accountId, outcome: Math.sign(other.rank - entry.rank) }));
       await tx.query(`
-        INSERT INTO account_matches (account_id, match_id, ended_at, status, rating, opponents) VALUES ($1, $2, $3, $4, $5, $6)
-      `, [entry.accountId, id, now, report.status, rating, JSON.stringify(encounters)]);
+        INSERT INTO account_matches (account_id, match_id, ended_at, status, opponents) VALUES ($1, $2, $3, $4, $5)
+      `, [entry.accountId, id, now, report.status, JSON.stringify(encounters)]);
     }
     if (opponents.length < 2) return;
     await tx.query(`
@@ -230,18 +209,22 @@ function createMatchStore(db) {
       scopeIncomplete: rows.length > 1 && !table };
   }
 
-  async function listPlayers(query, cursor = null) {
+  async function listPlayers(query, after = null, limit = 30) {
     const { rows } = await db.query(`
-      SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rating,
-        a.avatar_style AS "avatarStyle", a.avatar_photo_id AS "avatarPhotoId"
-      FROM accounts a JOIN player_stats s ON a.id = s.account_id
-      WHERE lower(a.display_name) LIKE $1 AND
-        ($2::int IS NULL OR s.rating < $2 OR (s.rating = $2 AND a.id > $3::uuid))
-      ORDER BY s.rating DESC, s.account_id LIMIT 31
-    `, [query + "%", cursor?.rating ?? null, cursor?.id ?? null]);
-    const players = rows.slice(0, 30);
+      WITH ranking AS (
+        SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rn AS rating,
+          CASE WHEN s.rounds = 0 THEN 0 ELSE s.round_wins::double precision / s.rounds END AS "roundWinRate",
+          a.avatar_style AS "avatarStyle", a.avatar_photo_id AS "avatarPhotoId"
+        FROM accounts a JOIN player_stats s ON a.id = s.account_id
+      )
+      SELECT * FROM ranking WHERE lower(name) LIKE $1 AND
+        ($2::float8 IS NULL OR (rating, matches, "roundWinRate") < ($2, $3, $4)
+          OR ((rating, matches, "roundWinRate") = ($2, $3, $4) AND id > $5))
+      ORDER BY rating DESC, matches DESC, "roundWinRate" DESC, id LIMIT $6
+    `, [query + "%", after?.rating ?? null, after?.matches ?? null, after?.roundWinRate ?? null, after?.id ?? null, limit + 1]);
+    const players = rows.slice(0, limit);
     const last = players.at(-1);
-    return { players, next: rows.length > players.length ? `${last.rating}/${last.id}` : null };
+    return { players, next: rows.length > players.length ? `${last.rating}/${last.matches}/${last.roundWinRate}/${last.id}` : null };
   }
 
   async function getProfile(id) {
@@ -253,7 +236,8 @@ function createMatchStore(db) {
     if (!row) return null;
     const [history, encounters, rivalry] = await Promise.all([
       db.query(`
-        SELECT rating, ended_at FROM account_matches WHERE account_id = $1 AND rating IS NOT NULL ORDER BY ended_at DESC LIMIT 30
+        SELECT after_rn AS rating, at AS ended_at FROM round_rating_entries WHERE account_id = $1
+        ORDER BY at DESC, match_id DESC, number DESC LIMIT 30
       `, [id]),
       db.query(`
         WITH recent AS (
@@ -270,12 +254,12 @@ function createMatchStore(db) {
           (SELECT * FROM rivalries WHERE account_id = $1 ORDER BY played DESC, rival_id LIMIT 12)
           UNION (SELECT * FROM rivalries WHERE account_id = $1 AND wins > losses ORDER BY played DESC, rival_id LIMIT 8)
           UNION (SELECT * FROM rivalries WHERE account_id = $1 AND losses > wins ORDER BY played DESC, rival_id LIMIT 8)
-        ) SELECT a.id, a.display_name AS name, played, wins, losses FROM top
-          JOIN accounts a ON a.id = top.rival_id ORDER BY played DESC, name
+        ) SELECT a.id, a.display_name AS name, played, wins, losses, s.rn AS rating FROM top
+          JOIN accounts a ON a.id = top.rival_id JOIN player_stats s ON s.account_id = a.id ORDER BY played DESC, name
       `, [id]),
     ]);
     return {
-      id, name: row.display_name, demoBot: row.is_demo_bot, rating: row.rating, matches: row.matches, finished: row.finished, interrupted: row.interrupted,
+      id, name: row.display_name, demoBot: row.is_demo_bot, rating: row.rn, matches: row.matches, finished: row.finished, interrupted: row.interrupted,
       ...(row.avatar_style != null && { avatarStyle: row.avatar_style }),
       ...(row.avatar_photo_id && { avatarPhotoId: row.avatar_photo_id }),
       victories: row.victories, rounds: row.rounds, roundWins: row.round_wins, scoreSum: Number(row.score_sum),
@@ -307,17 +291,28 @@ function createMatchStore(db) {
 
   async function listBots() {
     const { rows } = await db.query(`
-      SELECT a.id, a.display_name AS name, s.matches FROM accounts a JOIN player_stats s ON a.id = s.account_id
+      SELECT a.id, a.display_name AS name, s.matches, s.rn AS rating FROM accounts a JOIN player_stats s ON a.id = s.account_id
       WHERE a.is_demo_bot ORDER BY a.display_name
     `);
     return rows;
   }
 
-  return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish,
+  const recordDeparture = (id, seatId, reason) => db.query(
+    "UPDATE match_seats SET departure = $3 WHERE match_id = $1 AND seat_id = $2 AND departure IS NULL", [id, seatId, reason]);
+  const getRating = async (id) => (await db.query("SELECT rn FROM player_stats WHERE account_id = $1", [id])).rows[0]?.rn;
+  const reportHistory = (reporter, target, now) => db.query(`
+    INSERT INTO rating_reports (reporter_id, account_id, reported_at)
+    SELECT $1, id, $3::bigint FROM accounts WHERE id = $2 AND
+      (SELECT count(*) FROM rating_reports WHERE reporter_id = $1 AND reported_at > $3::bigint - 86400000) < 10
+    ON CONFLICT (reporter_id, account_id) DO UPDATE SET reported_at = EXCLUDED.reported_at
+    WHERE rating_reports.reported_at <= EXCLUDED.reported_at - 86400000
+  `, [reporter, target, now]);
+  return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish, recordDeparture, getRating,
+    recordRounds: (id, rounds, now) => recordRatedRounds(db, id, rounds, now), reportHistory,
     getMatch, getTableSummary, getProfile, listPlayers, listMatches, listBots, staleMatches };
 }
 
-function mountMatchRoutes(app, store, readAccount) {
+function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
   app.get("/api/matches/recent", async (request, response) => {
     const session = await readAccount(request.headers);
     response.set("Cache-Control", "no-store");
@@ -345,17 +340,38 @@ function mountMatchRoutes(app, store, readAccount) {
   app.get("/api/demo-bots", async (_request, response) => {
     response.set("Cache-Control", "public, max-age=30").json(await store.listBots());
   });
+  app.get("/api/podium", async (_request, response) => {
+    const { players } = await store.listPlayers("", null, 3);
+    response.set("Cache-Control", "public, max-age=15").json(players);
+  });
+  app.post("/api/players/:id/report", async (request, response) => {
+    if (!request.headers.origin || !acceptsOrigin(request.headers.origin))
+      return response.status(403).json({ error: "Origine non autorisée." });
+    const session = await readAccount(request.headers);
+    if (!session) return response.status(401).json({ error: "Connecte-toi pour signaler un historique." });
+    const { id } = request.params;
+    if (!uuidPattern.test(id) || id === session.account.id)
+      return response.status(400).json({ error: "Ce profil ne peut pas être signalé." });
+    const result = await store.reportHistory(session.account.id, id, Date.now());
+    if (!result.rowCount && !result.affectedRows)
+      return response.status(409).json({ error: "Signalement déjà envoyé ou limite quotidienne atteinte." });
+    response.json({ ok: true });
+  });
   app.get("/api/players", async (request, response) => {
     const { q = "", after = "" } = request.query;
     if (typeof q !== "string" || !/^[\p{L}0-9]{0,15}$/u.test(q)) {
       return response.status(400).json({ error: "Saisis au plus 15 lettres ou chiffres." });
     }
-    const [rating, id, extra] = typeof after === "string" ? after.split("/") : [];
-    if (after !== "" && (!/^\d{1,10}$/.test(rating ?? "") || Number(rating) > 2_147_483_647 || !uuidPattern.test(id ?? "") || extra !== undefined)) {
+    const parts = typeof after === "string" ? after.split("/") : [];
+    const [rating, matches, roundWinRate] = parts.slice(0, 3).map(Number);
+    const id = parts[3];
+    if (after !== "" && (parts.length !== 4 || !parts.slice(0, 3).every((item) => item.trim() !== "") ||
+        !Number.isFinite(rating) || rating < 0 || rating > 99 || !Number.isInteger(matches) || matches < 0 || matches > 2_147_483_647 ||
+        !Number.isFinite(roundWinRate) || roundWinRate < 0 || roundWinRate > 1 || !uuidPattern.test(id ?? ""))) {
       return response.status(400).json({ error: "Page de classement invalide." });
     }
     response.set("Cache-Control", "public, max-age=30").json(await store.listPlayers(q.toLowerCase(),
-      after ? { rating: Number(rating), id } : null));
+      after ? { rating, matches, roundWinRate, id } : null));
   });
   app.get("/api/players/:id", async (request, response) => {
     const profile = uuidPattern.test(request.params.id) && await store.getProfile(request.params.id);

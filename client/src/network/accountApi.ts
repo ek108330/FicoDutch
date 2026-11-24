@@ -45,6 +45,10 @@ export const readPlayers = (query: string, after: string, signal?: AbortSignal) 
   request<{ players: DirectoryPlayer[]; next: string | null }>(
     "/players?" + new URLSearchParams({ q: query, after }), { signal });
 export const readProfile = (id: string, signal?: AbortSignal) => request<Profile>(`/players/${encodeURIComponent(id)}`, { signal });
+export const reportProfile = (id: string) => request<{ ok: true }>(`/players/${encodeURIComponent(id)}/report`, {
+  method: "POST", body: "{}",
+});
+export const readPodium = (signal?: AbortSignal) => request<DirectoryPlayer[]>("/podium", { signal });
 export const readDemoBots = (signal?: AbortSignal) => request<Array<{ id: string; name: string; matches: number }>>("/demo-bots", { signal });
 export const readRecentMatches = (cursor: string | null, signal?: AbortSignal) =>
   request<{ matches: RecentMatch[]; next: string | null }>(

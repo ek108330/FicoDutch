@@ -2,6 +2,15 @@ const { randomBytes, randomUUID } = require("crypto");
 const { emojis, maxMessageLength } = require("../shared/hubSocial.json");
 
 const hubs = new Map();
+function applyRoundRating(hub, number, changes) {
+  hub.roundRating = { number, changes: changes.map(({ id, before, after }) => ({ id, before, after })) };
+  const ratings = new Map(changes.map(({ accountId, after }) => [accountId, after]));
+  for (const current of hubs.values()) {
+    for (const player of current.players) {
+      if (ratings.has(player.accountId)) player.rating = ratings.get(player.accountId);
+    }
+  }
+}
 const nameOperations = new Map();
 const guestNameInUse = (name) => [...hubs.values()].some(({ players }) =>
   players.some(({ pseudo, accountId, isBot }) => !accountId && !isBot && pseudo.toLowerCase() === name.toLowerCase()));
@@ -48,8 +57,8 @@ function getHubStatus(hub) {
 function getPublicHub(hub) {
   return {
     ...hub,
-    players: hub.players.map(({ id, pseudo, accountId, avatarStyle, avatarPhotoId, isHost, isBot, connected, connectionVersion }) => ({
-      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }), ...(accountId && { accountId, avatarStyle, avatarPhotoId }),
+    players: hub.players.map(({ id, pseudo, accountId, avatarStyle, avatarPhotoId, rating, isHost, isBot, connected, connectionVersion }) => ({
+      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }), ...(accountId && { accountId, avatarStyle, avatarPhotoId, rating }),
     })),
     status: getHubStatus(hub),
   };
@@ -91,9 +100,10 @@ function relayLobbyMessage(socketId, request, now = Date.now()) {
   };
 }
 
-function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, avatarPhotoId) {
+function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, avatarPhotoId, rating) {
   if (findPlayerHub(socketId)) return null;
   const host = newPlayer(socketId, pseudo, true, accountId, avatarStyle, avatarPhotoId);
+  host.rating = rating;
   const hub = {
     id: randomUUID(),
     ...(tracked && { tracked: true }),
@@ -115,7 +125,7 @@ function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, av
   return membership(hub, host);
 }
 
-function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId) {
+function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating) {
   const existing = findPlayerHub(socketId);
   if (existing) return existing.hub.id === hubId ? membership(existing.hub, existing.player) : null;
 
@@ -123,6 +133,7 @@ function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId)
   if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers ||
       (accountId && hub.players.some((player) => player.accountId === accountId))) return null;
   const player = newPlayer(socketId, pseudo, false, accountId, avatarStyle, avatarPhotoId);
+  player.rating = rating;
   hub.players.push(player);
   return membership(hub, player);
 }
@@ -154,7 +165,8 @@ function addHubBot(socketId, hubId, profiles = []) {
   const candidates = profiles.filter(({ id }) => !hub.players.some(({ accountId }) => accountId === id));
   const profile = candidates[Math.floor(Math.random() * candidates.length)];
   hub.players.push({
-    id: randomUUID(), pseudo: profile?.name ?? `Bot ${number}`, ...(profile && { accountId: profile.id }),
+    id: randomUUID(), pseudo: profile?.name ?? `Bot ${number}`,
+    ...(profile && { accountId: profile.id, rating: profile.rating, avatarStyle: profile.avatarStyle }),
     isHost: false, isBot: true, connected: true, connectionVersion: 0,
   });
   return true;
@@ -280,6 +292,7 @@ function restartHubGame(socketId, request) {
   hub.initialCardCounts = Object.fromEntries(hub.players.map(({ id }) => [id, cardsPerPlayer]));
   hub.memorizationEndsAt = Date.now() + dealingMs + memorizationMs;
   hub.gameFinished = false;
+  delete hub.roundRating;
   hub.gameNumber++;
   hub.clockVersion++;
   return true;
@@ -339,5 +352,5 @@ module.exports = {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
   finishHubGame, restartHubGame, resolveEncryptedRelay,
-  addHubBot, removeHubGuest, interruptHub, relayLobbyMessage,
+  addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, applyRoundRating,
 };

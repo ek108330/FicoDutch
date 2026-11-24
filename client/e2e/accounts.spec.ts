@@ -13,12 +13,18 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(page.getByText("Jouer sans compte")).toBeVisible();
     const hubPanel = page.locator(".home-entry");
     const statistics = page.getByRole("navigation", { name: "Statistiques" });
-    for (const [width, height] of [[360, 640], [740, 360], [1280, 800]]) {
+    const podium = page.getByRole("region", { name: "Podium RN" });
+    await expect(podium.getByRole("link")).toHaveCount(3);
+    const podiumNames = await podium.locator(".podium-name").allTextContents();
+    for (const [width, height] of [[320, 568], [360, 640], [740, 360], [1280, 800]]) {
       await page.setViewportSize({ width, height });
       await expect(statistics).toBeInViewport({ ratio: 1 });
       const panel = (await hubPanel.boundingBox())!;
       const buttons = (await statistics.boundingBox())!;
       expect(buttons.y).toBeGreaterThanOrEqual(panel.y + panel.height);
+      const topThree = (await podium.boundingBox())!;
+      expect(topThree.y).toBeGreaterThanOrEqual(buttons.y + buttons.height);
+      await expect(podium).toBeInViewport({ ratio: 1 });
       await page.screenshot({ path: testInfo.outputPath(`accueil-invite-${width}.png`) });
     }
     await page.setViewportSize({ width: 360, height: 640 });
@@ -36,14 +42,17 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     expect(await nativeBack()).toBe(false);
     await expect(page.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Classement", exact: true }).click();
-    await expect(page.getByRole("listitem")).toHaveCount(10);
-    const ratings = (await page.getByRole("listitem").getByText(/Elo$/).allTextContents())
-      .map((value) => Number(value.replace(/\D/g, "")));
+    const directory = page.getByRole("table", { name: "Classement des joueurs" });
+    await expect(directory.getByRole("row")).toHaveCount(11);
+    await expect(directory.getByRole("columnheader")).toHaveText(["Nom", "Parties", "Manches gagnées", "Indice RN"]);
+    const ratings = (await directory.locator("tbody td:last-child").allTextContents()).map(Number);
+    const names = await directory.locator("tbody a").allTextContents();
+    expect(names.slice(0, 3)).toEqual(podiumNames);
     expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
     await page.screenshot({ path: testInfo.outputPath("dix-bots.png"), fullPage: true });
     await page.getByRole("textbox", { name: "Rechercher un pseudo" }).fill("ChaBotté");
     await page.getByRole("button", { name: "Rechercher" }).click();
-    await expect(page.getByRole("listitem")).toHaveCount(1);
+    await expect(directory.getByRole("row")).toHaveCount(2);
     await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
@@ -191,6 +200,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await discardDrawn(host);
     for (const tab of [host, guest]) {
       await expect(tab.getByRole("heading", { name: "Fin de la partie" })).toBeVisible({ timeout: 15_000 });
+      await expect(tab.locator(".ranking-rn")).toHaveText(["50 → 56 (+6)", "50 → 44 (-6)"]);
       await expect(ready(tab)).toHaveCount(0);
     }
     await expect(guest.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);
@@ -224,7 +234,11 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expect(otherDevice.getByRole("heading", { name: "BobbyMobile" })).toBeVisible();
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Parties jouées2");
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Manches terminées1");
+    await expect(otherDevice.locator(".profile-numbers")).toContainText("Indice RN44");
     await otherDevice.screenshot({ path: testInfo.outputPath("03-profil-apres-renommage.png"), fullPage: true });
+    await host.goto(profileUrl);
+    await host.getByRole("button", { name: "Signaler cet historique" }).click();
+    await expect(host.getByRole("status")).toHaveText("Signalement transmis pour vérification.");
     await otherDevice.goto("/");
     await otherDevice.getByRole("button", { name: "Mes stats" }).click();
     await expect(otherDevice.getByRole("heading", { name: "Mes stats" })).toBeVisible();

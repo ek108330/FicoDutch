@@ -23,7 +23,7 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   let store = createMatchStore(db);
   const hub = { id: randomUUID(), gameNumber: 1, players };
   const id = matchId(hub);
-  await store.register(hub);
+  await store.register(hub, Date.now() - 60_000);
   assert.equal(await store.hasSeat(id, players[1].accountId), true);
   const stats = {
     rounds: 1,
@@ -35,6 +35,11 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
       pire: [{ players: [players[0].id], value: 13,
         exchange: { opponentId: players[1].id, given: "clubs-K", received: "hearts-K" } }] },
   };
+  const firstResult = { number: 1, announcer: null, emptyHand: null,
+    scores: players.map(({ id: seat }, index) => ({ id: seat, base: 41 + index, score: 41 + index, left: false })) };
+  assert.equal((await store.recordRounds(id, [firstResult])).through, 1);
+  assert.equal((await store.getProfile(players[0].accountId)).rating, 56);
+  assert.deepEqual(await store.recordRounds(id, [firstResult]), { through: 1, results: [] });
   assert.equal(await store.finish(id, "finished", stats), true);
   assert.equal(await store.finish(id, "interrupted", null), true);
   const read = await store.getMatch(id, players[0].accountId);
@@ -44,7 +49,7 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.deepEqual(read, await store.getMatch(id, players[1].accountId));
   assert.equal(await store.getMatch(id, randomUUID()), undefined);
   let profile = await store.getProfile(players[0].accountId);
-  assert.equal(profile.rating, 1516);
+  assert.equal(profile.rating, 56);
   assert.equal(profile.finished, 1);
   assert.equal(profile.rivals[0].wins, 1);
   assert.equal(profile.encounters[0].opponents[0].name, "Bobby");
@@ -66,7 +71,8 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.deepEqual(recovered.awards, {});
   profile = await store.getProfile(players[0].accountId);
   assert.equal(profile.name, "Alice22");
-  assert.equal(profile.rating, 1516);
+  assert.equal(profile.rating, 56);
+  assert.deepEqual(profile.ratings.map(({ rating }) => rating), [56]);
   assert.equal(profile.finished, 1);
   assert.equal(profile.interrupted, 1);
   assert.equal(profile.reactions, 8);
@@ -80,6 +86,6 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.equal(await store.getMatch(second, randomUUID()), undefined);
   assert.deepEqual((await store.listPlayers("alice")).players.map(({ name }) => name), ["Alice22"]);
   const ranking = (await store.listPlayers("")).players;
-  assert.deepEqual(ranking.map(({ name, rating }) => [name, rating]), [["Alice22", 1516], ["Bobby", 1484]]);
+  assert.deepEqual(ranking.map(({ name, rating }) => [name, rating]), [["Alice22", 56], ["Bobby", 44]]);
   assert.deepEqual((await store.listPlayers("", ranking[0])).players, [ranking[1]]);
 });

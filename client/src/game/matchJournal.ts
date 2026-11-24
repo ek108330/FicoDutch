@@ -17,7 +17,8 @@ export type MatchEvent =
   | { kind: "power"; playerId: string; power: PowerKind; stage: "start" | "execute" }
   | { kind: "look"; playerId: string; cards: HandCard[] }
   | { kind: "dutch"; playerId: string }
-  | { kind: "round-result"; scores: RoundScore[]; winners: string[]; announcer: string | null; dutchPenalty: boolean }
+  | { kind: "round-result"; scores: RoundScore[]; winners: string[]; announcer: string | null;
+      dutchPenalty: boolean; emptyHand?: string | null }
   | { kind: "match-end"; status: "finished" | "interrupted" };
 
 export type JournalEntry = MatchEvent & { matchId?: string; accountId?: string; sequence: number; round: number; at: number; validated: true };
@@ -53,4 +54,19 @@ export function matchEntries(journal?: MatchJournal): JournalEntry[] {
   const entries: JournalEntry[] = [];
   for (let node = journal; node; node = node.previous) entries.push(node.entry);
   return entries.reverse();
+}
+
+export function completedRoundsAfter(journal: MatchJournal | undefined, after: number) {
+  const rounds: { number: number; announcer: string | null; emptyHand: string | null;
+    scores: { id: string; score: number; base: number; left: boolean }[] }[] = [];
+  for (let node = journal; node && node.entry.round > after; node = node.previous) {
+    const { entry } = node;
+    if (entry.kind === "round-result") rounds.push({
+      number: entry.round,
+      announcer: entry.announcer,
+      emptyHand: entry.emptyHand ?? null,
+      scores: entry.scores.map(({ id, score, base, left }) => ({ id, score, base, left })),
+    });
+  }
+  return rounds.reverse().slice(0, 20);
 }

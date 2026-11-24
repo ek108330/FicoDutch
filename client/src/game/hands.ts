@@ -96,7 +96,7 @@ export function finishRound(state: GameState, now: number, emptyHandPlayerId: st
     },
   };
   return logMatch(next, now, {
-    kind: "round-result", announcer: dutchAnnouncerId, dutchPenalty, winners: winnerIds,
+    kind: "round-result", announcer: dutchAnnouncerId, dutchPenalty, winners: winnerIds, emptyHand: emptyHandPlayerId,
     scores: players.map(({ id, roundScore, totalScore, hasLeft }, index) =>
       ({ id, score: roundScore, base: baseScores[index].points, total: totalScore, left: hasLeft })),
   });

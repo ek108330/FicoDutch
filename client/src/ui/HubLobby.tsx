@@ -71,6 +71,7 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
                   : <span className="player-connection" data-connected={player.connected} role="img"
                     aria-label={status} title={status} />}
                 <strong>{player.pseudo}</strong>
+                {player.rating !== undefined && <small className="lobby-rn">RN {Math.round(player.rating)}</small>}
                 {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
               </li>
             );

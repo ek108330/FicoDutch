@@ -29,7 +29,7 @@ export type TablePlayer = {
 type GameTableProps = {
   localPlayerId: string;
   players: TablePlayer[];
-  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number; avatarPhotoId?: string }>;
+  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number; avatarPhotoId?: string; rating?: number }>;
   controls: ReactNode;
   piles?: ReactNode;
   activePlayerId?: string;
@@ -233,6 +233,8 @@ export default function GameTable({
                 )}
                 {clock && <PerimeterClock key={clock.turn} remaining={clock.remaining} duration={TURN_DURATION_MS} label="Temps restant" />}
               </span>
+              {member?.rating !== undefined && <small className="table-rn" aria-label={`Indice RN ${Math.round(member.rating)}`}
+                title={`Indice RN ${Math.round(member.rating)}`}>{Math.round(member.rating)}</small>}
               {announce && <DutchButton {...announce} />}
               {player.id === protectedPlayerId && (
                 <span className="dutch-icon dutch-announced" role="img" aria-label={`${player.pseudo} a annoncé Dutch`}

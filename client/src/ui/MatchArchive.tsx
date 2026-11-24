@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Crosshair, Crown, Gift, Podium, Swords, Timer, TriangleAlert } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
-import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
+import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
   readTableSummary, tableSummaryPath } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
 import { describeCardFace, suits } from "./cardLabels";
@@ -12,6 +12,7 @@ type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () =
 type Loader<T> = (signal: AbortSignal) => Promise<T>;
 const date = new Intl.DateTimeFormat("fr", { dateStyle: "medium", timeStyle: "short" });
 const number = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
+const percent = new Intl.NumberFormat("fr", { style: "percent", maximumFractionDigits: 1 });
 const seconds = new Intl.NumberFormat("fr", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const individual = [
   ["shuriken", "Le défausseur", Swords], ["luckyLuke", "Lucky Lucke", Timer], ["boulet", "Le boulet", TriangleAlert],
@@ -174,9 +175,35 @@ export function MatchArchive({ id, tableSummary, ...props }: RouteProps & { id: 
   </ArchiveFrame>;
 }
 
+function ratingLevel(rating: number) {
+  if (rating < 30) return "Débutant";
+  if (rating < 60) return "Challenger";
+  if (rating < 80) return "Expert";
+  if (rating < 95) return "Maître";
+  return "Légende";
+}
+
+function RatingHistory({ ratings }: Pick<Profile, "ratings">) {
+  if (!ratings.length) return <p className="archive-muted">Aucune manche classée.</p>;
+  const points = ratings.map(({ rating }, index) =>
+    `${5 + 290 * index / Math.max(1, ratings.length - 1)},${104 - rating}`);
+  const [lastX, lastY] = points.at(-1)!.split(",");
+  return <>
+    <svg className="archive-rating-chart" viewBox="0 0 300 109" role="img" aria-label="Évolution du RN sur les dernières manches classées">
+      <path d="M5 5H295 M5 54H295 M5 104H295" stroke="#4d7464" fill="none" />
+      <polyline points={points.join(" ")} fill="none" stroke="#f3de9a" strokeWidth="2" />
+      <circle cx={lastX} cy={lastY} r="3" fill="#f3de9a" />
+    </svg>
+    <ol className="archive-rating">{ratings.map((entry, index) =>
+      <li key={index}><strong>{Math.round(entry.rating)}</strong><time dateTime={new Date(entry.date).toISOString()}>{date.format(entry.date)}</time></li>
+    )}</ol>
+  </>;
+}
+
 function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Navigate }) {
+  const rating = Math.round(profile.rating);
   const values: Array<[string, string | number]> = [
-    ["Indice multijoueur", profile.rating], ["Parties jouées", profile.matches], ["Terminées", profile.finished],
+    ["Indice RN", `${rating} · ${ratingLevel(rating)}`], ["Parties jouées", profile.matches], ["Terminées", profile.finished],
     ["Interrompues", profile.interrupted], ["Victoires", profile.victories],
     ["Taux de victoire", profile.finished ? number.format(100 * profile.victories / profile.finished) + " %" : "—"],
     ["Manches terminées", profile.rounds], ["Manches gagnées", profile.roundWins],
@@ -198,10 +225,8 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
     <dl className="archive-card profile-numbers">{values.map(([label, value]) =>
       <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <section className="archive-card">
-      <h2>Évolution de l’indice</h2>
-      {profile.ratings.length ? <ol className="archive-rating">{profile.ratings.map((entry, index) =>
-        <li key={index}><strong>{entry.rating}</strong><time dateTime={new Date(entry.date).toISOString()}>{date.format(entry.date)}</time></li>,
-      )}</ol> : <p className="archive-muted">Aucune partie comptant pour l’indice.</p>}
+      <h2>Évolution de l’indice RN</h2>
+      <RatingHistory ratings={profile.ratings} />
     </section>
     <section className="archive-card">
       <h2>Historique des confrontations</h2>
@@ -217,17 +242,38 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
       <h2>{title}</h2>
       {rivals.length ? <ul className="archive-list">{rivals.map((rival) => <li key={rival.id}>
         <Link path={profilePath(rival.id)} navigate={navigate}>{rival.name}</Link>
-        <span>{plural(rival.played, "partie")} · {rival.wins} V / {rival.losses} D / {rival.played - rival.wins - rival.losses} N</span>
+        <span>RN {Math.round(rival.rating)} · {plural(rival.played, "partie")} · {rival.wins} V / {rival.losses} D / {rival.played - rival.wins - rival.losses} N</span>
       </li>)}</ul> : <p className="archive-muted">Aucun résultat à afficher.</p>}
     </section>)}
   </>;
 }
 
-export function PublicProfile({ id, personal, ...props }: RouteProps & { id: string; personal?: boolean }) {
+export function PublicProfile({ id, personal, canReport, ...props }: RouteProps & { id: string; personal?: boolean; canReport?: boolean }) {
   const [loader] = useState(() => (signal: AbortSignal) => readProfile(id, signal));
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [reportStatus, setReportStatus] = useState("");
+  async function report() {
+    setReporting(true);
+    try {
+      await reportProfile(id);
+      setReported(true);
+      setReportStatus("Signalement transmis pour vérification.");
+    } catch (error) {
+      setReportStatus(error instanceof Error ? error.message : "Signalement indisponible.");
+    } finally {
+      setReporting(false);
+    }
+  }
   return <ArchiveFrame title={personal ? "Mes stats" : "Profil public"} {...props}>
     {personal && <div className="archive-actions"><Link path="/mes-parties" navigate={props.navigate}>Mes parties</Link></div>}
-    <Load loader={loader}>{(profile) => <ProfileContent profile={profile} navigate={props.navigate} />}</Load>
+    <Load loader={loader}>{(profile) => <>
+      <ProfileContent profile={profile} navigate={props.navigate} />
+      {canReport && <div className="archive-actions">
+        <button type="button" disabled={reporting || reported} onClick={() => { void report(); }}>Signaler cet historique</button>
+        {reportStatus && <span role="status">{reportStatus}</span>}
+      </div>}
+    </>}</Load>
   </ArchiveFrame>;
 }
 
@@ -266,19 +312,47 @@ export function PlayersDirectory(props: RouteProps) {
       <button type="submit">Rechercher</button>
     </form>
     <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">
-      {players.length ? <ul className="archive-list">{players.map((player) => <li key={player.id}>
-        <span className="directory-player">
-          <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} mini />
-          <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
-        </span>
-        <span>{player.demoBot && "Bot · "}{plural(player.matches, "partie")} · <strong>{number.format(player.rating)} Elo</strong></span>
-      </li>)}</ul> : <p>Aucun joueur trouvé.</p>}
+      {players.length ? <table className="directory-ranking" aria-label="Classement des joueurs">
+        <colgroup><col /><col className="directory-matches" /><col className="directory-win-rate" /><col className="directory-rating" /></colgroup>
+        <thead><tr><th scope="col">Nom</th><th scope="col">Parties</th>
+          <th scope="col" title="Taux de victoire des manches">Manches gagnées</th><th scope="col">Indice RN</th></tr></thead>
+        <tbody>{players.map((player) => <tr key={player.id}>
+          <th scope="row"><span className="directory-player">
+            <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} mini />
+            <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
+          </span></th>
+          <td>{number.format(player.matches)}</td><td>{percent.format(player.roundWinRate)}</td>
+          <td><strong>{Math.round(player.rating)}</strong></td>
+        </tr>)}</tbody>
+      </table> : <p>Aucun joueur trouvé.</p>}
       {(pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages des joueurs">
         {pages.length > 1 && <button type="button" onClick={() => setPages(pages.slice(0, -1))}>Précédent</button>}
         {next && <button type="button" onClick={() => setPages([...pages, next])}>Suivant</button>}
       </nav>}
     </section>}</Load>
   </ArchiveFrame>;
+}
+
+export function RatingPodium({ navigate }: { navigate: Navigate }) {
+  const [players, setPlayers] = useState<Awaited<ReturnType<typeof readPodium>>>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void readPodium(controller.signal).then(setPlayers, () => {});
+    return () => controller.abort();
+  }, []);
+  if (!players.length) return null;
+  return <section className="home-podium" aria-labelledby="podium-title">
+    <h2 id="podium-title"><Podium size={17} aria-hidden="true" /> Podium RN</h2>
+    <ol>{players.map(({ id, name, avatarStyle, avatarPhotoId, rating }, index) =>
+      <li key={id} data-place={index + 1}>
+        <Link path={profilePath(id)} navigate={navigate}>
+          <PlayerAvatar id={id} name={name} style={avatarStyle} photoId={avatarPhotoId} mini />
+          <span className="podium-name" title={name}>{name}</span>
+          <small><span className="podium-place">{index + 1}</span> RN {Math.round(rating)}</small>
+        </Link>
+      </li>,
+    )}</ol>
+  </section>;
 }
 
 export function DemoBots(props: RouteProps) {

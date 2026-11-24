@@ -10,6 +10,8 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_demo_bot boolean NOT NULL DEFAU
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_style smallint CHECK (avatar_style BETWEEN 0 AND 7);
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_photo_id uuid;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_photo bytea;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS registered_at bigint;
+ALTER TABLE accounts ALTER COLUMN registered_at SET DEFAULT (extract(epoch FROM clock_timestamp()) * 1000)::bigint;
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_avatar_photo ON accounts (avatar_photo_id) WHERE avatar_photo_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS account_sessions (
@@ -42,6 +44,7 @@ CREATE TABLE IF NOT EXISTS match_seats (
 );
 CREATE INDEX IF NOT EXISTS match_seats_account ON match_seats (account_id, match_id);
 ALTER TABLE match_seats ADD COLUMN IF NOT EXISTS guest_token_hash text;
+ALTER TABLE match_seats ADD COLUMN IF NOT EXISTS departure text;
 
 CREATE TABLE IF NOT EXISTS player_stats (
   account_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
@@ -62,6 +65,44 @@ CREATE TABLE IF NOT EXISTS player_stats (
 );
 
 CREATE INDEX IF NOT EXISTS player_stats_elo ON player_stats (rating DESC, account_id);
+ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS rn double precision NOT NULL DEFAULT 50 CHECK (rn BETWEEN 0 AND 99);
+ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS rn_rounds integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS player_stats_rn ON player_stats (
+  rn DESC, matches DESC, (CASE WHEN rounds = 0 THEN 0 ELSE round_wins::double precision / rounds END) DESC, account_id
+);
+
+CREATE TABLE IF NOT EXISTS rated_rounds (
+  match_id text NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  number integer NOT NULL,
+  scores jsonb NOT NULL,
+  PRIMARY KEY (match_id, number)
+);
+CREATE TABLE IF NOT EXISTS round_rating_entries (
+  match_id text NOT NULL,
+  number integer NOT NULL,
+  at bigint NOT NULL,
+  account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  before_rn double precision NOT NULL,
+  after_rn double precision NOT NULL,
+  result_score smallint NOT NULL,
+  PRIMARY KEY (match_id, number, account_id),
+  FOREIGN KEY (match_id, number) REFERENCES rated_rounds(match_id, number) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS round_rating_account_time ON round_rating_entries (account_id, at DESC);
+
+CREATE TABLE IF NOT EXISTS rating_flags (
+  account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  opponent_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  kind text NOT NULL,
+  last_seen bigint NOT NULL,
+  PRIMARY KEY (account_id, opponent_id, kind)
+);
+CREATE TABLE IF NOT EXISTS rating_reports (
+  reporter_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  reported_at bigint NOT NULL,
+  PRIMARY KEY (reporter_id, account_id)
+);
 
 CREATE TABLE IF NOT EXISTS account_matches (
   account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
