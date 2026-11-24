@@ -66,8 +66,27 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
     await expect(page.locator(".profile-identity .player-avatar")).toHaveCSS("width", "128px");
-    await expect(page.getByText("Aucune confrontation terminée.")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Historique des confrontations" })).toHaveCount(0);
+    await expect(page.getByText("Aucune manche classée.")).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("profil-bot.png") });
+
+    await page.route("**/api/players/*", async (route) => {
+      const response = await route.fetch();
+      const profile = await response.json();
+      const ratings = [45, 48, 46, 52, 54].map((rating, index) => ({
+        rating, date: Date.UTC(2026, 0, index + 1),
+      }));
+      await route.fulfill({ response, json: { ...profile, ratings } });
+    });
+    await page.reload();
+    const ratingChart = page.getByRole("img", { name: "Évolution du RN sur les dernières manches classées" });
+    await expect(ratingChart).toBeVisible();
+    await expect(ratingChart.getByText("Indice RN", { exact: true })).toBeVisible();
+    await expect(ratingChart.getByText("Manches classées", { exact: true })).toBeVisible();
+    await expect(ratingChart.locator("polyline")).toHaveCount(1);
+    await expect(page.locator(".archive-card").filter({ has: ratingChart }).getByRole("list")).toHaveCount(0);
+    await ratingChart.screenshot({ path: testInfo.outputPath("graphique-rn.png") });
+    await page.unroute("**/api/players/*");
     await page.goto("/");
     const pseudo = (tab: Page) => tab.getByRole("textbox", { name: "Pseudo", exact: true });
     const create = (tab: Page) => tab.getByRole("button", { name: "Créer un Hub", exact: true });
@@ -294,6 +313,8 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Parties jouées2");
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Manches terminées1");
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Indice RN48");
+    await expect(otherDevice.getByRole("img", { name: "Évolution du RN sur les dernières manches classées" })
+      .locator("circle")).toHaveCount(1);
     await otherDevice.screenshot({ path: testInfo.outputPath("03-profil-apres-renommage.png"), fullPage: true });
     await host.goto(profileUrl);
     await host.getByRole("button", { name: "Signaler cet historique" }).click();

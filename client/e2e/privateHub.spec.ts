@@ -17,6 +17,10 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await Promise.all([openLobby(host, "SalonPrive"), openLobby(guest, "InvitePrive"), openLobby(outsider, "AttentePrive")]);
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     const privateSetting = host.getByRole("checkbox", { name: "Hub Privé" });
+    const hubName = host.getByRole("heading", { name: "Hub de SalonPrive" });
+    const [checkbox, title] = await Promise.all([privateSetting.boundingBox(), hubName.boundingBox()]);
+    expect(checkbox!.x + checkbox!.width).toBeLessThan(title!.x);
+    expect(checkbox!.y + checkbox!.height / 2).toBeCloseTo(title!.y + title!.height / 2, 0);
     await privateSetting.click();
     await expect(privateSetting).toBeChecked();
     await expect(privateHub(guest)).toContainText("Hub Privé · En attente");
@@ -110,8 +114,8 @@ test("une longue file privée défile et se filtre sans déplacer le bouton de l
 
     await host.setViewportSize({ width: 390, height: 1040 });
     const rows = queue.getByRole("listitem");
-    await expect(rows.nth(9)).toBeInViewport({ ratio: 1 });
-    await expect(rows.nth(10)).not.toBeInViewport();
+    await expect(rows.nth(5)).toBeInViewport({ ratio: 1 });
+    await expect(rows.nth(6)).not.toBeInViewport();
     await queue.evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expect(rows.last()).toBeInViewport({ ratio: 1 });
     await host.screenshot({ path: testInfo.outputPath("file-privee-defilement.png") });

@@ -31,7 +31,7 @@ async function withPlayerName(name, action) {
 }
 const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
 const HOST_GRACE_MS = 120_000;
-const CHAT_INTERVAL_MS = 650;
+const CHAT_INTERVAL_MS = 3_000;
 
 function findPlayerHub(socketId) {
   for (const hub of hubs.values()) {

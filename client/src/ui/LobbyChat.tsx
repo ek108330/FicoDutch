@@ -32,11 +32,9 @@ export default function LobbyChat({ hubId, connected }: Props) {
     socket.timeout(3_000).emit("hub:lobby-chat", { hubId, ...content }, (error: Error | null, status: LobbyChatStatus) => {
       if (error || status === "unavailable") {
         setNotice("Le message n’a pas été envoyé.");
-      } else if (status === "slow") {
-        setNotice("Attends un instant avant d’envoyer un autre message.");
       } else if (status === "invalid") {
         setNotice("Ce message ne peut pas être envoyé.");
-      } else if (content.kind === "text") {
+      } else if (status === "ok" && content.kind === "text") {
         setText((draft) => draft.trim() === content.text ? "" : draft);
       }
     });

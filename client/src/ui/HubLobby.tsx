@@ -78,18 +78,20 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
   return (
     <section className={`home-panel lobby-panel${managesAdmission ? " private-lobby" : ""}`} aria-labelledby="lobby-title">
       <header className="lobby-heading">
-        <h1 id="lobby-title"><HubName hub={hub} /></h1>
+        <div className="lobby-title-row">
+          <label className="private-setting">
+            <input type="checkbox" checked={!!hub.isPrivate} disabled={!isHost || !connected}
+              onChange={(event) => onUpdate(hub.variants, hub.endThreshold, event.target.checked)} />
+            Hub Privé
+          </label>
+          <h1 id="lobby-title"><HubName hub={hub} /></h1>
+        </div>
         <div className="lobby-meta">
           <p>Salle d'attente</p>
           <p>{hub.players.length}/{hub.maxPlayers} joueurs</p>
         </div>
       </header>
       <fieldset className="hub-settings" aria-label="Paramètres de la partie" disabled={!isHost || !connected}>
-        <label className="private-setting">
-          <input type="checkbox" checked={!!hub.isPrivate}
-            onChange={(event) => onUpdate(hub.variants, hub.endThreshold, event.target.checked)} />
-          Hub Privé
-        </label>
         <div className="threshold-setting">
           <label htmlFor={thresholdId}>Fin de partie</label>
           <input id={thresholdId} type="range" min="0" max={thresholds.length - 1}

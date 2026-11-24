@@ -303,8 +303,16 @@ input {
   align-self: stretch;
 }
 
+.lobby-title-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 3px;
+}
+
 .lobby-heading h1 {
-  margin: 0 0 3px;
+  margin: 0;
   font: 800 clamp(1.2rem, 5vw, 1.7rem)/1.12 var(--sans);
   letter-spacing: -0.035em;
   color: var(--ink);
@@ -334,7 +342,10 @@ input {
 }
 
 .private-lobby .lobby-body {
-  grid-template-rows: auto minmax(0, 1fr) clamp(92px, 17dvh, 165px);
+  --request-height: 40px;
+  --request-gap: 4px;
+  --admission-list-height: calc(3 * var(--request-height) + 2 * var(--request-gap));
+  grid-template-rows: auto minmax(0, calc(32px + var(--admission-list-height))) minmax(92px, 1fr);
 }
 
 .lobby-actions {
@@ -376,10 +387,10 @@ input {
 
 .hub-name .player-avatar { flex: 0 0 auto; }
 .private-setting {
-  justify-self: start;
   min-height: 24px;
   font-size: 0.82rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .private-setting input {
@@ -405,8 +416,6 @@ input {
 }
 
 .lobby-admission {
-  --request-height: 40px;
-  --request-gap: 4px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
@@ -458,7 +467,7 @@ input {
   align-content: start;
   gap: var(--request-gap);
   min-height: 0;
-  max-height: calc(5 * var(--request-height) + 4 * var(--request-gap));
+  max-height: var(--admission-list-height);
   overflow: auto;
   overscroll-behavior: contain;
   margin: 0;
@@ -590,6 +599,8 @@ input {
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
+
+.private-lobby .chat-log { height: 100%; }
 
 .chat-log ol {
   display: grid;
@@ -3299,9 +3310,8 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-interactions dd, .profile-numbers dd { margin: 3px 0 0; font-size: 0.9rem; }
 .profile-numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; }
 .profile-numbers dd { color: #ffdf91; font-size: 1.04rem; }
-.archive-list, .archive-rating { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
-.archive-list li, .archive-rating li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
-.archive-rating { max-height: 230px; overflow: auto; }
+.archive-list { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
+.archive-list li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
 .account-card { width: min(100%, 430px); display: grid; gap: 14px; margin: clamp(10px, 7vh, 55px) auto 0; }
 .account-card h1 { display: flex; align-items: center; gap: 8px; }
 .account-card form label { display: grid; gap: 6px; }
@@ -3393,6 +3403,10 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .directory-player a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-player .player-avatar { flex: none; }
 .archive-rating-chart { display: block; width: min(100%, 430px); margin-inline: auto; }
+.rating-chart-grid { stroke: #608674; }
+.rating-chart-labels { fill: #d1e2d6; font-size: 9px; }
+.rating-chart-line { fill: none; stroke: #f3de9a; stroke-width: 2; }
+.rating-chart-point { fill: #f3de9a; }
 .lobby-rn, .table-rn { white-space: nowrap; font-weight: 700; }
 .table-rn {
   flex: none;

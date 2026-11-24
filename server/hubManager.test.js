@@ -240,10 +240,11 @@ test("le chat du lobby identifie l’auteur et ne relaie qu’aux membres du Hub
   const emoji = { hubId: hub.id, kind: "emoji", emoji: "clap" };
   assert.equal(relayLobbyMessage("chat-guest", emoji, 1_300).status, "slow");
   assert.equal(relayLobbyMessage("chat-guest", { ...emoji, emoji: "toString" }, 2_000).status, "invalid");
-  assert.equal(relayLobbyMessage("chat-guest", emoji, 2_000).message.emoji, "clap");
+  assert.equal(relayLobbyMessage("chat-guest", text, 3_999).status, "slow");
+  assert.equal(relayLobbyMessage("chat-guest", emoji, 4_000).message.emoji, "clap");
   startHubGame("chat-host", request);
-  assert.equal(relayLobbyMessage("chat-guest", text, 3_000).status, "unavailable");
-  assert.equal(relayLobbyMessage("chat-guest", emoji, 3_000).status, "unavailable");
+  assert.equal(relayLobbyMessage("chat-guest", text, 7_000).status, "unavailable");
+  assert.equal(relayLobbyMessage("chat-guest", emoji, 7_000).status, "unavailable");
 });
 
 test("le relais chiffré vérifie les identités et ne transmet que l’enveloppe autorisée", (t) => {

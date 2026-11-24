@@ -207,19 +207,41 @@ function ratingLevel(rating: number) {
 
 function RatingHistory({ ratings }: Pick<Profile, "ratings">) {
   if (!ratings.length) return <p className="archive-muted">Aucune manche classée.</p>;
-  const points = ratings.map(({ rating }, index) =>
-    `${5 + 290 * index / Math.max(1, ratings.length - 1)},${104 - rating}`);
-  const [lastX, lastY] = points.at(-1)!.split(",");
-  return <>
-    <svg className="archive-rating-chart" viewBox="0 0 300 109" role="img" aria-label="Évolution du RN sur les dernières manches classées">
-      <path d="M5 5H295 M5 54H295 M5 104H295" stroke="#4d7464" fill="none" />
-      <polyline points={points.join(" ")} fill="none" stroke="#f3de9a" strokeWidth="2" />
-      <circle cx={lastX} cy={lastY} r="3" fill="#f3de9a" />
-    </svg>
-    <ol className="archive-rating">{ratings.map((entry, index) =>
-      <li key={index}><strong>{Math.round(entry.rating)}</strong><time dateTime={new Date(entry.date).toISOString()}>{date.format(entry.date)}</time></li>
-    )}</ol>
-  </>;
+  const values = ratings.map(({ rating }) => rating);
+  const best = Math.max(...values);
+  const lowest = Math.min(...values);
+  const step = [5, 10, 20].find((interval) => best - lowest <= 4 * interval) ?? 25;
+  const floor = Math.max(0, Math.floor((lowest - 1) / step) * step);
+  const ceiling = Math.min(100, Math.ceil((best + 1) / step) * step);
+  const left = 40;
+  const right = 308;
+  const top = 12;
+  const bottom = 116;
+  const last = ratings.length - 1;
+  const x = (index: number) => last ? left + (right - left) * index / last : (left + right) / 2;
+  const y = (rating: number) => bottom - (bottom - top) * (rating - floor) / (ceiling - floor);
+  const ticks = Array.from({ length: (ceiling - floor) / step + 1 }, (_, index) => floor + index * step);
+  const roundTicks = [...new Set([0, Math.floor(last / 2), last])];
+
+  return <svg className="archive-rating-chart" viewBox="0 0 320 150" role="img"
+    aria-label="Évolution du RN sur les dernières manches classées">
+    <desc>{ratings.length} manches, du RN {number.format(values[0])} au RN {number.format(values[last])}.</desc>
+    <g className="rating-chart-grid">
+      {ticks.map((rating) => <line key={rating} x1={left} y1={y(rating)} x2={right} y2={y(rating)} />)}
+      <line x1={left} y1={top} x2={left} y2={bottom} />
+    </g>
+    <g className="rating-chart-labels">
+      <text transform={`translate(11 ${(top + bottom) / 2}) rotate(-90)`} textAnchor="middle">Indice RN</text>
+      {ticks.map((rating) => <text key={rating} x={left - 5} y={y(rating)} dominantBaseline="central" textAnchor="end">{rating}</text>)}
+      {roundTicks.map((index) => <text key={index} x={x(index)} y={bottom + 12} textAnchor="middle">{index + 1}</text>)}
+      <text x={(left + right) / 2} y={145} textAnchor="middle">Manches classées</text>
+    </g>
+    {last > 0 && <polyline className="rating-chart-line" points={values.map((rating, index) => `${x(index)},${y(rating)}`).join(" ")} />}
+    {ratings.map((entry, index) => <circle className="rating-chart-point" key={index} cx={x(index)} cy={y(entry.rating)}
+      r={index === last ? 3 : 2}>
+      <title>{`${number.format(entry.rating)} RN · ${date.format(entry.date)}`}</title>
+    </circle>)}
+  </svg>;
 }
 
 function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Navigate }) {
@@ -249,16 +271,6 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
     <section className="archive-card">
       <h2>Évolution de l’indice RN</h2>
       <RatingHistory ratings={profile.ratings} />
-    </section>
-    <section className="archive-card">
-      <h2>Historique des confrontations</h2>
-      {profile.encounters.length ? <ul className="archive-list">{profile.encounters.map((encounter, index) =>
-        <li key={index}>
-          <time dateTime={new Date(encounter.date).toISOString()}>{date.format(encounter.date)}</time>
-          <span>{encounter.opponents.map(({ id, name, outcome }, opponent) =>
-            <span key={id}>{opponent > 0 && ", "}<Link path={profilePath(id)} navigate={navigate}>{name}</Link> ({outcome > 0 ? "V" : outcome < 0 ? "D" : "N"})</span>)}</span>
-        </li>,
-      )}</ul> : <p className="archive-muted">Aucune confrontation terminée.</p>}
     </section>
     {groups.map(([title, rivals]) => <section key={title} className="archive-card">
       <h2>{title}</h2>

@@ -36,9 +36,15 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await expect(messages(host)).toContainText("BobChat");
     await expect(messages(host).locator("b")).toHaveCount(0);
     await expect(input).toHaveValue("");
+    await input.fill("Message trop rapide");
+    await input.press("Enter");
     await emoji(host, "Salut").click();
     await expect(messages(guest).getByRole("img", { name: "Salut" })).toBeVisible();
     await expect(messages(guest)).toContainText("AliceChat");
+    await expect(messages(host)).not.toContainText("Message trop rapide");
+    await expect(chat(guest).getByRole("status")).toHaveCount(0);
+    await expect(input).toHaveValue("Message trop rapide");
+    await input.clear();
     await expect(messages(newcomer)).toHaveText("Aucun message pour le moment.");
     await chat(guest).screenshot({ path: testInfo.outputPath("01-chat-lobby-portrait.png") });
 
