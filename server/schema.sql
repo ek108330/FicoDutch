@@ -7,7 +7,15 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_handle ON accounts (lower(handle));
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_display_name ON accounts (lower(display_name));
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_demo_bot boolean NOT NULL DEFAULT false;
-ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_style smallint CHECK (avatar_style BETWEEN 0 AND 7);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_style smallint;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'accounts'::regclass AND conname = 'accounts_avatar_style_range') THEN
+    ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_avatar_style_check;
+    ALTER TABLE accounts ADD CONSTRAINT accounts_avatar_style_range CHECK (avatar_style BETWEEN 0 AND 231);
+  END IF;
+END
+$$;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_photo_id uuid;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_photo bytea;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS registered_at bigint;

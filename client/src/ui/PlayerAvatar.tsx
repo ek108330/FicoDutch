@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { avatarPhotoUrl } from "../network/accountApi";
-import { automaticAvatar, avatarStyles } from "./playerAvatarConfig";
+import { getAvatarStyle } from "./playerAvatarConfig";
 
 export default function PlayerAvatar({ id, name, style, photoId, mini = false }: {
   id: string; name: string; style?: number | null; photoId?: string | null; mini?: boolean;
 }) {
   const [failedPhoto, setFailedPhoto] = useState<string>();
-  const choice = avatarStyles[style ?? -1] ?? automaticAvatar(id);
+  const choice = getAvatarStyle(id, style);
   const initials = Array.from(name).slice(0, 2).join("").toLocaleUpperCase("fr");
   return <span className={`player-avatar${mini ? " player-avatar-mini" : ""}`} aria-hidden="true"
     style={{ backgroundColor: choice.background, color: choice.ink }}>

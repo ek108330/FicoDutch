@@ -3,7 +3,7 @@ import { ArrowLeft, UserRound } from "lucide-react";
 import type { Account } from "../../../shared/statistics";
 import { profilePath, rename, saveAvatar, saveAvatarPhoto, signIn, signOut, type AccountSession } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
-import { avatarStyles, prepareAvatarPhoto } from "./playerAvatarConfig";
+import { generateAvatarStyle, prepareAvatarPhoto } from "./playerAvatarConfig";
 
 type Props = {
   account: Account | null;
@@ -50,18 +50,13 @@ export default function AccountScreen({ account, onChange, navigate, forStats }:
         </a>
         <h1><UserRound aria-hidden="true" /> {account ? "Mon compte" : creating ? "Créer un compte" : "Connexion"}</h1>
         {forStats && <p>Connecte-toi pour retrouver tes statistiques personnelles.</p>}
-        {account && <form className="account-avatar-form" onSubmit={(event) => {
-          event.preventDefault();
-          const style = new FormData(event.currentTarget).get("avatar");
-          void run(() => saveAvatar(style === "auto" ? null : Number(style)), () => setNotice("Icône enregistrée."));
-        }}>
-          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} photoId={account.avatarPhotoId} />
-          <label>Icône du profil <select name="avatar" defaultValue={account.avatarStyle ?? "auto"}>
-            <option value="auto">Automatique</option>
-            {avatarStyles.map(({ name, symbol }, i) => <option key={name} value={i}>{symbol} {name}</option>)}
-          </select></label>
-          <button type="submit" disabled={busy}>Enregistrer l’icône</button>
-        </form>}
+        {account && <section className="account-avatar-form" aria-label="Icône du profil">
+          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} />
+          <button type="button" disabled={busy} onClick={() =>
+            void run(() => saveAvatar(generateAvatarStyle(account.id, account.avatarStyle)), () => setNotice("Icône enregistrée."))}>
+            Générer une icône
+          </button>
+        </section>}
         {account && <form className="account-photo-form" onSubmit={(event) => {
           event.preventDefault();
           const form = event.currentTarget;
@@ -73,6 +68,7 @@ export default function AccountScreen({ account, onChange, navigate, forStats }:
             });
           }
         }}>
+          {account.avatarPhotoId && <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} photoId={account.avatarPhotoId} />}
           <label>Photo de profil <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required
             aria-describedby="photo-format" /></label>
           <p id="photo-format">La photo publique est recadrée en cercle et réduite à 128 × 128 px.</p>

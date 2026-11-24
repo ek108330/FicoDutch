@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Crosshair, Crown, Gift, Podium, Swords, Timer, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
   readTableSummary, tableSummaryPath } from "../network/accountApi";
@@ -341,14 +341,14 @@ export function RatingPodium({ navigate }: { navigate: Navigate }) {
     return () => controller.abort();
   }, []);
   if (!players.length) return null;
-  return <section className="home-podium" aria-labelledby="podium-title">
-    <h2 id="podium-title"><Podium size={17} aria-hidden="true" /> Podium RN</h2>
+  return <section className="home-podium" aria-label="Podium RN">
     <ol>{players.map(({ id, name, avatarStyle, avatarPhotoId, rating }, index) =>
       <li key={id} data-place={index + 1}>
         <Link path={profilePath(id)} navigate={navigate}>
           <PlayerAvatar id={id} name={name} style={avatarStyle} photoId={avatarPhotoId} mini />
           <span className="podium-name" title={name}>{name}</span>
-          <small><span className="podium-place">{index + 1}</span> RN {Math.round(rating)}</small>
+          <small>RN {Math.round(rating)}</small>
+          <span className="podium-step"><span className="sr-only">Rang </span>{index + 1}</span>
         </Link>
       </li>,
     )}</ol>

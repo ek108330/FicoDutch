@@ -15,6 +15,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     const statistics = page.getByRole("navigation", { name: "Statistiques" });
     const podium = page.getByRole("region", { name: "Podium RN" });
     await expect(podium.getByRole("link")).toHaveCount(3);
+    await expect(podium.getByRole("heading")).toHaveCount(0);
     const podiumNames = await podium.locator(".podium-name").allTextContents();
     for (const [width, height] of [[320, 568], [360, 640], [740, 360], [1280, 800]]) {
       await page.setViewportSize({ width, height });
@@ -25,6 +26,13 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       const topThree = (await podium.boundingBox())!;
       expect(topThree.y).toBeGreaterThanOrEqual(buttons.y + buttons.height);
       await expect(podium).toBeInViewport({ ratio: 1 });
+      const steps = await podium.locator(".podium-step").evaluateAll((items) => items.map((item) => {
+        const { height, bottom } = item.getBoundingClientRect();
+        return { height, bottom };
+      }));
+      expect(steps[0].height).toBeGreaterThan(steps[1].height);
+      expect(steps[1].height).toBeGreaterThan(steps[2].height);
+      expect(steps[0].bottom).toBeCloseTo(steps[2].bottom);
       await page.screenshot({ path: testInfo.outputPath(`accueil-invite-${width}.png`) });
     }
     await page.setViewportSize({ width: 360, height: 640 });
@@ -137,11 +145,21 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await signIn(guest, "BobbyCompte", true);
     await signIn(otherDevice, "bobbycompte");
     await (await openSettings(host)).getByRole("button", { name: "Mon compte", exact: true }).click();
-    await host.getByLabel("Icône du profil").selectOption("6");
-    await host.getByRole("button", { name: "Enregistrer l’icône" }).click();
+    const profileIcon = host.getByRole("region", { name: "Icône du profil" });
+    const renderedIcon = profileIcon.locator(".player-avatar");
+    const icon = () => renderedIcon.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [element.firstElementChild?.textContent, style.backgroundColor, style.color];
+    });
+    const initial = await icon();
+    await expect(profileIcon.getByRole("combobox")).toHaveCount(0);
+    await profileIcon.getByRole("button", { name: "Générer une icône" }).click();
     await expect(host.getByRole("status")).toHaveText("Icône enregistrée.");
+    const generated = await icon();
+    expect(generated).not.toEqual(initial);
     await host.reload();
-    await expect(host.getByLabel("Icône du profil")).toHaveValue("6");
+    await expect(renderedIcon).toBeVisible();
+    expect(await icon()).toEqual(generated);
     await host.screenshot({ path: testInfo.outputPath("icone-compte.png") });
     const picture = await host.evaluate(() => {
       const canvas = document.createElement("canvas");
@@ -160,7 +178,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await host.getByRole("button", { name: "Enregistrer la photo" }).click();
     await expect(host.getByRole("status")).toHaveText("Photo enregistrée.");
     await host.reload();
-    const photo = host.locator(".account-avatar-form .player-avatar img");
+    const photo = host.locator(".account-photo-form .player-avatar img");
     await expect(photo).toHaveJSProperty("naturalWidth", 128);
     await expect(photo).toHaveJSProperty("naturalHeight", 128);
     const alpha = await photo.evaluate(async (image: HTMLImageElement) => {

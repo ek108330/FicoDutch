@@ -191,8 +191,8 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
     const session = await readAccount(request.headers);
     if (!session) return response.status(401).json({ error: "Connecte-toi pour modifier ton icône." });
     const style = request.body?.style;
-    if (style !== null && (!Number.isInteger(style) || style < 0 || style > 7)) {
-      return response.status(400).json({ error: "Choisis une icône proposée." });
+    if (style !== null && (!Number.isInteger(style) || style < 0 || style > 231)) {
+      return response.status(400).json({ error: "Cette icône est invalide." });
     }
     const { rows } = await db.query(`
       UPDATE accounts SET avatar_style = $1 WHERE id = $2

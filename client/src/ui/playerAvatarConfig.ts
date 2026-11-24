@@ -1,4 +1,4 @@
-export const avatarStyles = [
+const legacyStyles = [
   { name: "Pique", symbol: "♠", background: "#183e3b", ink: "#e2f5dc" },
   { name: "Cœur", symbol: "♥", background: "#8f283c", ink: "#fff0e9" },
   { name: "Trèfle", symbol: "♣", background: "#24624a", ink: "#fff3c4" },
@@ -14,17 +14,39 @@ const pastelColors = [
   ["#e2e0df", "#575960"], ["#e5daed", "#755785"], ["#eedbc9", "#8a583c"], ["#f8f4e9", "#fffcf4"],
 ];
 const symbols = ["♣", "♦", "♠", "♥"];
+const colorsPerShape = pastelColors.length * (pastelColors.length - 1);
+const combinations = symbols.length * colorsPerShape;
 
-export function automaticAvatar(id: string) {
+function automaticStyle(id: string) {
   let hash = 2166136261;
   for (const character of id) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0;
   const background = (hash >>> 2) % pastelColors.length;
   const foreground = (background + 1 + (hash >>> 10) % (pastelColors.length - 1)) % pastelColors.length;
+  const otherColor = foreground < background ? foreground : foreground - 1;
+  return legacyStyles.length + (hash % symbols.length) * colorsPerShape +
+    background * (pastelColors.length - 1) + otherColor;
+}
+
+export function getAvatarStyle(id: string, style?: number | null) {
+  const selected = style != null && Number.isInteger(style) && style >= 0 && style < legacyStyles.length + combinations
+    ? style : automaticStyle(id);
+  if (legacyStyles[selected]) return legacyStyles[selected];
+  const index = selected - legacyStyles.length;
+  const background = Math.floor(index / (pastelColors.length - 1)) % pastelColors.length;
+  const otherColor = index % (pastelColors.length - 1);
+  const foreground = otherColor < background ? otherColor : otherColor + 1;
   return {
-    symbol: symbols[hash % symbols.length],
+    symbol: symbols[Math.floor(index / colorsPerShape)],
     background: pastelColors[background][foreground === pastelColors.length - 1 ? 1 : 0],
     ink: pastelColors[foreground][1],
   };
+}
+
+export function generateAvatarStyle(id: string, style?: number) {
+  const current = (style ?? automaticStyle(id)) - legacyStyles.length;
+  const canRepeat = current >= 0 && current < combinations;
+  const draw = Math.floor(Math.random() * (combinations - Number(canRepeat)));
+  return legacyStyles.length + draw + Number(canRepeat && draw >= current);
 }
 
 export const tablePlayerName = (name: string, accountId?: string) =>
