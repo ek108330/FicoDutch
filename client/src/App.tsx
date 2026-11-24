@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GAME_CONFIG, hubStatusLabels } from "./config/gameConfig";
-import { ChartNoAxesColumn, Plus, Settings } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
@@ -18,8 +18,8 @@ import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
-import { DemoBots, MatchArchive, PublicProfile, RecentMatches } from "./ui/MatchArchive";
-import { guestMatchToken, matchPath, profilePath, readAccount, readMatch, rememberGuestMatch, type AccountSession } from "./network/accountApi";
+import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RecentMatches } from "./ui/MatchArchive";
+import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, tableSummaryPath, type AccountSession } from "./network/accountApi";
 import { logDeal, logMatch } from "./game/matchJournal";
 import { matchStatistics } from "./game/matchStatistics";
 
@@ -55,7 +55,6 @@ function App() {
   const [path, setPath] = useState(() => window.location.pathname);
   const pathRef = useRef(path);
   const sealed = useRef<string>(null);
-  const shownMatch = useRef<string>(null);
   const hubRef = useRef<CurrentHub | null>(null);
   const sessionRef = useRef(session);
   const readyRef = useRef(false);
@@ -187,10 +186,6 @@ function App() {
       setSessionNotice(null);
       setPreviewHubId(null);
       applyHub(hub, serverTime);
-      if (match && hub.gameFinished && shownMatch.current !== match && pathRef.current === "/") {
-        shownMatch.current = match;
-        navigate(matchPath(match));
-      }
     }
 
     function onConnect() {
@@ -217,10 +212,11 @@ function App() {
             const hostWithoutRound = saved.isHost && !hostRoundRef.current;
             clearTable();
             storeReady(true);
-            const match = saved.matchId;
-            if (match) {
-              void readMatch(match).then(() => {
-                if (!sessionRef.current && pathRef.current === "/") navigate(matchPath(match));
+            if (saved.matchId) {
+              void readMatch(saved.matchId).then((match) => {
+                if (match.status === "interrupted" && !sessionRef.current && pathRef.current === "/") {
+                  navigate(matchPath(match.id));
+                }
               }, () => {});
             }
             setSessionNotice(hostWithoutRound
@@ -266,12 +262,14 @@ function App() {
       alert(message);
     }
 
-    function onHubEnded({ hubId, reason, matchId }: HubEnd) {
+    function onHubEnded({ hubId, reason, matchId, tableSummary }: HubEnd) {
       if (sessionRef.current?.hubId !== hubId) return;
+      const saved = sessionRef.current;
+      const guest = !hubRef.current?.players.find(({ id }) => id === saved.playerId)?.accountId;
       clearTable();
       if (matchId) {
-        shownMatch.current = matchId;
-        navigate(matchPath(matchId));
+        if (guest) rememberGuestMatch(matchId, saved.token);
+        navigate(tableSummary ? tableSummaryPath(matchId) : matchPath(matchId));
         setSessionNotice(null);
         return;
       }
@@ -280,18 +278,11 @@ function App() {
         : "L’hôte a interrompu la partie.");
     }
 
-    function onMatchReady({ id, hubId }: { id: string; hubId: string }) {
-      if (sessionRef.current?.hubId !== hubId || shownMatch.current === id) return;
-      shownMatch.current = id;
-      navigate(matchPath(id));
-    }
-
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("hubs:update", onHubs);
     socket.on("hub:error", onHubError);
     socket.on("hub:ended", onHubEnded);
-    socket.on("match:ready", onMatchReady);
     socket.on("hub:created", acceptMembership);
     socket.on("hub:joined", acceptMembership);
     window.addEventListener("online", connectToServer);
@@ -305,7 +296,6 @@ function App() {
       socket.off("hubs:update", onHubs);
       socket.off("hub:error", onHubError);
       socket.off("hub:ended", onHubEnded);
-      socket.off("match:ready", onMatchReady);
       socket.off("hub:created", acceptMembership);
       socket.off("hub:joined", acceptMembership);
       window.removeEventListener("online", connectToServer);
@@ -480,18 +470,21 @@ function App() {
   );
 
   function renderScreen() {
-    const match = routeId(path, "/parties/");
+    const tableMatch = routeId(path, "/bilans/");
+    const match = tableMatch ?? routeId(path, "/parties/");
     const profile = routeId(path, "/joueurs/");
     const archiveProps = {
       navigate, backToTable: !!currentHub,
       ...(currentHub?.gameFinished && { leaveTable: () => { leaveHub(); navigate("/"); } }),
     };
     if (profile) return <PublicProfile key={profile} id={profile} {...archiveProps} />;
+    if (path === "/joueurs") return <PlayersDirectory {...archiveProps} />;
     if (path === "/bots") return <DemoBots {...archiveProps} />;
-    if (path === "/compte" || (accountSession?.enabled && !account && ((match && !guestMatchToken(match)) || path === "/mes-parties"))) {
-      return <AccountScreen account={account} onChange={changeAccount} navigate={navigate} />;
+    if (path === "/mes-stats" && account) return <PublicProfile key={account.id} id={account.id} personal {...archiveProps} />;
+    if (path === "/compte" || (accountSession?.enabled && !account && ((match && !guestMatchToken(match)) || path === "/mes-parties" || path === "/mes-stats"))) {
+      return <AccountScreen account={account} onChange={changeAccount} navigate={navigate} forStats={path === "/mes-stats"} />;
     }
-    if (match && accountSession) return <MatchArchive key={match} id={match} {...archiveProps} />;
+    if (match && accountSession) return <MatchArchive key={path} id={match} tableSummary={!!tableMatch} {...archiveProps} />;
     if (path === "/mes-parties" && accountSession) return <RecentMatches {...archiveProps} />;
     if (currentHub?.gameStarted) {
       const { memorizationDeadline } = currentHub;
@@ -521,11 +514,6 @@ function App() {
           onInterrupt={interrupt}
           restarting={restarting}
           settings={settings}
-          archiveControl={currentHub.gameFinished && currentHub.tracked && <a className="settings-trigger" aria-label="Statistiques de la partie"
-            href={matchPath(`${currentHub.id}:${currentHub.gameNumber}`)} onClick={(event) => {
-              event.preventDefault();
-              navigate(matchPath(`${currentHub.id}:${currentHub.gameNumber}`));
-            }}><ChartNoAxesColumn size={19} aria-hidden="true" /></a>}
           playSound={playSound}
           clockVersion={currentHub.clockVersion}
           pause={currentHub.hostPause
@@ -565,25 +553,24 @@ function App() {
                 createHub();
               }}>
                 {sessionNotice && <p className="home-notice" role="status">{sessionNotice}</p>}
-                {accountSession?.enabled ? <div className="account-links">
-                  {account ? <>
-                    <strong>{account.name}</strong>
-                    <a href={profilePath(account.id)} onClick={(event) => { event.preventDefault(); navigate(profilePath(account.id)); }}>Mon profil</a>
-                    <a href="/mes-parties" onClick={(event) => { event.preventDefault(); navigate("/mes-parties"); }}>Mes parties</a>
-                    <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Mon compte</a>
-                  </> : <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Se connecter ou créer un compte</a>}
-                </div> : null}
-                {accountSession?.demo && <div className="account-links">
-                  <a href="/bots" onClick={(event) => { event.preventDefault(); navigate("/bots"); }}>Bots de test</a>
-                </div>}
-                {accountSession && !account ? <input id="pseudo" type="text" aria-label="Pseudo" placeholder={accountSession.enabled ? "Pseudo invité" : "Pseudo"}
-                  value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
-                  onChange={(event) => savePseudo(event.target.value)} /> : !accountSession ? <button type="button" onClick={() => {
-                    void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
-                  }}>Vérifier la connexion</button> : null}
+                {accountSession && !account ? <label className="guest-entry">
+                  Jouer sans compte
+                  <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
+                    value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
+                    onChange={(event) => savePseudo(event.target.value)} />
+                </label> : !accountSession ? <button type="button" onClick={() => {
+                  void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
+                }}>Vérifier la connexion</button> : <strong>{account?.name}</strong>}
                 <button className="primary-button" type="submit" disabled={!accountSession}>
                   <Plus size={19} aria-hidden="true" /> Créer un Hub
                 </button>
+                {accountSession?.enabled && <nav className="home-stats" aria-label="Statistiques">
+                  <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
+                  <button type="button" onClick={() => navigate("/joueurs")}>Autres joueurs</button>
+                </nav>}
+                {accountSession?.enabled ? <div className="account-links">
+                  <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>{account ? "Mon compte" : "Se connecter ou créer un compte"}</a>
+                </div> : null}
               </form>
               <section className="home-join" aria-labelledby="join-title">
                 <h2 id="join-title">Rejoindre une partie</h2>

@@ -19,6 +19,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 public final class MainActivity extends Activity {
     private static final String GAME_HOST = "ficodutch-preprod.onrender.com";
@@ -28,6 +30,7 @@ public final class MainActivity extends Activity {
     private View loadError;
     private TextView errorMessage;
     private WebView browser;
+    private OnBackInvokedCallback backCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +56,35 @@ public final class MainActivity extends Activity {
             screen.requestApplyInsets();
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            backCallback = this::goBackInGame;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+        }
         loadGame();
+    }
+
+    private void goBackInGame() {
+        WebView current = browser;
+        if (current == null) return;
+        current.evaluateJavascript("""
+                (() => {
+                  const dialog = document.querySelector('dialog:modal');
+                  if (!dialog) return false;
+                  if (typeof dialog.requestClose === 'function') dialog.requestClose();
+                  else dialog.close();
+                  return true;
+                })()
+                """, handled -> {
+            if (current == browser && "false".equals(handled) && current.canGoBack()) current.goBack();
+        });
+    }
+
+    @Override
+    @SuppressLint("GestureBackNavigation") // Pre-Android 13 fallback; newer releases use the dispatcher.
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        goBackInGame();
     }
 
     private void loadGame() {
@@ -121,6 +152,9 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && backCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+        }
         destroyBrowser();
         super.onDestroy();
     }

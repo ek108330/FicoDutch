@@ -1,4 +1,4 @@
-import type { Account, MatchStatus, Profile, SavedMatch } from "../../../shared/statistics";
+import type { Account, DirectoryPlayer, MatchStatus, Profile, SavedMatch, TableSummary } from "../../../shared/statistics";
 import { SERVER_URL } from "./socket";
 
 export type AccountSession = { enabled: boolean; account: Account | null; demo?: boolean };
@@ -28,12 +28,17 @@ export function rememberGuestMatch(id: string, token: string) {
   try { sessionStorage.setItem("ficodutch-match:" + id, token); }
   catch { /* The browser can block session storage. */ }
 }
-export function readMatch(id: string, signal?: AbortSignal) {
+function matchOptions(id: string, signal?: AbortSignal) {
   const token = guestMatchToken(id);
-  return request<SavedMatch>(`/matches/${encodeURIComponent(id)}`, {
-    signal, ...(token && { headers: { "X-FicoDutch-Seat": token } }),
-  });
+  return { signal, ...(token && { headers: { "X-FicoDutch-Seat": token } }) };
 }
+export const readMatch = (id: string, signal?: AbortSignal) =>
+  request<SavedMatch>(`/matches/${encodeURIComponent(id)}`, matchOptions(id, signal));
+export const readTableSummary = (id: string, signal?: AbortSignal) =>
+  request<TableSummary>(`/matches/${encodeURIComponent(id)}?table=1`, matchOptions(id, signal));
+export const readPlayers = (query: string, after: string, signal?: AbortSignal) =>
+  request<{ players: DirectoryPlayer[]; next: string | null }>(
+    "/players?" + new URLSearchParams({ q: query, after }), { signal });
 export const readProfile = (id: string, signal?: AbortSignal) => request<Profile>(`/players/${encodeURIComponent(id)}`, { signal });
 export const readDemoBots = (signal?: AbortSignal) => request<Array<{ id: string; name: string; matches: number }>>("/demo-bots", { signal });
 export const readRecentMatches = (cursor: string | null, signal?: AbortSignal) =>
@@ -41,4 +46,5 @@ export const readRecentMatches = (cursor: string | null, signal?: AbortSignal) =
     "/matches/recent" + (cursor ? `?before=${encodeURIComponent(cursor)}` : ""), { signal });
 
 export const matchPath = (id: string) => `/parties/${encodeURIComponent(id)}`;
+export const tableSummaryPath = (id: string) => `/bilans/${encodeURIComponent(id)}`;
 export const profilePath = (id: string) => `/joueurs/${encodeURIComponent(id)}`;

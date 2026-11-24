@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS matches (
   report jsonb
 );
 CREATE INDEX IF NOT EXISTS open_matches ON matches (checkpoint_at) WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS matches_table ON matches (id text_pattern_ops);
 
 CREATE TABLE IF NOT EXISTS match_seats (
   match_id text NOT NULL REFERENCES matches(id) ON DELETE CASCADE,

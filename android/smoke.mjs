@@ -58,6 +58,8 @@ try {
   adb("shell", "am", "start", "-W", "-n", `${appId}/.MainActivity`);
   await find("Créer un Hub", 120_000);
   capture("01-accueil-android");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await find("Créer un Hub");
 
   await tap("Pseudo");
   adb("shell", "input", "text", "TestFicoAndroid");
@@ -69,6 +71,8 @@ try {
   playing = true;
   await find("Mémorisation");
   capture("03-table-portrait");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await find("TestFicoAndroid");
 
   adb("shell", "settings", "put", "system", "accelerometer_rotation", "0");
   adb("shell", "settings", "put", "system", "user_rotation", "1");

@@ -105,9 +105,8 @@ async function admit(socket, data, action) {
   if (identity) return action(identity);
   const pseudo = readPseudo(data);
   if (!pseudo) return socket.emit("hub:error", "Pseudo invalide.");
-  if (!matchStore) return action({ pseudo });
   await withPlayerName(pseudo, async () => {
-    if (guestNameInUse(pseudo) || await matchStore.nameReserved(pseudo)) {
+    if (guestNameInUse(pseudo) || await matchStore?.nameReserved(pseudo)) {
       socket.emit("hub:error", "Ce pseudo est déjà utilisé. Choisis-en un autre ou connecte-toi.");
     } else if (socket.connected) await action({ pseudo });
   });
@@ -136,10 +135,9 @@ async function persistEnd(socket, request, status, acknowledge) {
     }
     if (status === "finished") {
       hub.gameFinished = true;
-      io.to(hub.players.map(({ socketId }) => socketId).filter(Boolean)).emit("match:ready", { id, hubId: hub.id });
     } else {
       const sockets = interruptHub(socket.id, hub.id);
-      if (sockets) io.to(sockets).emit("hub:ended", { hubId: hub.id, reason: "interrupted", matchId: id });
+      if (sockets) io.to(sockets).emit("hub:ended", { hubId: hub.id, reason: "interrupted", matchId: id, tableSummary: true });
     }
     if (typeof acknowledge === "function") acknowledge(true);
     broadcastHubs();

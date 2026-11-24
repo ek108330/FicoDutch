@@ -21,6 +21,7 @@ type Props = {
   onLeave: () => void;
   onRestart: () => void;
   onInterrupt?: () => void;
+  gameFinished: boolean;
   canRestart: boolean;
 };
 
@@ -112,7 +113,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 
 export default function RoundResults({
   result, settings, roundNumber, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext, onLeave,
-  onRestart, onInterrupt, canRestart,
+  onRestart, onInterrupt, canRestart, gameFinished,
 }: Props) {
   const interruptDialog = useRef<HTMLDialogElement>(null);
   const interruptTitle = useId();
@@ -154,24 +155,21 @@ export default function RoundResults({
               ))}
             </div>
           </fieldset>
-          {!isFinal && isHost && (
-            <button type="button" className="result-primary" disabled={!canStartNext} onClick={startNext}>
-              Lancer la manche suivante
-            </button>
-          )}
-          {isFinal && (isHost ? (
+          {isHost ? (
             <div className="result-actions">
-              {onInterrupt && <button type="button" className="hub-danger" aria-haspopup="dialog" onClick={() => interruptDialog.current?.showModal()}>
+              {onInterrupt && <button type="button" className="hub-danger" aria-haspopup="dialog" disabled={isFinal && !gameFinished}
+                onClick={() => interruptDialog.current?.showModal()}>
                 Interrompre la partie
               </button>}
-              <button type="button" className="result-primary" disabled={!canRestart} onClick={onRestart}>
-                Lancer la prochaine partie
+              <button type="button" className="result-primary" disabled={isFinal ? !canRestart : !canStartNext}
+                onClick={isFinal ? onRestart : startNext}>
+                {isFinal ? "Lancer la prochaine partie" : "Lancer la manche suivante"}
               </button>
             </div>
-          ) : <button type="button" className="result-primary" onClick={onLeave}>Quitter la table</button>)}
+          ) : isFinal && <button type="button" className="result-primary" onClick={onLeave}>Quitter la table</button>}
         </div>
       </section>
-      {isFinal && onInterrupt && <dialog className="hub-management game-settings" ref={interruptDialog} aria-labelledby={interruptTitle}>
+      {isHost && onInterrupt && <dialog className="hub-management game-settings" ref={interruptDialog} aria-labelledby={interruptTitle}>
         <InterruptConfirmation titleId={interruptTitle} onCancel={() => interruptDialog.current?.close()} onConfirm={() => {
           interruptDialog.current?.close();
           onInterrupt();

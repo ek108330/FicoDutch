@@ -20,7 +20,7 @@ export function InterruptConfirmation({ titleId, onCancel, onConfirm }: {
   return (
     <section aria-labelledby={titleId} aria-describedby={description}>
       <h2 id={titleId}>Interrompre la partie ?</h2>
-      <p id={description}>Le Hub sera fermé et tous les joueurs retourneront à l’accueil.</p>
+      <p id={description}>Le Hub sera fermé pour tous les joueurs.</p>
       <div className="hub-management-actions">
         <button type="button" autoFocus onClick={onCancel}>Annuler</button>
         <button type="button" className="hub-danger" onClick={onConfirm}>Confirmer l’interruption</button>

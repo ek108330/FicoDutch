@@ -9,8 +9,18 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
   const guest = await browser.newPage({ baseURL });
   try {
     await page.goto("/");
-    await page.getByRole("link", { name: "Bots de test" }).click();
+    await expect(page.getByText("Jouer sans compte")).toBeVisible();
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.screenshot({ path: testInfo.outputPath("accueil-invite.png") });
+    await page.getByRole("button", { name: "Mes stats" }).click();
+    await expect(page.getByText("Connecte-toi pour retrouver tes statistiques personnelles.")).toBeVisible();
+    await page.goBack();
+    await page.getByRole("button", { name: "Autres joueurs" }).click();
     await expect(page.getByRole("listitem")).toHaveCount(10);
+    await page.getByRole("textbox", { name: "Rechercher un pseudo" }).fill("botat");
+    await page.getByRole("button", { name: "Rechercher" }).click();
+    await expect(page.getByRole("listitem")).toHaveCount(1);
+    await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
     await page.getByRole("link", { name: "BotAtlas", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
     await expect(page.getByText("Aucune confrontation terminée.")).toHaveCount(0);
@@ -88,20 +98,27 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expectLocalTurn(host);
     await drawDeck(host).click();
     await discardDrawn(host);
-    await Promise.all([host, guest].map((page) => expect(ready(page)).toBeVisible({ timeout: 15_000 })));
-    await expect(guest.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
-    expect(await host.locator(".archive-screen table").innerText()).toEqual(await guest.locator(".archive-screen table").innerText());
-    const url = guest.url();
-    expect(host.url()).toBe(url);
-    await guest.screenshot({ path: testInfo.outputPath("01-bilan-termine-portrait.png"), fullPage: true });
-    await host.screenshot({ path: testInfo.outputPath("02-bilan-termine-ordinateur.png"), fullPage: true });
-
-    await host.getByRole("link", { name: "Retour à la table" }).click();
+    for (const tab of [host, guest]) {
+      await expect(tab.getByRole("heading", { name: "Fin de la partie" })).toBeVisible({ timeout: 15_000 });
+      await expect(ready(tab)).toHaveCount(0);
+    }
+    await expect(guest.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);
     await expect(host.getByRole("button", { name: "Lancer la prochaine partie" })).toBeEnabled();
-    await host.getByRole("button", { name: "Interrompre la partie" }).click();
+    await expect(host.getByRole("button", { name: "Interrompre la partie" })).toBeVisible();
+    await host.screenshot({ path: testInfo.outputPath("01-fin-de-partie.png"), fullPage: true });
+    await host.getByRole("button", { name: "Lancer la prochaine partie" }).click();
+    await expect(guest.getByRole("region", { name: "Mémorisation" })).toBeVisible();
+    const management = await openManagement(host);
+    await management.getByRole("button", { name: "Interrompre la partie" }).click();
     await host.getByRole("button", { name: "Confirmer l’interruption" }).click();
-    await expect(ready(host)).toBeVisible();
-    await expect(host.getByText("Partie terminée", { exact: true })).toBeVisible();
+    await Promise.all([host, guest].map((tab) => expect(ready(tab)).toBeVisible()));
+    const cumulative = (tab: Page) => tab.getByRole("region", { name: "Bilan cumulé de la table" });
+    await expect(cumulative(guest)).toContainText("2 parties · 1 manche terminée");
+    expect(await cumulative(host).innerText()).toEqual(await cumulative(guest).innerText());
+    await guest.screenshot({ path: testInfo.outputPath("02-bilan-cumule-portrait.png"), fullPage: true });
+    await cumulative(guest).getByRole("link").last().click();
+    await expect(guest.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
+    const url = guest.url();
 
     await otherDevice.goto("/compte");
     await otherDevice.getByLabel("Pseudo", { exact: true }).fill("BobbyMobile");
@@ -111,11 +128,14 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     const profileUrl = (await link.getAttribute("href"))!;
     await link.click();
     await expect(otherDevice.getByRole("heading", { name: "BobbyMobile" })).toBeVisible();
-    await expect(otherDevice.locator(".profile-numbers")).toContainText("Parties jouées1");
+    await expect(otherDevice.locator(".profile-numbers")).toContainText("Parties jouées2");
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Manches terminées1");
     await otherDevice.screenshot({ path: testInfo.outputPath("03-profil-apres-renommage.png"), fullPage: true });
-    await otherDevice.goto("/mes-parties");
-    await otherDevice.getByRole("listitem").getByRole("link").click();
+    await otherDevice.goto("/");
+    await otherDevice.getByRole("button", { name: "Mes stats" }).click();
+    await expect(otherDevice.getByRole("heading", { name: "Mes stats" })).toBeVisible();
+    await otherDevice.getByRole("link", { name: "Mes parties" }).click();
+    await otherDevice.getByRole("listitem").filter({ hasText: "Terminée" }).getByRole("link").click();
     await expect(ready(otherDevice)).toBeVisible();
     await expect(otherDevice.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
     expect(otherDevice.url()).toBe(url);

@@ -68,4 +68,10 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.equal(profile.reactions, 8);
   assert.equal(profile.victories, 1);
   assert.equal((await store.listMatches(players[0].accountId)).matches.length, 2);
+  const games = await store.listTableMatches(second, players[0].accountId);
+  assert.deepEqual(games.map(({ id, status, rounds }) => [id, status, rounds]), [
+    [id, "finished", 1], [second, "interrupted", 1],
+  ]);
+  assert.deepEqual(await store.listTableMatches(second, randomUUID()), []);
+  assert.deepEqual((await store.listPlayers("alice", "")).players.map(({ name }) => name), ["Alice22"]);
 });

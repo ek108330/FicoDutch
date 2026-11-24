@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Crosshair, Crown, Flame, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
-import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
-import { matchPath, profilePath, readDemoBots, readMatch, readProfile, readRecentMatches } from "../network/accountApi";
+import type { Award, AwardId, MatchPlayer, Profile, SavedMatch, TableSummary } from "../../../shared/statistics";
+import { guestMatchToken, matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
+  readTableSummary, rememberGuestMatch } from "../network/accountApi";
 
 type Navigate = (path: string) => void;
 type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () => void };
@@ -146,8 +147,76 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
   </>;
 }
 
-export function MatchArchive({ id, ...props }: RouteProps & { id: string }) {
+function CumulativeResults({ summary, navigate }: { summary: TableSummary; navigate: Navigate }) {
+  const totals = new Map<string, { player: MatchPlayer; games: number; gameWins: number; rounds: number; wins: number;
+    dutch: number; dutchWon: number; reactions: number; penalties: number; exchanges: number }>();
+  let rounds = 0;
+  for (const game of summary.games) {
+    rounds += game.rounds;
+    for (const player of game.players) {
+      const id = player.accountId ?? player.id;
+      const total = totals.get(id) ?? { player, games: 0, gameWins: 0, rounds: 0, wins: 0,
+        dutch: 0, dutchWon: 0, reactions: 0, penalties: 0, exchanges: 0 };
+      total.player = player;
+      total.games++;
+      if (player.rank === 1 && player.eligible !== false) total.gameWins++;
+      total.rounds += player.rounds;
+      total.wins += player.wins;
+      total.dutch += player.dutch;
+      total.dutchWon += player.dutchWon;
+      total.reactions += player.reactions;
+      total.penalties += player.penalties;
+      total.exchanges += player.exchanges;
+      totals.set(id, total);
+    }
+  }
+
+  function openMatch(id: string) {
+    const token = guestMatchToken(summary.match.id);
+    if (token) rememberGuestMatch(id, token);
+    navigate(matchPath(id));
+  }
+
+  return <section className="archive-card cumulative-results" aria-labelledby="cumulative-title">
+    <h2 id="cumulative-title">Bilan cumulé de la table</h2>
+    <p>{plural(summary.games.length, "partie")} · {plural(rounds, "manche terminée", "manches terminées")}</p>
+    <div className="cumulative-players">
+      {Array.from(totals.values(), ({ player, games, gameWins, rounds, wins, dutch, dutchWon, reactions, penalties, exchanges }) => (
+        <article className="cumulative-player" key={player.accountId ?? player.id}>
+          <h3><PlayerName player={player} navigate={navigate} /></h3>
+          <dl>
+            <div><dt>Parties gagnées</dt><dd>{gameWins} / {games}</dd></div>
+            <div><dt>Manches gagnées</dt><dd>{wins} / {rounds}</dd></div>
+            <div><dt>Dutch réussis</dt><dd>{dutchWon} / {dutch}</dd></div>
+            <div><dt>Réactions</dt><dd>{reactions}</dd></div>
+            <div><dt>Pénalités</dt><dd>{penalties}</dd></div>
+            <div><dt>Échanges</dt><dd>{exchanges}</dd></div>
+          </dl>
+        </article>
+      ))}
+    </div>
+    {summary.games.length > 1 && <ul className="archive-list">
+      {summary.games.filter(({ id }) => id !== summary.match.id).map((game) => <li key={game.id}>
+        <Link path={matchPath(game.id)} navigate={() => openMatch(game.id)}>{date.format(game.startedAt)}</Link>
+        <span>{plural(game.rounds, "manche terminée", "manches terminées")}</span>
+      </li>)}
+    </ul>}
+  </section>;
+}
+
+function InterruptedTable({ id, ...props }: RouteProps & { id: string }) {
+  const loader = useCallback((signal: AbortSignal) => readTableSummary(id, signal), [id]);
+  return <ArchiveFrame title="Statistiques de la partie" {...props}>
+    <Load loader={loader}>{(summary) => <>
+      <CumulativeResults summary={summary} navigate={props.navigate} />
+      <MatchContent match={summary.match} navigate={props.navigate} />
+    </>}</Load>
+  </ArchiveFrame>;
+}
+
+export function MatchArchive({ id, tableSummary, ...props }: RouteProps & { id: string; tableSummary: boolean }) {
   const [loader] = useState(() => (signal: AbortSignal) => readMatch(id, signal));
+  if (tableSummary) return <InterruptedTable id={id} {...props} />;
   return <ArchiveFrame title="Statistiques de la partie" {...props}>
     <Load loader={loader}>{(match) => <MatchContent match={match} navigate={props.navigate} />}</Load>
   </ArchiveFrame>;
@@ -199,9 +268,10 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   </>;
 }
 
-export function PublicProfile({ id, ...props }: RouteProps & { id: string }) {
+export function PublicProfile({ id, personal, ...props }: RouteProps & { id: string; personal?: boolean }) {
   const [loader] = useState(() => (signal: AbortSignal) => readProfile(id, signal));
-  return <ArchiveFrame title="Profil public" {...props}>
+  return <ArchiveFrame title={personal ? "Mes stats" : "Profil public"} {...props}>
+    {personal && <div className="archive-actions"><Link path="/mes-parties" navigate={props.navigate}>Mes parties</Link></div>}
     <Load loader={loader}>{(profile) => <ProfileContent profile={profile} navigate={props.navigate} />}</Load>
   </ArchiveFrame>;
 }
@@ -222,6 +292,33 @@ export function RecentMatches(props: RouteProps) {
         </nav>}
       </section>
     }</Load>
+  </ArchiveFrame>;
+}
+
+export function PlayersDirectory(props: RouteProps) {
+  const [query, setQuery] = useState("");
+  const [pages, setPages] = useState([""]);
+  const cursor = pages.at(-1) ?? "";
+  const loader = useCallback((signal: AbortSignal) => readPlayers(query, cursor, signal), [query, cursor]);
+  return <ArchiveFrame title="Autres joueurs" {...props}>
+    <form className="archive-actions player-search" onSubmit={(event) => {
+      event.preventDefault();
+      setQuery(String(new FormData(event.currentTarget).get("name")).trim());
+      setPages([""]);
+    }}>
+      <label>Rechercher un pseudo <input name="name" maxLength={15} pattern="[A-Za-z0-9]+" /></label>
+      <button type="submit">Rechercher</button>
+    </form>
+    <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">
+      {players.length ? <ul className="archive-list">{players.map((player) => <li key={player.id}>
+        <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
+        <span>{player.demoBot && "Bot · "}{plural(player.matches, "partie")}</span>
+      </li>)}</ul> : <p>Aucun joueur trouvé.</p>}
+      {(pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages des joueurs">
+        {pages.length > 1 && <button type="button" onClick={() => setPages(pages.slice(0, -1))}>Précédent</button>}
+        {next && <button type="button" onClick={() => setPages([...pages, next])}>Suivant</button>}
+      </nav>}
+    </section>}</Load>
   </ArchiveFrame>;
 }
 

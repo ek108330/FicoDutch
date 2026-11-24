@@ -200,7 +200,7 @@ export default function GameTable({
         const giveToPlayer = power?.kind === "give-card" && player.id !== localPlayerId;
         const canChooseFromHand = power && power.selection.remaining > 0 &&
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
-        const name = player.pseudo + (position === "bottom" ? " (Moi)" : "");
+        const name = player.pseudo;
         const announce = position === "bottom" ? dutchControl : undefined;
         const emoji = tableEmojis?.get(player.id);
         const layout = getHandLayout(player.cardCount, player.handLayout);

@@ -185,6 +185,29 @@ function createMatchStore(db) {
     return row && { id, ...row.report, startedAt: Number(row.started_at), endedAt: Number(row.ended_at) };
   }
 
+  async function listTableMatches(id, accountId, guestToken) {
+    const { rows } = await db.query(`
+      SELECT m.id, m.started_at, m.report->>'status' AS status, m.report->'rounds' AS rounds, m.report->'players' AS players
+      FROM matches m WHERE m.id LIKE $1 AND m.ended_at IS NOT NULL
+        AND EXISTS (SELECT 1 FROM match_seats s WHERE s.match_id = m.id
+          AND (s.account_id = $2 OR s.guest_token_hash = $3))
+      ORDER BY m.started_at, m.id
+    `, [id.split(":")[0] + ":%", accountId ?? null, seatHash(guestToken)]);
+    return rows.map(({ id, started_at, status, rounds, players }) =>
+      ({ id, startedAt: Number(started_at), status, rounds, players }));
+  }
+
+  async function listPlayers(query, after) {
+    const { rows } = await db.query(`
+      SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches
+      FROM accounts a JOIN player_stats s ON a.id = s.account_id
+      WHERE lower(a.display_name) LIKE $1 AND lower(a.display_name) > $2
+      ORDER BY lower(a.display_name) LIMIT 31
+    `, [query + "%", after]);
+    const players = rows.slice(0, 30);
+    return { players, next: rows.length > players.length ? players.at(-1).name.toLowerCase() : null };
+  }
+
   async function getProfile(id) {
     const { rows } = await db.query("SELECT a.display_name, a.is_demo_bot, s.* FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1", [id]);
     const row = rows[0];
@@ -249,7 +272,8 @@ function createMatchStore(db) {
     return rows;
   }
 
-  return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish, getMatch, getProfile, listMatches, listBots, staleMatches };
+  return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish,
+    getMatch, listTableMatches, getProfile, listPlayers, listMatches, listBots, staleMatches };
 }
 
 function mountMatchRoutes(app, store, readAccount) {
@@ -271,10 +295,21 @@ function mountMatchRoutes(app, store, readAccount) {
     if (!session && !seatHash(guestToken)) return response.status(401).json({ error: "Connecte-toi pour consulter ce bilan." });
     const match = matchPattern.test(request.params.id) && await store.getMatch(request.params.id, session?.account.id, guestToken);
     if (!match) return response.status(404).json({ error: "Ce bilan est introuvable ou n’est pas encore disponible." });
+    if (request.query.table === "1") {
+      const games = await store.listTableMatches(match.id, session?.account.id, guestToken);
+      return response.json({ match, games });
+    }
     response.json(match);
   });
   app.get("/api/demo-bots", async (_request, response) => {
     response.set("Cache-Control", "public, max-age=30").json(await store.listBots());
+  });
+  app.get("/api/players", async (request, response) => {
+    const { q = "", after = "" } = request.query;
+    if (![q, after].every((value) => typeof value === "string" && /^[A-Za-z0-9]{0,15}$/.test(value))) {
+      return response.status(400).json({ error: "Saisis au plus 15 lettres ou chiffres." });
+    }
+    response.set("Cache-Control", "public, max-age=30").json(await store.listPlayers(q.toLowerCase(), after.toLowerCase()));
   });
   app.get("/api/players/:id", async (request, response) => {
     const profile = uuidPattern.test(request.params.id) && await store.getProfile(request.params.id);

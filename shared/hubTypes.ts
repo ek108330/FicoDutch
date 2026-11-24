@@ -46,7 +46,7 @@ export type CreateHubRequest = {
 
 export type HubSession = { hubId: string; playerId: string; token: string; isHost: boolean; matchId?: string };
 export type HubMembership = { hub: Hub; session: HubSession };
-export type HubEnd = { hubId: string; reason: "removed" | "interrupted"; matchId?: string };
+export type HubEnd = { hubId: string; reason: "removed" | "interrupted"; matchId?: string; tableSummary?: boolean };
 export type HubEmoji = keyof typeof hubSocial.emojis;
 export type LobbyChatContent = { kind: "text"; text: string } | { kind: "emoji"; emoji: HubEmoji };
 export type LobbyChatMessage = LobbyChatContent & { id: string; hubId: string; playerId: string; pseudo: string };

@@ -74,6 +74,11 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     await guest.screenshot({ path: testInfo.outputPath("01-resultats-manche-1.png") });
     await expect(next(host)).toBeEnabled();
     await expect(next(guest)).toHaveCount(0);
+    const interruptRound = host.getByRole("button", { name: "Interrompre la partie", exact: true });
+    await expect(guest.getByRole("button", { name: "Interrompre la partie", exact: true })).toHaveCount(0);
+    await interruptRound.click();
+    await host.getByRole("dialog", { name: "Interrompre la partie ?" }).getByRole("button", { name: "Annuler" }).click();
+    await expect(next(host)).toBeEnabled();
     await expect(sixCards(guest)).toBeDisabled();
     await sixCards(host).click();
     await expect(sixCards(guest)).toHaveAttribute("aria-pressed", "true");

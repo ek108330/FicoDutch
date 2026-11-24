@@ -7,11 +7,12 @@ type Props = {
   account: Account | null;
   onChange: (session: AccountSession) => void;
   navigate: (path: string) => void;
+  forStats?: boolean;
 };
 
 const namePattern = "[A-Z][A-Za-z0-9]{4,14}";
 
-export default function AccountScreen({ account, onChange, navigate }: Props) {
+export default function AccountScreen({ account, onChange, navigate, forStats }: Props) {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -36,7 +37,7 @@ export default function AccountScreen({ account, onChange, navigate }: Props) {
     const data = new FormData(event.currentTarget);
     if (account) void run(() => rename(String(data.get("name"))), () => setNotice("Pseudo enregistré."));
     else void run(() => signIn(String(data.get("handle")), String(data.get("password")), creating),
-      () => { if (!/^\/(parties|mes-parties)(\/|$)/.test(location.pathname)) navigate("/"); });
+      () => { if (!forStats && !/^\/(parties|bilans|mes-parties)(\/|$)/.test(location.pathname)) navigate("/"); });
   }
 
   return (
@@ -46,6 +47,7 @@ export default function AccountScreen({ account, onChange, navigate }: Props) {
           <ArrowLeft size={17} aria-hidden="true" /> Accueil
         </a>
         <h1><UserRound aria-hidden="true" /> {account ? "Mon compte" : creating ? "Créer un compte" : "Connexion"}</h1>
+        {forStats && <p>Connecte-toi pour retrouver tes statistiques personnelles.</p>}
         <form onSubmit={submit} key={account?.id ?? String(creating)}>
           {account ? <>
             <p>Identifiant de connexion <strong>{account.handle}</strong></p>

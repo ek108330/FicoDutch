@@ -3016,6 +3016,17 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-ranking table { width: 100%; border-collapse: collapse; }
 .archive-ranking :is(th, td) { text-align: left; padding: 4px; border-bottom: 1px solid #507260; }
 .archive-ranking :is(th, td):last-child { text-align: right; }
+.cumulative-results { margin-bottom: 12px; }
+.cumulative-players { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 8px; margin-top: 10px; }
+.cumulative-player { min-width: 0; border: 1px solid #507260; border-radius: 8px; padding: 8px; }
+.cumulative-player h3 { font-size: 0.95rem; overflow-wrap: anywhere; }
+.cumulative-player dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 5px; font-size: 0.8rem; }
+.cumulative-player dd { margin: 0; font-weight: 700; }
+.cumulative-results > .archive-list { margin-top: 8px; }
+.player-search { align-items: end; }
+.player-search label { display: grid; gap: 4px; }
+.player-search input { min-height: 37px; padding: 6px 9px; border: 1px solid #aacbb5; border-radius: 7px; font: inherit; width: 100%; }
+.archive-list + .archive-actions { margin-top: 10px; }
 .archive-interactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .archive-interactions dt, .profile-numbers dt { font-weight: 700; }
 .archive-interactions dd, .profile-numbers dd { margin: 3px 0 0; font-size: 0.9rem; }
@@ -3033,3 +3044,15 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-error { color: #ffd4c6; }
 .account-links { display: flex; flex-wrap: wrap; gap: 4px 9px; justify-content: center; align-items: center; font-size: 0.84rem; }
 .home-create .account-links a { color: #194d38; font-weight: 700; }
+.guest-entry { display: grid; gap: 4px; text-align: left; font-size: 0.9rem; font-weight: 700; }
+.home-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.home-stats button {
+  min-height: 34px;
+  border: 1px solid #577963;
+  border-radius: 8px;
+  background: #e4efe7;
+  color: #153e30;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
