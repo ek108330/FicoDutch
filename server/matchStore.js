@@ -183,6 +183,18 @@ function createMatchStore(db) {
     return row && { id, ...row.report, startedAt: Number(row.started_at), endedAt: Number(row.ended_at) };
   }
 
+  async function getRatingMovements(ids) {
+    const { rows } = await db.query(`
+      SELECT a.id AS "accountId", a.display_name AS name,
+        sum(r.after_rn - r.before_rn) AS delta
+      FROM round_rating_entries r JOIN accounts a ON a.id = r.account_id
+      WHERE r.match_id = ANY($1::text[])
+      GROUP BY a.id, a.display_name
+      ORDER BY a.display_name, a.id
+    `, [ids]);
+    return rows.map((entry) => ({ ...entry, delta: Number(entry.delta.toFixed(9)) }));
+  }
+
   async function getTableSummary(match) {
     const { rows } = await db.query(`
       SELECT m.id, m.started_at, m.report->>'status' AS status, m.report->'players' AS players,
@@ -206,6 +218,7 @@ function createMatchStore(db) {
       games: rows.length,
       totalRounds: rows.reduce((total, { rounds, unfinished }) => total + rounds + Number(unfinished), 0),
       playerCount: new Set(rows.flatMap(({ players }) => players.map(playerKey))).size,
+      ratingMovements: await getRatingMovements(rows.map(({ id }) => id)),
       scopeIncomplete: rows.length > 1 && !table };
   }
 
@@ -309,7 +322,7 @@ function createMatchStore(db) {
   `, [reporter, target, now]);
   return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish, recordDeparture, getRating,
     recordRounds: (id, rounds, now) => recordRatedRounds(db, id, rounds, now), reportHistory,
-    getMatch, getTableSummary, getProfile, listPlayers, listMatches, listBots, staleMatches };
+    getMatch, getRatingMovements, getTableSummary, getProfile, listPlayers, listMatches, listBots, staleMatches };
 }
 
 function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
@@ -335,7 +348,7 @@ function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
       return response.json(await store.getTableSummary(match));
     }
     const { table: _table, ...report } = match;
-    response.json(report);
+    response.json({ ...report, ratingMovements: await store.getRatingMovements([match.id]) });
   });
   app.get("/api/demo-bots", async (_request, response) => {
     response.set("Cache-Control", "public, max-age=30").json(await store.listBots());

@@ -68,6 +68,11 @@ async function checkSeats(page: Page, count: number, cards: number) {
   }
   const { width, height } = page.viewportSize()!;
   if (width < height) {
+    if (count === 6) {
+      const inset = await table.evaluate((element) => parseFloat(getComputedStyle(element).borderBottomWidth) + 3);
+      const hand = (await table.locator(".position-bottom .player-cards").boundingBox())!;
+      expect(hand.y + hand.height).toBeLessThanOrEqual(tableBox.y + tableBox.height - inset);
+    }
     for (const seat of boxes) {
       if (seat.label.includes("position-left")) expect(seat.left - tableBox.x, seat.label).toBeLessThan(30);
       if (seat.label.includes("position-right")) expect(tableBox.x + tableBox.width - seat.right, seat.label).toBeLessThan(30);

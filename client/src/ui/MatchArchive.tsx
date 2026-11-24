@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
-import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
+import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
   readTableSummary, tableSummaryPath } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
@@ -104,6 +104,27 @@ function Interaction({ id, award, roster, navigate }: {
   }
 }
 
+const ratingDelta = new Intl.NumberFormat("fr", { maximumFractionDigits: 2, signDisplay: "always" });
+
+function MatchRatingMovements({ movements, navigate }: { movements: RatingMovement[]; navigate: Navigate }) {
+  const changes = movements.map(({ delta }) => delta);
+  const extremes = [
+    { title: "Plus fort gain de RN", delta: Math.max(0, ...changes), Icon: ArrowUpRight },
+    { title: "Plus forte perte de RN", delta: Math.min(0, ...changes), Icon: ArrowDownRight },
+  ];
+  return <section className="archive-awards archive-rating-movements" aria-label="Variations de l’indice RN">
+    {extremes.map(({ title, delta, Icon }) => <article className="archive-card" key={title}>
+      <h3><Icon size={16} aria-hidden="true" />{title}</h3>
+      {delta ? <p>
+        <strong>{movements.filter((entry) => entry.delta === delta).map(({ accountId, name }, index) =>
+          <Fragment key={accountId}>{index > 0 && " & "}<Link path={profilePath(accountId)} navigate={navigate}>{name}</Link></Fragment>,
+        )}</strong>
+        <span className="archive-rn-delta">{Math.abs(delta) < 0.005 ? `${delta > 0 ? "+" : "−"}<0,01` : ratingDelta.format(delta)} RN</span>
+      </p> : <p className="archive-muted">{movements.length ? "Aucune variation" : "Aucune manche classée"}</p>}
+    </article>)}
+  </section>;
+}
+
 function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Navigate }) {
   const sorted = match.players.filter(({ rank }) => rank !== undefined).sort((a, b) => a.rank! - b.rank!);
   const roster = new Map(match.players.map((player) => [player.id, player]));
@@ -134,6 +155,7 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
         </tr>)}</tbody>
       </table>
     </section>}
+    <MatchRatingMovements movements={match.ratingMovements ?? []} navigate={navigate} />
     <section aria-labelledby="individual-title">
       <h2 id="individual-title">Récompenses individuelles</h2>
       <div className="archive-awards">{individual.map(([id, title, Icon]) => {

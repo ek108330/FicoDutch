@@ -38,7 +38,7 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   const firstResult = { number: 1, announcer: null, emptyHand: null,
     scores: players.map(({ id: seat }, index) => ({ id: seat, base: 41 + index, score: 41 + index, left: false })) };
   assert.equal((await store.recordRounds(id, [firstResult])).through, 1);
-  assert.equal((await store.getProfile(players[0].accountId)).rating, 56);
+  assert.equal((await store.getProfile(players[0].accountId)).rating, 52);
   assert.deepEqual(await store.recordRounds(id, [firstResult]), { through: 1, results: [] });
   assert.equal(await store.finish(id, "finished", stats), true);
   assert.equal(await store.finish(id, "interrupted", null), true);
@@ -49,7 +49,7 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.deepEqual(read, await store.getMatch(id, players[1].accountId));
   assert.equal(await store.getMatch(id, randomUUID()), undefined);
   let profile = await store.getProfile(players[0].accountId);
-  assert.equal(profile.rating, 56);
+  assert.equal(profile.rating, 52);
   assert.equal(profile.finished, 1);
   assert.equal(profile.rivals[0].wins, 1);
   assert.equal(profile.encounters[0].opponents[0].name, "Bobby");
@@ -71,8 +71,8 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.deepEqual(recovered.awards, {});
   profile = await store.getProfile(players[0].accountId);
   assert.equal(profile.name, "Alice22");
-  assert.equal(profile.rating, 56);
-  assert.deepEqual(profile.ratings.map(({ rating }) => rating), [56]);
+  assert.equal(profile.rating, 52);
+  assert.deepEqual(profile.ratings.map(({ rating }) => rating), [52]);
   assert.equal(profile.finished, 1);
   assert.equal(profile.interrupted, 1);
   assert.equal(profile.reactions, 8);
@@ -83,9 +83,11 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.equal(summary.rounds, 2);
   assert.equal(summary.awards.shuriken[0].value, 8);
   assert.equal(summary.players[0].rank, 1);
+  assert.deepEqual(summary.ratingMovements.map(({ name, delta }) => [name, delta]), [["Alice22", 2], ["Bobby", -2]]);
+  assert.deepEqual(await store.getRatingMovements([second]), []);
   assert.equal(await store.getMatch(second, randomUUID()), undefined);
   assert.deepEqual((await store.listPlayers("alice")).players.map(({ name }) => name), ["Alice22"]);
   const ranking = (await store.listPlayers("")).players;
-  assert.deepEqual(ranking.map(({ name, rating }) => [name, rating]), [["Alice22", 56], ["Bobby", 44]]);
+  assert.deepEqual(ranking.map(({ name, rating }) => [name, rating]), [["Alice22", 52], ["Bobby", 48]]);
   assert.deepEqual((await store.listPlayers("", ranking[0])).players, [ranking[1]]);
 });

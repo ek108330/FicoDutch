@@ -13,7 +13,7 @@ function calculateRatings(players, encounters) {
   const participation = 1 + 0.1 * (players.length - 2);
   return players.map((player) => {
     const { accountId, rating, ratedRounds, score, forfeited } = player;
-    const coefficient = (ratedRounds < 10 ? 12 : 8) * participation;
+    const coefficient = (ratedRounds < 10 ? 4 : 2) * participation;
     let total = 0;
     for (const opponent of players) {
       if (opponent === player) continue;

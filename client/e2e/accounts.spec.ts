@@ -7,6 +7,7 @@ const ready = (page: Page) => page.getByRole("heading", { name: "Statistiques de
 const game = (page: Page) => page.getByRole("button", { name: "Lancer la partie", exact: true });
 
 test("un invité garde un pseudo unique et peut jouer contre un bot de test", async ({ page, browser, baseURL }, testInfo) => {
+  test.setTimeout(45_000);
   const guest = await browser.newPage({ baseURL });
   try {
     await page.goto("/");
@@ -93,8 +94,23 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       await page.setViewportSize({ width, height });
       await expectScreenFits(page);
       for (const seat of await page.locator(".table-player").all()) await expect(seat).toBeInViewport({ ratio: 1 });
+      const table = page.locator(".game-table");
+      const feltBottom = await table.evaluate((element) =>
+        element.getBoundingClientRect().bottom - parseFloat(getComputedStyle(element).borderBottomWidth) - 3);
+      const hand = (await page.locator(".position-bottom .player-cards").boundingBox())!;
+      expect(hand.y + hand.height).toBeLessThanOrEqual(feltBottom);
       await page.screenshot({ path: testInfo.outputPath(`table-six-badges-${width}.png`) });
     }
+    await page.setViewportSize({ width: 320, height: 568 });
+    await expect(page.getByRole("region", { name: "Tour de jeu" })).toBeVisible({ timeout: 20_000 });
+    const compactHand = page.locator(".position-bottom .player-cards");
+    const insideFelt = await compactHand.evaluate((hand) => {
+      const table = hand.closest(".game-table")!;
+      const bottom = table.getBoundingClientRect().bottom - parseFloat(getComputedStyle(table).borderBottomWidth) - 3;
+      return hand.getBoundingClientRect().bottom <= bottom;
+    });
+    expect(insideFelt).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath("table-six-en-jeu-320.png") });
     await page.setViewportSize({ width: 360, height: 640 });
     const management = await openManagement(page);
     await management.getByRole("button", { name: "Interrompre la partie" }).click();
@@ -127,7 +143,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     expect(interactionColumns).toBe(1);
     await expect(interactions).toContainText(/a donné un roi noir à .+ contre une dame\./);
     await expect(interactions).not.toContainText("entre leurs mains");
-    await page.screenshot({ path: testInfo.outputPath("bilan-invite.png") });
+    await page.screenshot({ path: testInfo.outputPath("bilan-invite.png"), fullPage: true });
     await page.getByRole("button", { name: "Revenir à l’accueil", exact: true }).click();
     await expect(pseudo(page)).toBeVisible();
   } finally { await guest.close(); }
@@ -252,6 +268,14 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       await expect(totals.getByText("2 parties", { exact: true })).toBeVisible();
       await expect(tab.getByRole("heading", { name: "Bilan cumulé de la table" })).toHaveCount(0);
       await expect(tab.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
+      const rating = tab.getByRole("region", { name: "Variations de l’indice RN" });
+      await expect(rating.getByRole("article")).toHaveCount(2);
+      await expect(rating.getByRole("article").first()).toContainText("AliceCompte");
+      await expect(rating.getByRole("article").first()).toContainText("+2 RN");
+      await expect(rating.getByRole("article").last()).toContainText("BobbyCompte");
+      await expect(rating.getByRole("article").last()).toContainText(/[-−]2 RN/);
+      const [gain, loss] = await Promise.all([rating.getByRole("article").first().boundingBox(), rating.getByRole("article").last().boundingBox()]);
+      expect(gain!.y).toBeCloseTo(loss!.y);
       await expect(tab.getByRole("region", { name: "Interactions et rivalités" })).toContainText("a fait échouer 1 annonce Dutch");
     }
     expect(await host.locator(".archive-screen").innerText()).toEqual(await guest.locator(".archive-screen").innerText());
@@ -267,7 +291,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expect(otherDevice.getByRole("heading", { name: "BobbyMobile" })).toBeVisible();
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Parties jouées2");
     await expect(otherDevice.locator(".profile-numbers")).toContainText("Manches terminées1");
-    await expect(otherDevice.locator(".profile-numbers")).toContainText("Indice RN44");
+    await expect(otherDevice.locator(".profile-numbers")).toContainText("Indice RN48");
     await otherDevice.screenshot({ path: testInfo.outputPath("03-profil-apres-renommage.png"), fullPage: true });
     await host.goto(profileUrl);
     await host.getByRole("button", { name: "Signaler cet historique" }).click();
@@ -279,6 +303,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await otherDevice.getByRole("listitem").filter({ hasText: "Terminée" }).getByRole("link").click();
     await expect(ready(otherDevice)).toBeVisible();
     await expect(otherDevice.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
+    await expect(otherDevice.getByRole("region", { name: "Variations de l’indice RN" })).toContainText("+2 RN");
     const url = otherDevice.url();
 
     const anonymous = await browser.newPage({ baseURL });

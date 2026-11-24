@@ -2855,6 +2855,10 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
     grid-template-areas: "left-top right-top" "center center" "left-bottom right-bottom" "own own";
   }
 
+  .game-screen .game-table.is-large-table[data-player-count="6"] {
+    grid-template-rows: minmax(min-content, 1fr) repeat(3, auto) minmax(0, 1fr);
+  }
+
   .game-screen .game-table.is-large-table:is([data-player-count="4"], [data-player-count="5"]) {
     grid-template-rows: minmax(min-content, 1fr) auto auto minmax(min-content, 1fr);
   }
@@ -2881,8 +2885,12 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   }
 
   .game-screen .game-table.is-large-table[data-player-count="6"] {
-    grid-template-rows: auto auto auto auto minmax(min-content, 1fr);
+    grid-template-rows: repeat(4, auto) minmax(0, 1fr);
     row-gap: 4px;
+  }
+
+  .game-table.is-large-table[data-player-count="6"] .position-bottom .player-cards {
+    --hand-width: 38vw;
   }
 
   .game-screen .game-table.is-large-table[data-player-count="6"] .position-top .player-name {
@@ -2924,7 +2932,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .game-screen .game-table.is-large-table[data-player-count="6"] {
     min-height: calc(100dvh - 8px);
-    padding-bottom: 14px;
+    padding-bottom: 7px;
     row-gap: 3px;
   }
 
@@ -2933,6 +2941,11 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .game-table[data-player-count="6"] .turn-layout {
     grid-template-rows: auto 40px;
+  }
+
+  .game-screen .game-table.is-large-table[data-player-count="6"] .table-center:has(.memorization-panel) {
+    flex-direction: row;
+    justify-content: center;
   }
 
 }
@@ -3091,6 +3104,10 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-meta span:first-child { color: #ffdf91; font-weight: 750; }
 .archive-screen .archive-note { margin-top: 10px; font-size: 0.9rem; }
 .archive-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 136px), 1fr)); gap: 8px; }
+.archive-rating-movements { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 8px; }
+.archive-rn-delta { display: block; margin-top: 2px; }
+.archive-rating-movements article:first-child h3 svg { color: #abe3b8; }
+.archive-rating-movements article:last-child h3 svg { color: #ffb3a8; }
 .archive-card, .account-card { padding: 12px; border: 1px solid #6d9580; border-radius: 11px; background: #153e30; }
 .archive-card h2 { margin-top: 0; }
 .archive-card > svg { color: #f4cf75; }
