@@ -79,6 +79,13 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   assert.equal((await readAzure(now + week)).ratingWeekStart, 50);
   assert.equal((await readAzure(now + week + 1)).ratingWeekStart, profile.ratings[0].rating);
   assert.equal((await readAzure(now + week + 100_001)).ratingWeekStart, null);
+  const weekFirstPage = await store.listSortedPlayers("", "week", "desc", 0, 1, now + 100_000);
+  assert.ok(weekFirstPage.players[0].rating > weekFirstPage.players[0].ratingWeekStart);
+  assert.equal(weekFirstPage.next, "1");
+  const weekSecondPage = await store.listSortedPlayers("", "week", "desc", Number(weekFirstPage.next), 3, now + 100_000);
+  assert.equal(weekSecondPage.players.at(-1).ratingWeekStart, null);
+  assert.ok(weekSecondPage.players.every(({ id }) => id !== weekFirstPage.players[0].id));
+  assert.deepEqual((await store.listSortedPlayers("", "name", "asc", 0, 2)).players.map(({ name }) => name), ["Azure", "Betty"]);
 
   await db.query("UPDATE player_stats SET rn = 50, matches = 4, rounds = 4, round_wins = 1");
   await db.query("UPDATE player_stats SET matches = 6 WHERE account_id = $1", [denis.accountId]);

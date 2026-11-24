@@ -663,10 +663,8 @@ function App() {
       <main className="home-page">
         <header className="top-bar">
           <div className="brand"><img src="/ficodutch-logo.png" alt="" width="30" height="20" /> <span>FicoDutch</span></div>
-          <div className="header-actions">
-            <span className="version">Version {GAME_CONFIG.version}</span>
-            {settings}
-          </div>
+          {settings}
+          <span className="version">Version {GAME_CONFIG.version}</span>
         </header>
         <div className="home-content">
           {currentHub ? (

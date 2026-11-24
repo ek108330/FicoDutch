@@ -41,9 +41,11 @@ export const readMatch = (id: string, signal?: AbortSignal) =>
   request<SavedMatch>(`/matches/${encodeURIComponent(id)}`, matchOptions(id, signal));
 export const readTableSummary = (id: string, signal?: AbortSignal) =>
   request<SavedMatch>(`/matches/${encodeURIComponent(id)}?table=1`, matchOptions(id, signal));
-export const readPlayers = (query: string, after: string, signal?: AbortSignal) =>
+export type DirectorySort = { column: "name" | "rounds" | "wins" | "rating" | "week"; direction: "asc" | "desc" };
+export const readPlayers = (query: string, after: string, sort: DirectorySort, signal?: AbortSignal) =>
   request<{ players: DirectoryPlayer[]; next: string | null }>(
-    "/players?" + new URLSearchParams({ q: query, after }), { signal });
+    "/players?" + new URLSearchParams({ q: query, after,
+      ...(sort.column === "rating" && sort.direction === "desc" ? {} : { sort: sort.column, direction: sort.direction }) }), { signal });
 export const readProfile = (id: string, signal?: AbortSignal) => request<Profile>(`/players/${encodeURIComponent(id)}`, { signal });
 export const reportProfile = (id: string) => request<{ ok: true }>(`/players/${encodeURIComponent(id)}/report`, {
   method: "POST", body: "{}",

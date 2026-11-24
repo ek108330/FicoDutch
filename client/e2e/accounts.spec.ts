@@ -53,14 +53,45 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.getByRole("button", { name: "Classement", exact: true }).click();
     const directory = page.getByRole("table", { name: "Classement des joueurs" });
     await expect(directory.getByRole("row")).toHaveCount(11);
-    await expect(directory.getByRole("columnheader")).toHaveText(["Nom", "Manches", "Manches gagnées", "Indice RN", "RN 7 j"]);
+    await expect(directory.getByRole("columnheader")).toHaveText(["Nom", "Manches", "Victoires", "RN", "7j"]);
+    expect(await directory.locator("tbody a").evaluateAll((links) => links.every((link) => {
+      const range = document.createRange();
+      range.selectNodeContents(link);
+      return range.getClientRects().length === 1;
+    }))).toBe(true);
     const ratings = (await directory.locator("tbody td:nth-last-child(2)").allTextContents()).map(Number);
     const names = await directory.locator("tbody a").allTextContents();
     expect(names.slice(0, 3)).toEqual(podiumNames);
     expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
+    const sortBy = (name: string) => directory.getByRole("button", { name, exact: true }).click();
+    await sortBy("Nom");
+    await expect(directory.locator("tbody a").first()).toHaveText("BotEnTrain");
+    await sortBy("Nom");
+    await expect(directory.locator("tbody a").first()).toHaveText("ValteriBotAs");
+    for (const [column, index] of [["Manches", 1], ["Victoires", 2]] as const) {
+      const sortedValues = async () => (await directory.locator(`tbody td:nth-of-type(${index})`).allTextContents()).map((value) => parseFloat(value));
+      await sortBy(column);
+      await expect.poll(async () => {
+        const values = await sortedValues();
+        return values.every((value, position) => position === 0 || values[position - 1] >= value);
+      }).toBe(true);
+      await sortBy(column);
+      await expect.poll(async () => {
+        const values = await sortedValues();
+        return values.every((value, position) => position === 0 || values[position - 1] <= value);
+      }).toBe(true);
+    }
+    await sortBy("7j");
+    await expect(directory.getByRole("columnheader").last()).toHaveAttribute("aria-sort", "descending");
+    await sortBy("RN");
     await page.screenshot({ path: testInfo.outputPath("dix-bots.png"), fullPage: true });
-    await page.getByRole("textbox", { name: "Rechercher un pseudo" }).fill("ChaBotté");
-    await page.getByRole("button", { name: "Rechercher" }).click();
+    const search = page.getByRole("searchbox", { name: "Rechercher un joueur" });
+    await expect(page.getByRole("button", { name: "Rechercher", exact: true })).toHaveCount(0);
+    await Promise.all([
+      page.waitForRequest((request) => /\/api\/players\?q=C&/.test(request.url())),
+      search.pressSequentially("C"),
+    ]);
+    await search.pressSequentially("haBotté");
     await expect(directory.getByRole("row")).toHaveCount(2);
     await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();

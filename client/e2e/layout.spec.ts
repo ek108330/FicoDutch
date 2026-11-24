@@ -10,7 +10,12 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await expect(page.locator(".home-page")).toHaveCSS("background-color", "rgb(16, 47, 41)");
     const logo = page.locator(".brand img");
     await expect(logo).toHaveJSProperty("naturalWidth", 144);
-    await expect(logo).toHaveCSS("width", "30px");
+    const logoBox = (await logo.boundingBox())!;
+    const gearBox = (await gear.boundingBox())!;
+    const versionBox = (await page.locator(".top-bar .version").boundingBox())!;
+    expect(logoBox.width).toBeGreaterThan(30);
+    expect(logoBox.y + logoBox.height / 2).toBeCloseTo(gearBox.y + gearBox.height / 2, 0);
+    expect(versionBox.y).toBeGreaterThanOrEqual(gearBox.y + gearBox.height);
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/ficodutch-logo.png");
     const pseudo = page.getByRole("textbox", { name: "Pseudo" });
     await expect(pseudo).toHaveAttribute("placeholder", "Pseudo");

@@ -25,41 +25,39 @@ input {
   color: var(--ink);
 }
 
-.top-bar,
-.header-actions,
 .brand {
   display: flex;
   align-items: center;
 }
 
 .top-bar {
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
   min-height: 62px;
-  padding: 6px clamp(12px, 4vw, 38px);
+  padding: 4px clamp(12px, 4vw, 38px);
   border-bottom: 1px solid rgb(245 212 107 / 18%);
 }
 
 .brand {
   gap: 8px;
-  font-size: clamp(1.125rem, 4.8vw, 1.45rem);
+  font-size: clamp(1.35rem, 5.5vw, 1.85rem);
   font-weight: 800;
   color: #f5d46b;
 }
 
 .brand img {
   flex-shrink: 0;
-  width: 30px;
+  width: clamp(36px, 10vw, 48px);
   height: auto;
   border: 1px solid rgb(245 212 107 / 40%);
   border-radius: 6px;
 }
 
-.header-actions {
-  gap: clamp(5px, 2vw, 14px);
-}
-
 .version {
+  grid-column: 1 / -1;
+  text-align: center;
   font-size: clamp(0.65rem, 2.8vw, 0.75rem);
   line-height: 1.2;
   color: #cadbd2;
@@ -83,6 +81,8 @@ input {
 .settings-trigger:hover {
   background: #2a5848;
 }
+
+.top-bar .settings-trigger { width: 38px; height: 38px; }
 
 .home-page button:focus-visible,
 .game-settings button:focus-visible,
@@ -689,10 +689,8 @@ input {
 }
 
 @media (max-width: 360px) {
-  .top-bar { padding-inline: 8px; gap: 4px; }
-  .brand { gap: 5px; font-size: 1.03rem; }
-  .brand img { width: 25px; }
-  .header-actions { gap: 4px; }
+  .top-bar { padding-inline: 8px; }
+  .brand { gap: 6px; }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
@@ -700,6 +698,10 @@ input {
     min-height: 50px;
     padding-block: 2px;
   }
+  .top-bar .settings-trigger { width: 30px; height: 30px; border-radius: 8px; }
+  .top-bar .brand { line-height: 1; }
+  .top-bar .brand img { width: 42px; }
+  .top-bar .version { font-size: 0.65rem; }
 
   .lobby-panel {
     grid-template: "heading body" auto "settings body" auto "actions body" 1fr / minmax(0, 1.1fr) minmax(0, 1.25fr);
@@ -3344,9 +3346,9 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-ranking table { width: 100%; border-collapse: collapse; }
 .archive-ranking :is(th, td) { text-align: left; padding: 4px; border-bottom: 1px solid #507260; }
 .archive-ranking :is(th, td):last-child { text-align: right; }
-.player-search { align-items: end; }
-.player-search label { display: grid; gap: 4px; }
-.player-search input { min-height: 37px; padding: 6px 9px; border: 1px solid #aacbb5; border-radius: 7px; font: inherit; width: 100%; }
+.directory-screen h1 { text-align: center; }
+.player-search { min-height: 37px; padding: 6px 9px; border: 1px solid #aacbb5; border-radius: 7px; font: inherit; width: 100%; }
+.directory-card { padding-inline: clamp(5px, 2vw, 12px); }
 .archive-list + .archive-actions { margin-top: 10px; }
 .archive-interactions { display: grid; gap: 8px; }
 .archive-interactions dt, .profile-numbers dt { font-weight: 700; }
@@ -3521,19 +3523,36 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
   text-align: right;
   font-size: clamp(0.72rem, 2.9vw, 0.95rem);
 }
-.directory-ranking .directory-rounds { width: 16%; }
-.directory-ranking .directory-win-rate { width: 19%; }
-.directory-ranking .directory-rating { width: 15%; }
-.directory-ranking .directory-rating-week { width: 16%; }
+.directory-ranking .directory-rounds { width: 17%; }
+.directory-ranking .directory-win-rate { width: 18%; }
+.directory-ranking .directory-rating { width: 10%; }
+.directory-ranking .directory-rating-week { width: 11%; }
 .directory-ranking [data-change="1"] { color: #abe3b8; }
 .directory-ranking [data-change="-1"] { color: #ffb3a8; }
 .directory-ranking thead { color: #f3de9a; font-size: 0.92em; }
-.directory-ranking :is(th, td) { padding: 5px 2px; border-bottom: 1px solid #4d7464; }
+.directory-ranking :is(th, td) { padding: 3px 1px; border-bottom: 1px solid #4d7464; }
 .directory-ranking :is(th, td):first-child { text-align: left; }
-.directory-ranking thead th:not(:first-child) { padding-inline-start: 4px; }
+.directory-ranking thead button {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.directory-sort-indicator {
+  width: 0;
+  height: 0;
+  border-inline: 3px solid transparent;
+  border-top: 4px solid currentColor;
+}
+[aria-sort="ascending"] .directory-sort-indicator { transform: rotate(180deg); }
 .directory-ranking .directory-player { gap: 4px; }
-.directory-player a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.directory-player .player-avatar { flex: none; }
+.directory-player a { min-width: 0; overflow-wrap: anywhere; }
+.directory-player .player-avatar { flex: none; width: 18px; height: 18px; font-size: 0.62rem; }
 .archive-rating-chart { display: block; width: min(100%, 430px); margin-inline: auto; }
 .rating-chart-grid { stroke: #608674; }
 .rating-chart-labels { fill: #d1e2d6; font-size: 9px; }

@@ -2,6 +2,21 @@ const { uuidPattern } = require("./accounts");
 const { createHash } = require("node:crypto");
 const { recordRatedRounds } = require("./roundRating");
 const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
+const playerRanking = `
+  SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rounds, s.rn AS rating,
+    CASE WHEN s.rounds = 0 THEN 0 ELSE s.round_wins::double precision / s.rounds END AS "roundWinRate",
+    a.avatar_style AS "avatarStyle", a.avatar_photo_id AS "avatarPhotoId"
+  FROM accounts a JOIN player_stats s ON a.id = s.account_id
+`;
+const playerOrder = 'rating DESC, matches DESC, "roundWinRate" DESC, id';
+const sortColumns = { name: "lower(name)", rounds: "rounds", wins: '"roundWinRate"', rating: "rating",
+  week: 'rating - "ratingWeekStart"' };
+
+function weekStart(row, since, until) {
+  return `(SELECT before_rn FROM round_rating_entries
+    WHERE account_id = ${row}.id AND at BETWEEN ${since}::bigint AND ${until}::bigint
+    ORDER BY at, match_id, number LIMIT 1)`;
+}
 const seatHash = (token) => typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token)
   ? createHash("sha256").update(token).digest("hex") : null;
 
@@ -225,28 +240,37 @@ function createMatchStore(db) {
 
   async function listPlayers(query, after = null, limit = 30, weekAt = Date.now()) {
     const { rows } = await db.query(`
-      WITH ranking AS (
-        SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rounds, s.rn AS rating,
-          CASE WHEN s.rounds = 0 THEN 0 ELSE s.round_wins::double precision / s.rounds END AS "roundWinRate",
-          a.avatar_style AS "avatarStyle", a.avatar_photo_id AS "avatarPhotoId"
-        FROM accounts a JOIN player_stats s ON a.id = s.account_id
-      ), page AS (
+      WITH ranking AS (${playerRanking}), page AS (
         SELECT * FROM ranking WHERE lower(name) LIKE $1 AND
           ($2::float8 IS NULL OR (rating, matches, "roundWinRate") < ($2, $3, $4)
             OR ((rating, matches, "roundWinRate") = ($2, $3, $4) AND id > $5))
-        ORDER BY rating DESC, matches DESC, "roundWinRate" DESC, id LIMIT $6
+        ORDER BY ${playerOrder} LIMIT $6
       )
-      SELECT page.*, (
-        SELECT before_rn FROM round_rating_entries
-        WHERE account_id = page.id AND at BETWEEN $7::bigint AND $8::bigint
-        ORDER BY at, match_id, number LIMIT 1
-      ) AS "ratingWeekStart"
-      FROM page ORDER BY rating DESC, matches DESC, "roundWinRate" DESC, id
+      SELECT page.*, ${weekStart("page", "$7", "$8")} AS "ratingWeekStart"
+      FROM page ORDER BY ${playerOrder}
     `, [query + "%", after?.rating ?? null, after?.matches ?? null, after?.roundWinRate ?? null, after?.id ?? null,
       limit + 1, weekAt === null ? null : weekAt - WEEK_MS, weekAt]);
     const players = rows.slice(0, limit);
     const last = players.at(-1);
     return { players, next: rows.length > players.length ? `${last.rating}/${last.matches}/${last.roundWinRate}/${last.id}` : null };
+  }
+
+  async function listSortedPlayers(query, sort, direction, offset, limit = 30, now = Date.now()) {
+    const order = `${sortColumns[sort]} ${direction === "asc" ? "ASC" : "DESC"} NULLS LAST, ${playerOrder}`;
+    const weekly = sort === "week";
+    const { rows } = await db.query(`
+      WITH ranking AS (${playerRanking}),
+      filtered AS (
+        SELECT ranking.* ${weekly ? `, ${weekStart("ranking", "$4", "$5")} AS "ratingWeekStart"` : ""}
+        FROM ranking WHERE lower(name) LIKE $1
+      ),
+      page AS (
+        SELECT * FROM filtered ORDER BY ${order} LIMIT $2 OFFSET $3
+      )
+      SELECT page.* ${weekly ? "" : `, ${weekStart("page", "$4", "$5")} AS "ratingWeekStart"`}
+      FROM page ORDER BY ${order}
+    `, [query + "%", limit + 1, offset, now - WEEK_MS, now]);
+    return { players: rows.slice(0, limit), next: rows.length > limit ? String(offset + limit) : null };
   }
 
   async function getProfile(id) {
@@ -331,7 +355,7 @@ function createMatchStore(db) {
   `, [reporter, target, now]);
   return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish, recordDeparture, getRating,
     recordRounds: (id, rounds, now) => recordRatedRounds(db, id, rounds, now), reportHistory,
-    getMatch, getRatingMovements, getTableSummary, getProfile, listPlayers, listMatches, listBots, staleMatches };
+    getMatch, getRatingMovements, getTableSummary, getProfile, listPlayers, listSortedPlayers, listMatches, listBots, staleMatches };
 }
 
 function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
@@ -380,9 +404,18 @@ function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
     response.json({ ok: true });
   });
   app.get("/api/players", async (request, response) => {
-    const { q = "", after = "" } = request.query;
+    const { q = "", after = "", sort, direction } = request.query;
     if (typeof q !== "string" || !/^[\p{L}0-9]{0,15}$/u.test(q)) {
       return response.status(400).json({ error: "Saisis au plus 15 lettres ou chiffres." });
+    }
+    if (sort !== undefined) {
+      const offset = Number(after);
+      if (typeof sort !== "string" || !Object.hasOwn(sortColumns, sort) || !["asc", "desc"].includes(direction) ||
+          typeof after !== "string" || !/^\d{0,10}$/.test(after) || offset > 2_147_483_617) {
+        return response.status(400).json({ error: "Tri ou page de classement invalide." });
+      }
+      return response.set("Cache-Control", "public, max-age=30").json(
+        await store.listSortedPlayers(q.toLowerCase(), sort, direction, offset));
     }
     const parts = typeof after === "string" ? after.split("/") : [];
     const [rating, matches, roundWinRate] = parts.slice(0, 3).map(Number);

@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useState, type ReactNode } from "reac
 import { ArrowDownRight, ArrowLeft, ArrowUpRight, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
-  readTableSummary, tableSummaryPath } from "../network/accountApi";
+  readTableSummary, tableSummaryPath, type DirectorySort } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
 import { describeCardFace, suits } from "./cardLabels";
 import type { CardRank } from "../game/cards";
@@ -33,8 +33,10 @@ function Link({ path, navigate, children }: { path: string; navigate: Navigate; 
   }}>{children}</a>;
 }
 
-function ArchiveFrame({ title, children, navigate, backToTable, leaveTable }: RouteProps & { title: string; children: ReactNode }) {
-  return <main className="archive-screen">
+function ArchiveFrame({ title, children, navigate, backToTable, leaveTable, className }: RouteProps & {
+  title: string; children: ReactNode; className?: string;
+}) {
+  return <main className={className ? `archive-screen ${className}` : "archive-screen"}>
     <header className="archive-header">
       <nav className="archive-actions" aria-label="Navigation">
         <Link path="/" navigate={navigate}><ArrowLeft size={17} aria-hidden="true" /> {backToTable ? "Retour à la table" : "Accueil"}</Link>
@@ -52,7 +54,11 @@ function Load<T>({ loader, children }: { loader: Loader<T>; children: (result: T
   const [attempt, retry] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    loader(controller.signal).then(setData, (caught: Error) => {
+    loader(controller.signal).then((next) => {
+      if (controller.signal.aborted) return;
+      setError(undefined);
+      setData(next);
+    }, (caught: Error) => {
       if (!controller.signal.aborted) setError(caught.message);
     });
     return () => controller.abort();
@@ -387,24 +393,39 @@ export function RecentMatches(props: RouteProps) {
 export function PlayersDirectory(props: RouteProps) {
   const [query, setQuery] = useState("");
   const [pages, setPages] = useState([""]);
+  const [sort, setSort] = useState<DirectorySort>({ column: "rating", direction: "desc" });
   const cursor = pages.at(-1) ?? "";
-  const loader = useCallback((signal: AbortSignal) => readPlayers(query, cursor, signal), [query, cursor]);
-  return <ArchiveFrame title="Classement" {...props}>
-    <form className="archive-actions player-search" onSubmit={(event) => {
-      event.preventDefault();
-      setQuery(String(new FormData(event.currentTarget).get("name")).trim());
-      setPages([""]);
-    }}>
-      <label>Rechercher un pseudo <input name="name" maxLength={15} pattern="[\p{L}0-9]+" /></label>
-      <button type="submit">Rechercher</button>
-    </form>
-    <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">
+  const requestKey = `${query}:${sort.column}:${sort.direction}:${cursor}`;
+  const loader = useCallback(async (signal: AbortSignal) => ({
+    ...await readPlayers(query, cursor, sort, signal), key: requestKey,
+  }), [query, cursor, sort, requestKey]);
+  const columns = [
+    ["name", "Nom", "Pseudo du joueur"], ["rounds", "Manches", "Nombre de manches jouées"],
+    ["wins", "Victoires", "Taux de victoire des manches"], ["rating", "RN", "Indice RN"],
+    ["week", "7j", "Évolution du RN sur les sept derniers jours"],
+  ] as const;
+  return <ArchiveFrame title="Classement" className="directory-screen" {...props}>
+    <input className="player-search" type="search" placeholder="Rechercher un joueur" aria-label="Rechercher un joueur"
+      autoComplete="off" maxLength={15} value={query} onChange={(event) => {
+        setQuery(event.target.value.normalize("NFC").replace(/[^\p{L}0-9]/gu, ""));
+        setPages([""]);
+      }} />
+    <Load loader={loader}>{({ players, next, key }) => <section className="archive-card directory-card" aria-busy={key !== requestKey}>
       {players.length ? <table className="directory-ranking" aria-label="Classement des joueurs">
         <colgroup><col /><col className="directory-rounds" /><col className="directory-win-rate" />
           <col className="directory-rating" /><col className="directory-rating-week" /></colgroup>
-        <thead><tr><th scope="col">Nom</th><th scope="col" title="Nombre de manches jouées">Manches</th>
-          <th scope="col" title="Taux de victoire des manches">Manches gagnées</th><th scope="col">Indice RN</th>
-          <th scope="col" title="Évolution du RN sur les sept derniers jours">RN 7 j</th></tr></thead>
+        <thead><tr>{columns.map(([column, label, title]) => {
+          const active = sort.column === column;
+          return <th key={column} scope="col" aria-sort={active ? sort.direction === "asc" ? "ascending" : "descending" : undefined}>
+            <button type="button" title={title} onClick={() => {
+              const direction = active ? sort.direction === "desc" ? "asc" : "desc" : column === "name" ? "asc" : "desc";
+              setSort({ column, direction });
+              setPages([""]);
+            }}>
+              {label}{active && <span className="directory-sort-indicator" aria-hidden="true" />}
+            </button>
+          </th>;
+        })}</tr></thead>
         <tbody>{players.map((player) => {
           const weekStart = player.ratingWeekStart;
           const change = weekStart == null ? null : player.rating - weekStart;
@@ -423,7 +444,7 @@ export function PlayersDirectory(props: RouteProps) {
           </tr>;
         })}</tbody>
       </table> : <p>Aucun joueur trouvé.</p>}
-      {(pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages des joueurs">
+      {key === requestKey && (pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages des joueurs">
         {pages.length > 1 && <button type="button" onClick={() => setPages(pages.slice(0, -1))}>Précédent</button>}
         {next && <button type="button" onClick={() => setPages([...pages, next])}>Suivant</button>}
       </nav>}
