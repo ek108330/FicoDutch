@@ -17,10 +17,10 @@ type TurnControlsProps = {
 };
 
 const powerLabels: Record<PowerKind, { title: string; instruction: string }> = {
-  "look-own": { title: "Pouvoir du 8", instruction: "Choisis une de tes cartes à regarder." },
-  "look-other": { title: "Pouvoir du 9", instruction: "Choisis une carte adverse à regarder." },
+  "look-own": { title: "Pouvoir du 8", instruction: "Choisis une de tes cartes." },
+  "look-other": { title: "Pouvoir du 9", instruction: "Choisis une carte adverse." },
   "blind-swap": { title: "Pouvoir du 10", instruction: "Échange deux cartes face cachée." },
-  "look-and-swap": { title: "Pouvoir du Valet", instruction: "Choisis deux cartes à regarder." },
+  "look-and-swap": { title: "Pouvoir du Valet", instruction: "Choisis deux cartes." },
   "give-card": { title: "Pouvoir du Joker+", instruction: "Glisse sur un joueur." },
 };
 
@@ -43,20 +43,21 @@ function PowerControls({ power, act }: {
 
   return (
     <div className="power-controls">
-      <div className="power-heading">
-        <h2 aria-label={powerLabels[power.kind].title}>{power.kind === "give-card" ? "Joker+" : powerLabels[power.kind].title}</h2>
-        {!power.lookTarget && !power.pendingSwap && <div className="turn-decision">
-          {valetPair && <button type="button" className="turn-swap" aria-label="Échanger les cartes" disabled={!canSwap}
-            title={canSwap ? "Échanger les deux cartes retournées" : "Échange bloqué par la protection Dutch"} {...swapTap}>
-            <ArrowDownUp size={16} aria-hidden="true" />
-          </button>}
-          <button type="button" className="turn-cancel" aria-label={valetPair ? "Annuler l’échange" : "Passer le pouvoir"}
-            title={valetPair ? "Laisser les cartes en place" : "Passer le pouvoir"} {...cancelTap}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>}
+      {!power.lookTarget && !power.pendingSwap &&
+        <button type="button" className="turn-cancel" aria-label={valetPair ? "Annuler l’échange" : "Passer le pouvoir"}
+          title={valetPair ? "Laisser les cartes en place" : "Passer le pouvoir"} {...cancelTap}>
+          <X size={16} aria-hidden="true" />
+        </button>}
+      <div className="power-copy">
+        <h2 className="power-heading" aria-label={powerLabels[power.kind].title}>
+          {power.kind === "give-card" ? "Joker+" : powerLabels[power.kind].title}
+        </h2>
+        <p>{instruction}</p>
       </div>
-      <p>{instruction}</p>
+      {valetPair && <button type="button" className="turn-swap" aria-label="Échanger les cartes" disabled={!canSwap}
+        title={canSwap ? "Échanger les deux cartes retournées" : "Échange bloqué par la protection Dutch"} {...swapTap}>
+        <ArrowDownUp size={16} aria-hidden="true" />
+      </button>}
     </div>
   );
 }

@@ -216,25 +216,28 @@ export default function GameTable({
           <div className={`table-player position-${position}${active ? " is-active-player" : ""}`} key={player.id} data-hand-player={player.id}
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
             <div className="player-name">
-              <span className="player-name-label" title={player.pseudo !== name ? player.pseudo : undefined}>
-                {member?.accountId && <PlayerAvatar id={member.accountId} name={player.pseudo} style={member.avatarStyle}
-                  photoId={member.avatarPhotoId} mini />}
-                <span className="player-name-text">
-                  {name}
-                  {leaderIds?.includes(player.id) && (
-                    <span className="leader-crown" role="img" aria-label="En tête du classement" title="En tête du classement">
-                      <Crown size={13} aria-hidden="true" />
-                    </span>
+              <span className="player-identity">
+                {member?.accountId && <span className="player-credentials">
+                  <PlayerAvatar id={member.accountId} name={player.pseudo} style={member.avatarStyle} photoId={member.avatarPhotoId} mini />
+                  {member.rating !== undefined && <small className="table-rn" aria-label={`Indice RN ${Math.round(member.rating)}`}
+                    title={`Indice RN ${Math.round(member.rating)}`}>{Math.round(member.rating)}</small>}
+                </span>}
+                <span className="player-name-label" title={player.pseudo !== name ? player.pseudo : undefined}>
+                  <span className="player-name-text">
+                    {name}
+                    {leaderIds?.includes(player.id) && (
+                      <span className="leader-crown" role="img" aria-label="En tête du classement" title="En tête du classement">
+                        <Crown size={13} aria-hidden="true" />
+                      </span>
+                    )}
+                  </span>
+                  {giveToPlayer && (
+                    <button type="button" className="gift-recipient-name" aria-label={`Donner une carte à ${player.pseudo}`}
+                      onClick={(event) => { if (event.detail === 0) power.choosePlayer(player.id); }} />
                   )}
+                  {clock && <PerimeterClock key={clock.turn} remaining={clock.remaining} duration={TURN_DURATION_MS} label="Temps restant" />}
                 </span>
-                {giveToPlayer && (
-                  <button type="button" className="gift-recipient-name" aria-label={`Donner une carte à ${player.pseudo}`}
-                    onClick={(event) => { if (event.detail === 0) power.choosePlayer(player.id); }} />
-                )}
-                {clock && <PerimeterClock key={clock.turn} remaining={clock.remaining} duration={TURN_DURATION_MS} label="Temps restant" />}
               </span>
-              {member?.rating !== undefined && <small className="table-rn" aria-label={`Indice RN ${Math.round(member.rating)}`}
-                title={`Indice RN ${Math.round(member.rating)}`}>{Math.round(member.rating)}</small>}
               {announce && <DutchButton {...announce} />}
               {player.id === protectedPlayerId && (
                 <span className="dutch-icon dutch-announced" role="img" aria-label={`${player.pseudo} a annoncé Dutch`}

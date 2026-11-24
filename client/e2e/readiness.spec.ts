@@ -75,11 +75,14 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await guest.screenshot({ path: testInfo.outputPath("pioche-tour-actif.png") });
     await expect(guest.locator("html")).toHaveAttribute("data-test-tones", /^[1-9]\d*$/);
     await guest.setViewportSize({ width: 390, height: 844 });
-    const settingsBox = (await guest.locator(".game-actions .settings-trigger").boundingBox())!;
-    const opponentName = (await guest.locator(".position-top .player-name").boundingBox())!;
-    const overlaps = settingsBox.x < opponentName.x + opponentName.width && settingsBox.x + settingsBox.width > opponentName.x &&
-      settingsBox.y < opponentName.y + opponentName.height && settingsBox.y + settingsBox.height > opponentName.y;
-    expect(overlaps).toBe(false);
+    const settingsTrigger = guest.locator(".table-options .settings-trigger");
+    await expect(settingsTrigger).toHaveCSS("background-color", "rgb(243, 212, 110)");
+    await expect(settingsTrigger).toHaveCSS("color", "rgb(23, 72, 51)");
+    const settingsBox = (await settingsTrigger.boundingBox())!;
+    const emojis = (await guest.getByRole("group", { name: "Emojis de la table" }).boundingBox())!;
+    const table = (await guest.locator(".game-table").boundingBox())!;
+    expect(settingsBox.x).toBeGreaterThanOrEqual(emojis.x + emojis.width);
+    expect(settingsBox.y).toBeGreaterThanOrEqual(table.y + table.height);
     await openSettings(guest);
     await expect(sound).toHaveAttribute("aria-pressed", "true");
     await closeSettings(guest);

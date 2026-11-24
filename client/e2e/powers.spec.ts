@@ -91,10 +91,10 @@ test("vision et échange des cartes spéciales", async ({ page: host, browser, b
     await host.screenshot({ path: testInfo.outputPath("02-valet-portrait.png") });
     await guest.screenshot({ path: testInfo.outputPath("03-valet-vue-adversaire.png") });
     await guest.setViewportSize({ width: 390, height: 844 });
-    const swapValet = host.locator(".power-heading").getByRole("button", { name: "Échanger les cartes" });
+    const swapValet = host.locator(".power-controls").getByRole("button", { name: "Échanger les cartes" });
     await expect(swapValet).toBeVisible();
     await expect(swapValet).toHaveCSS("color", "rgb(36, 25, 12)");
-    await expect(host.locator(".power-heading").getByRole("button", { name: "Annuler l’échange" })).toBeVisible();
+    await expect(host.locator(".power-controls").getByRole("button", { name: "Annuler l’échange" })).toBeVisible();
     await expect(guest.getByRole("button", { name: "Échanger les cartes" })).toHaveCount(0);
     await swapValet.click();
     await expect(guest.locator('[data-card-animation="swap"]')).toHaveCount(2);
@@ -174,7 +174,10 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await expect(host.locator(".discard-slot .joker-face")).toHaveCSS("color", "rgb(36, 25, 12)");
     const firstLine = (await panel.locator(".power-heading").boundingBox())!;
     const secondLine = (await panel.locator(".power-controls p").boundingBox())!;
+    const cancel = (await panel.getByRole("button", { name: "Passer le pouvoir" }).boundingBox())!;
     expect(firstLine.y + firstLine.height).toBeLessThan(secondLine.y);
+    expect(cancel.x + cancel.width).toBeLessThan(firstLine.x);
+    expect(secondLine.height).toBeCloseTo(firstLine.height, 0);
     await expect(guest.locator(".discard-cover")).toHaveCount(0);
     await guest.screenshot({ path: testInfo.outputPath("04-pouvoir-joker-deux-lignes.png") });
 

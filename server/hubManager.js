@@ -3,7 +3,7 @@ const { emojis, maxMessageLength } = require("../shared/hubSocial.json");
 
 const hubs = new Map();
 function applyRoundRating(hub, number, changes) {
-  hub.roundRating = { number, changes: changes.map(({ id, before, after }) => ({ id, before, after })) };
+  hub.roundRating = { number };
   const ratings = new Map(changes.map(({ accountId, after }) => [accountId, after]));
   for (const current of hubs.values()) {
     for (const player of current.players) {

@@ -550,7 +550,6 @@ function App() {
           deadline={memorizationDeadline}
           members={currentHub.players}
           gameFinished={currentHub.gameFinished}
-          roundRating={currentHub.roundRating}
           hostRound={hostRound?.hubId === currentHub.id && hostRound.gameNumber === currentHub.gameNumber ? hostRound.state : null}
           peers={peers}
           updateHostRound={updateHostRound}

@@ -1,7 +1,6 @@
 import type hubSocial from "./hubSocial.json";
 
 export type HubStatus = "waiting" | "in-progress" | "full" | "finished";
-export type RoundRating = { number: number; changes: { id: string; before: number; after: number }[] };
 
 export type HubPlayer = {
   id: string;
@@ -31,7 +30,7 @@ export type Hub = {
   gameNumber: number;
   hostPause: { startedAt: number; until: number } | null;
   clockVersion: number;
-  roundRating?: RoundRating;
+  roundRating?: { number: number };
   initialCardCounts?: Record<string, number>;
   memorizationEndsAt?: number;
   createdAt: number;

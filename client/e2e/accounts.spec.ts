@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { SavedMatch } from "../../shared/statistics";
-import { discard, discardDrawn, drawDeck, expectLocalTurn, fixDeckOrder, openManagement, openSettings } from "./tableFlow";
+import { discard, discardDrawn, drawDeck, expectLocalTurn, expectScreenFits, fixDeckOrder, openManagement, openSettings } from "./tableFlow";
 
 const password = "essai";
 const ready = (page: Page) => page.getByRole("heading", { name: "Statistiques de la partie" });
@@ -82,12 +82,20 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await guest.goto("/");
     await pseudo(guest).fill("invitelibre");
     await Promise.all([rejected(guest), create(guest).click()]);
-    await page.getByRole("button", { name: "Ajouter un bot" }).click();
+    for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Ajouter un bot" }).click();
     await expect(game(page)).toBeEnabled();
     await game(page).click();
     await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible();
     await expect(page.locator(".position-bottom .player-avatar")).toHaveCount(0);
     await expect(page.locator(".position-top .player-avatar-mini")).toHaveCount(1);
+    await expect(page.locator(".player-credentials .table-rn")).toHaveCount(5);
+    for (const [width, height] of [[320, 568], [740, 360]]) {
+      await page.setViewportSize({ width, height });
+      await expectScreenFits(page);
+      for (const seat of await page.locator(".table-player").all()) await expect(seat).toBeInViewport({ ratio: 1 });
+      await page.screenshot({ path: testInfo.outputPath(`table-six-badges-${width}.png`) });
+    }
+    await page.setViewportSize({ width: 360, height: 640 });
     const management = await openManagement(page);
     await management.getByRole("button", { name: "Interrompre la partie" }).click();
     await page.getByRole("button", { name: "Confirmer l’interruption" }).click();
@@ -114,6 +122,9 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(rois.locator("p")).toHaveText(/.+ & .+ avec 2 rois noirs\./);
     const interactions = page.getByRole("region", { name: "Interactions et rivalités" });
     await expect(interactions.locator(".archive-card")).toHaveCount(5);
+    const interactionColumns = await interactions.locator(".archive-card").evaluateAll((cards) =>
+      new Set(cards.map((card) => card.getBoundingClientRect().x)).size);
+    expect(interactionColumns).toBe(1);
     await expect(interactions).toContainText(/a donné un roi noir à .+ contre une dame\./);
     await expect(interactions).not.toContainText("entre leurs mains");
     await page.screenshot({ path: testInfo.outputPath("bilan-invite.png") });
@@ -208,6 +219,10 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await game(host).click();
     await expect(guest.locator(".position-top .player-name-text")).toHaveText("AliceCompt");
     await expect(guest.locator(".position-top .player-avatar-mini img")).toHaveJSProperty("naturalWidth", 128);
+    const badge = (await guest.locator(".position-top .player-credentials").boundingBox())!;
+    const name = (await guest.locator(".position-top .player-name-label").boundingBox())!;
+    expect(badge.y + badge.height).toBeLessThanOrEqual(name.y);
+    await expect(guest.locator(".position-top .table-rn")).toHaveText("50");
     await expectLocalTurn(guest, 20_000);
     await guest.screenshot({ path: testInfo.outputPath("icones-en-jeu.png") });
     await drawDeck(guest).click();
@@ -218,7 +233,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await discardDrawn(host);
     for (const tab of [host, guest]) {
       await expect(tab.getByRole("heading", { name: "Fin de la partie" })).toBeVisible({ timeout: 15_000 });
-      await expect(tab.locator(".ranking-rn")).toHaveText(["50 → 56 (+6)", "50 → 44 (-6)"]);
+      await expect(tab.getByRole("table", { name: "Classement cumulé" })).not.toContainText("→");
       await expect(ready(tab)).toHaveCount(0);
     }
     await expect(guest.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);

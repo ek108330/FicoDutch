@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GAME_CONFIG } from "../config/gameConfig";
-import type { HubPlayer, RoundRating } from "../../../shared/hubTypes";
+import type { HubPlayer } from "../../../shared/hubTypes";
 import { memorizationLimit } from "../game/memorization";
 import type { CardTarget, GameState } from "../game/gameTypes";
 import { useRoundTurn, type UpdateHostRound } from "../game/useRoundTurn";
@@ -22,7 +22,6 @@ type RoundScreenProps = {
   deadline: number;
   members: HubPlayer[];
   gameFinished: boolean;
-  roundRating?: RoundRating;
   hostRound: GameState | null;
   peers: ReturnType<typeof useHubPeers>;
   updateHostRound: UpdateHostRound;
@@ -41,7 +40,7 @@ type Memorization = { roundNumber: number; chosen: number[]; visible: number[] }
 const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] };
 
 export default function RoundScreen({
-  hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound, roundRating,
+  hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
   peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
@@ -127,15 +126,16 @@ export default function RoundScreen({
     setMemory({ roundNumber, chosen: chosen.includes(position) ? chosen : [...chosen, position], visible: [...visible, position] });
   }
 
-  function gameActions(action?: ReactNode) {
-    return <div className="game-actions">{action}{settings}</div>;
-  }
+  const toolbar = <div className="table-options">
+    {emojisEnabled && <EmojiButtons label="Emojis de la table" table onChoose={chooseEmoji} />}
+    {settings}
+  </div>;
 
   if (pause || !scene || turn.waitingForClock || !connectionReady) {
     const hostPaused = pause?.reason === "host";
     return (
       <main className="game-screen">
-        {gameActions()}
+        <div className="game-actions">{settings}</div>
         <section className="round-results" aria-labelledby="pause-title">
           {hostPaused && pause.deadline !== undefined && <PerimeterClock remaining={pause.deadline - now}
             duration={GAME_CONFIG.network.reconnectGracePeriodSeconds * 1_000} label="Délai de reprise" radius={15} />}
@@ -150,7 +150,7 @@ export default function RoundScreen({
   if (scene.phase === "waiting") {
     return (
       <main className="game-screen">
-        {gameActions()}
+        <div className="game-actions">{settings}</div>
         <section className="round-results" aria-labelledby="waiting-title">
           <h1 id="waiting-title">{gameFinished ? "La partie est terminée" : "En attente de la prochaine manche"}</h1>
           {!gameFinished && (
@@ -169,10 +169,10 @@ export default function RoundScreen({
     if (turn.finalMotion) {
       return (
         <main className="game-screen table-screen">
-          {gameActions()}
           <GameTable localPlayerId={playerId} members={membersById} cardMotion={turn.finalMotion} playSound={playSound} leaderIds={scene.leaderIds}
             players={scene.result.players.map(({ id, pseudo, cards, handLayout }) => ({ id, pseudo, cardCount: cards.length, handLayout }))}
             controls={<section className="round-panel"><strong>Manche {roundNumber}</strong></section>} />
+          {toolbar}
         </main>
       );
     }
@@ -182,7 +182,6 @@ export default function RoundScreen({
         result={scene.result}
         settings={settings}
         roundNumber={roundNumber}
-        ratingChanges={roundRating?.number === roundNumber ? roundRating.changes : undefined}
         remaining={turn.remaining}
         isHost={playerId === hostId}
         canEditVariants={playerId === hostId && !restarting}
@@ -224,7 +223,9 @@ export default function RoundScreen({
 
   return (
     <main className="game-screen table-screen">
-      {gameActions(canLeave && playerId !== hostId && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>)}
+      {canLeave && playerId !== hostId && <div className="game-actions">
+        <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>
+      </div>}
       <GameTable
         localPlayerId={playerId}
         members={membersById}
@@ -278,9 +279,7 @@ export default function RoundScreen({
           )
         }
       />
-      {emojisEnabled && <div className="table-options">
-        <EmojiButtons label="Emojis de la table" table onChoose={chooseEmoji} />
-      </div>}
+      {toolbar}
     </main>
   );
 }

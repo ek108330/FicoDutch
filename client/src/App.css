@@ -1046,22 +1046,38 @@ input {
 
 .table-options {
   grid-row: 2;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: 6px;
+  width: min(100%, 1400px);
   font: 600 0.75rem/1.25 var(--sans);
 }
 
 .table-options .emoji-buttons {
+  justify-content: center;
   flex-wrap: nowrap;
   gap: clamp(2px, 0.7vw, 5px);
 }
 
 .table-options .emoji-buttons button {
-  width: clamp(24px, 8.3vw, 36px);
+  width: min(clamp(24px, 8vw, 36px), calc((100% - 8 * clamp(2px, 0.7vw, 5px)) / 9));
   height: var(--table-toolbar-height);
   background: #123b2a;
   font-size: clamp(0.95rem, 4.3vw, 1.2rem);
 }
+
+.table-options .settings-trigger {
+  grid-column: 2;
+  width: var(--table-toolbar-height);
+  height: var(--table-toolbar-height);
+  border-color: #f3de9a;
+  border-radius: 7px;
+  background: #f3d46e;
+  color: #174833;
+}
+.table-options .settings-trigger:hover { background: #ffe49a; }
+.table-options .settings-trigger svg { width: 63%; height: 63%; }
 
 .table-emoji {
   position: absolute;
@@ -1522,20 +1538,7 @@ input {
   overflow-wrap: anywhere;
 }
 
-.power-heading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.turn-decision {
-  display: flex;
-  flex: none;
-  gap: 4px;
-}
-
-.turn-panel .turn-decision button {
+.turn-panel .power-controls button {
   display: grid;
   flex: none;
   place-items: center;
@@ -1559,8 +1562,18 @@ input {
 
 .turn-panel[data-local-turn] button:focus-visible { outline-color: #654318; }
 
-.power-controls { font-size: clamp(0.68rem, 2.8vw, 0.8rem); }
-.game-table .power-heading h2 { margin: 0; color: inherit; font: inherit; font-weight: 800; }
+.power-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 5px;
+  font-size: clamp(0.68rem, 2.8vw, 0.8rem);
+  line-height: 1.15;
+}
+.power-controls .turn-cancel { grid-column: 1; }
+.power-controls .power-copy { grid-column: 2; }
+.power-controls .turn-swap { grid-column: 3; }
+.game-table .power-heading { margin: 0; color: inherit; font: inherit; font-weight: 800; white-space: nowrap; }
 .turn-panel .power-controls p { margin: 1px 0 0; color: inherit; overflow-wrap: anywhere; }
 
 .perimeter-clock {
@@ -2025,6 +2038,9 @@ button.pile-slot:not(:disabled) .pile-card,
 
 .table-player .player-name { position: relative; }
 
+.player-identity { display: inline-grid; justify-items: center; max-width: 100%; }
+.player-credentials { display: flex; gap: 3px; align-items: center; }
+
 .player-name-label {
   position: relative;
   display: inline-flex;
@@ -2059,7 +2075,7 @@ button.pile-slot:not(:disabled) .pile-card,
 .player-avatar > span:first-child { font-size: 1.55em; }
 .player-avatar-mini { width: 22px; height: 22px; border-width: 1px; font-size: 0.69rem; }
 .player-avatar-mini > span:last-child { display: none; }
-.game-table .player-avatar-mini { width: 1.45em; height: 1.45em; font-size: inherit; }
+.game-table .player-avatar-mini { width: 1.12em; height: 1.12em; font-size: inherit; }
 .game-table .player-avatar-mini > span:first-child { font-size: 1em; }
 .profile-identity, .directory-player { display: flex; align-items: center; gap: 9px; }
 .account-avatar-form .player-avatar { justify-self: center; }
@@ -2619,11 +2635,11 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .game-table .table-piles :is(.deck-placeholder, .discard-placeholder) { font-size: clamp(0.57rem, 2.4vw, 0.75rem); }
 
-  .game-table:is([data-player-count="3"], .is-large-table) :is(.position-left, .position-left-top, .position-left-bottom) {
+  .game-table[data-player-count="3"] .position-left {
     justify-self: start;
   }
 
-  .game-table:is([data-player-count="3"], .is-large-table) :is(.position-right, .position-right-top, .position-right-bottom) {
+  .game-table[data-player-count="3"] .position-right {
     justify-self: end;
   }
 
@@ -2637,7 +2653,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
       "own own";
     align-items: center;
     gap: 12px;
-    padding: 44px 12px 12px;
+    padding: 36px 8px 12px;
   }
 
   .game-table[data-player-count="3"] :is(.table-player, .table-center) {
@@ -2729,7 +2745,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   }
 
   .turn-layout .turn-panel { padding: 2px 7px; }
-  .turn-panel .turn-decision button { width: 28px; height: 24px; }
+  .turn-panel .power-controls button { width: 28px; height: 24px; }
 
   .turn-panel[data-power] {
     max-width: min(100%, 470px);
@@ -2778,6 +2794,8 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 .is-large-table .position-left-bottom { grid-area: left-bottom; }
 .is-large-table .position-right-top { grid-area: right-top; }
 .is-large-table .position-right-bottom { grid-area: right-bottom; }
+.is-large-table :is(.position-left, .position-left-top, .position-left-bottom) { justify-self: start; }
+.is-large-table :is(.position-right, .position-right-top, .position-right-bottom) { justify-self: end; }
 
 .game-table.is-large-table .player-name {
   margin: 0 0 4px;
@@ -2906,7 +2924,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .game-screen .game-table.is-large-table[data-player-count="6"] {
     min-height: calc(100dvh - 8px);
-    padding-bottom: 5px;
+    padding-bottom: 14px;
     row-gap: 3px;
   }
 
@@ -2971,6 +2989,10 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   min-height: 0;
 }
 
+@media (orientation: portrait) {
+  .game-screen.table-screen .game-table.is-large-table { padding-inline: 6px; }
+}
+
 @media (orientation: portrait) and (max-height: 760px) {
   .game-screen.table-screen .game-table.is-large-table { padding-top: 23px; }
 }
@@ -2988,7 +3010,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .table-screen .game-table.is-large-table[data-player-count="6"] .player-cards { --hand-gap: 2px; }
   .table-screen .game-table[data-player-count="6"] .turn-panel[data-power] { padding: 0 4px; line-height: 1.12; }
   .table-screen .game-table[data-player-count="6"] .power-controls { font-size: 0.68rem; }
-  .table-screen .game-table[data-player-count="6"] .turn-decision button { height: 18px; }
+  .table-screen .game-table[data-player-count="6"] .power-controls button { height: 18px; }
 
   .table-screen .game-table.is-large-table[data-player-count="6"] .table-piles :is(.pile-card, .deck-placeholder, .discard-placeholder) {
     width: 32px;
@@ -3030,7 +3052,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   .table-screen .turn-layout .pile-card .joker-face { font-size: 0.68rem; }
 
   .table-screen .turn-layout .turn-panel[data-power] { padding: 0 6px; line-height: 1.16; }
-  .table-screen .turn-panel .turn-decision button { width: 22px; height: 18px; }
+  .table-screen .turn-panel .power-controls button { width: 22px; height: 18px; }
 }
 
 @media (orientation: landscape) and (max-height: 370px) {
@@ -3100,7 +3122,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .player-search label { display: grid; gap: 4px; }
 .player-search input { min-height: 37px; padding: 6px 9px; border: 1px solid #aacbb5; border-radius: 7px; font: inherit; width: 100%; }
 .archive-list + .archive-actions { margin-top: 10px; }
-.archive-interactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+.archive-interactions { display: grid; gap: 8px; }
 .archive-interactions dt, .profile-numbers dt { font-weight: 700; }
 .archive-interactions dd, .profile-numbers dd { margin: 3px 0 0; font-size: 0.9rem; }
 .profile-numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; }
@@ -3199,7 +3221,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .directory-player a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-player .player-avatar { flex: none; }
 .archive-rating-chart { display: block; width: min(100%, 430px); margin-inline: auto; }
-.lobby-rn, .table-rn, .ranking-rn { white-space: nowrap; font-weight: 700; }
+.lobby-rn, .table-rn { white-space: nowrap; font-weight: 700; }
 .table-rn {
   flex: none;
   padding: 1px 3px;
@@ -3209,7 +3231,6 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
   font-size: 0.66em;
 }
 .lobby-rn { font-size: 0.72rem; }
-.ranking-rn { flex: none; color: #f3de9a; font-size: 0.77em; }
 
 @media (orientation: landscape) and (max-height: 450px) {
   .home-content:has(.home-podium) { padding-block: 5px; }

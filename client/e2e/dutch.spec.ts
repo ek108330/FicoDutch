@@ -47,7 +47,7 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await expect(guest.locator(".player-cards .face-up")).toHaveCount(0);
     await expectTableFits(host);
     await host.screenshot({ path: testInfo.outputPath("03-protection-valet.png") });
-    await host.locator(".power-heading").getByRole("button", { name: "Annuler l’échange" }).click();
+    await host.locator(".power-controls").getByRole("button", { name: "Annuler l’échange" }).click();
 
     for (const page of [host, guest]) {
       await expect(page.getByRole("heading", { name: "Manche 1", exact: true })).toBeVisible();
