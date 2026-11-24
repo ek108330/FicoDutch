@@ -2555,14 +2555,14 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .result-summary p { margin: 0; font-size: 0.82rem; line-height: 1.2; }
 
-  .result-screen[data-final] .result-footer {
+  .result-screen .result-footer {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
   }
 
-  .result-screen[data-final] .result-actions { width: auto; }
+  .result-screen .result-actions { width: auto; }
 
   .result-hands { gap: 4px; }
   .result-hand { padding-block: 3px; }
@@ -2992,6 +2992,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
   .table-screen .game-table.is-large-table[data-player-count="6"] .table-piles :is(.pile-card, .deck-placeholder, .discard-placeholder) {
     width: 32px;
+    height: calc(32px / var(--card-ratio));
   }
 }
 
