@@ -3360,16 +3360,28 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 }
 .profile-stat-group dl, .profile-stat-group dd { margin: 0; }
 .profile-stat-group dl { display: grid; gap: 5px; }
+.profile-stat-count {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 3px;
+}
+.profile-stat-count dd { white-space: nowrap; }
 .profile-stat-group dt { color: #d1e2d6; font-size: clamp(0.66rem, 2.8vw, 0.81rem); }
 .profile-stat-group :is(h2 strong, dd) { color: #ffdf91; font-weight: 750; }
 .archive-list { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
 .archive-list li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.archive-screen > .profile-rival-group { margin-top: 7px; padding-block: 7px; }
+.profile-rival-group h2 { margin-bottom: 4px; }
+.profile-rival-group .archive-muted { margin: 0; }
+.profile-rivals { row-gap: 2px; }
 .profile-rivals li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 3rem 4rem 6.2rem;
   align-items: baseline;
   font-size: clamp(0.72rem, 3vw, 0.9rem);
   font-variant-numeric: tabular-nums;
+  line-height: 1.25;
 }
 .profile-rivals a { min-width: 0; overflow-wrap: anywhere; }
 .profile-rivals span { text-align: right; white-space: nowrap; }

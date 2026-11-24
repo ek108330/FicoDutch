@@ -100,6 +100,15 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       lists.map((list) => Array.from(list.querySelectorAll("li:first-child > span"), (cell) => cell.getBoundingClientRect().x)));
     expect(columns).toHaveLength(3);
     expect(columns).toEqual([columns[0], columns[0], columns[0]]);
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect(page.getByText("10 et Valets utilisés", { exact: true })).toBeVisible();
+    const inlineCounts = await page.locator(".profile-stat-count").evaluateAll((rows) => rows.map((row) => {
+      const label = row.querySelector("dt")!.getBoundingClientRect();
+      const value = row.querySelector("dd")!.getBoundingClientRect();
+      return label.right <= value.left && label.bottom > value.top && value.bottom > label.top;
+    }));
+    expect(inlineCounts).toEqual([true, true, true]);
+    await page.setViewportSize({ width: 360, height: 640 });
     await page.screenshot({ path: testInfo.outputPath("profil-rivalites-portrait.png"), fullPage: true });
     await page.unroute("**/api/players/*");
     await page.goto("/");

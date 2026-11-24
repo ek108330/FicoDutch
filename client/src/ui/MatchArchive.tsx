@@ -281,7 +281,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   const details: [string, string | number][] = [
     ["Score moyen par manche", profile.rounds ? number.format(profile.scoreSum / profile.rounds) : "—"],
     ["Meilleur score de manche", profile.bestScore ?? "—"],
-    ["Réactions réussies", profile.reactions], ["Pénalités de réaction", profile.penalties], ["Échanges initiés", profile.exchanges],
+    ["Réactions réussies", profile.reactions], ["Pénalités de réaction", profile.penalties], ["10 et Valets utilisés", profile.exchanges],
   ];
   const groups = [
     { title: "Rivaux réguliers", rivals: profile.rivals.filter(({ played }) => played >= 3).slice(0, 12) },
@@ -306,7 +306,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
         aria-label={title}>
         <h2>{title} <strong>{number.format(played)}</strong></h2>
         <dl>
-          <div><dt>{title === "Dutch" ? "Dont réussis" : "Dont gagnées"}</dt><dd>{number.format(wins)}</dd></div>
+          <div className="profile-stat-count"><dt>{title === "Dutch" ? "Dont réussis" : "Dont gagnées"}</dt><dd>{number.format(wins)}</dd></div>
           <div><dt title={rateTitle}>{title === "Dutch" ? "Taux de réussite" : "Taux de victoire"}</dt><dd>{rate}</dd></div>
         </dl>
       </section>)}
@@ -317,7 +317,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
       <h2>Évolution de l’indice RN</h2>
       <RatingHistory ratings={profile.ratings} />
     </section>
-    {groups.map(({ title, rivals, showLossRate }) => <section key={title} className="archive-card" aria-label={title}>
+    {groups.map(({ title, rivals, showLossRate }) => <section key={title} className="archive-card profile-rival-group" aria-label={title}>
       <h2>{title}</h2>
       {rivals.length ? <ul className="archive-list profile-rivals">{rivals.map((rival) => <li key={rival.id}>
         <Link path={profilePath(rival.id)} navigate={navigate}>{rival.name}</Link>
