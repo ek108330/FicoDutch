@@ -47,6 +47,7 @@ function countPair(store: Map<string, Award>, first: string, second: string) {
 
 export function matchStatistics(journal: MatchJournal | undefined, status: MatchStatus, partial = false): MatchStats {
   const activities = new Map<string, Activity>();
+  const botIds = new Set<string>();
   const targets = new Map<string, Award>();
   const pairs = new Map<string, Award>();
   const lookUp = (id: string) => activities.get(id);
@@ -69,7 +70,8 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
       case "deal":
         discardOrigin = undefined;
         unfinished = { round: event.round, reactions: 0, penalties: 0, exchanges: 0, gifts: 0 };
-        for (const { id, name, cards } of event.players) {
+        for (const { id, name, cards, isBot } of event.players) {
+          if (isBot) botIds.add(id);
           if (!activities.has(id)) activities.set(id, newActivity(id, name, event.round));
           for (const card of cards) collect(id, card);
         }
@@ -162,7 +164,7 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
       const entry = lookUp(score.id)!;
       entry.player.rank = scores.findIndex((other) => other.total === score.total) + 1;
       entry.player.total = score.total;
-      entry.player.eligible = entry.firstRound === 1 && !score.left;
+      entry.player.eligible = entry.firstRound === 1 && !score.left && !botIds.has(score.id);
     }
   }
 

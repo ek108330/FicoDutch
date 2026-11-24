@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Crosshair, Crown, Flame, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
-import { matchPath, profilePath, readMatch, readProfile, readRecentMatches } from "../network/accountApi";
+import { matchPath, profilePath, readDemoBots, readMatch, readProfile, readRecentMatches } from "../network/accountApi";
 
 type Navigate = (path: string) => void;
 type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () => void };
@@ -170,6 +170,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   ];
   return <>
     <h2>{profile.name}</h2>
+    {profile.demoBot && <p className="archive-muted">Bot de démonstration · historique initial simulé</p>}
     <dl className="archive-card profile-numbers">{values.map(([label, value]) =>
       <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <section className="archive-card">
@@ -221,5 +222,17 @@ export function RecentMatches(props: RouteProps) {
         </nav>}
       </section>
     }</Load>
+  </ArchiveFrame>;
+}
+
+export function DemoBots(props: RouteProps) {
+  return <ArchiveFrame title="Bots de test" {...props}>
+    <Load loader={readDemoBots}>{(bots) => <section className="archive-card">
+      <p className="archive-muted">Profils de démonstration peuplés par des parties simulées.</p>
+      <ul className="archive-list">{bots.map((bot) => <li key={bot.id}>
+        <Link path={profilePath(bot.id)} navigate={props.navigate}>{bot.name}</Link>
+        <span>{plural(bot.matches, "partie")}</span>
+      </li>)}</ul>
+    </section>}</Load>
   </ArchiveFrame>;
 }

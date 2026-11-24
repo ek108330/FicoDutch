@@ -3032,4 +3032,4 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-screen .archive-primary { background: #f3de9a; color: #24190c; font-weight: 750; }
 .archive-error { color: #ffd4c6; }
 .account-links { display: flex; flex-wrap: wrap; gap: 4px 9px; justify-content: center; align-items: center; font-size: 0.84rem; }
-.home-create .account-links a { color: #f3de9a; }
+.home-create .account-links a { color: #194d38; font-weight: 700; }

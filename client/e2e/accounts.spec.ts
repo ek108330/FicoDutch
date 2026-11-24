@@ -1,9 +1,49 @@
 import { expect, test, type Page } from "@playwright/test";
 import { discard, discardDrawn, drawDeck, expectLocalTurn, fixDeckOrder, openManagement } from "./tableFlow";
 
-const password = "Fico-manche-2026-Soleil";
+const password = "essai";
 const ready = (page: Page) => page.getByRole("heading", { name: "Statistiques de la partie" });
 const game = (page: Page) => page.getByRole("button", { name: "Lancer la partie", exact: true });
+
+test("un invité garde un pseudo unique et peut jouer contre un bot de test", async ({ page, browser, baseURL }, testInfo) => {
+  const guest = await browser.newPage({ baseURL });
+  try {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Bots de test" }).click();
+    await expect(page.getByRole("listitem")).toHaveCount(10);
+    await page.getByRole("link", { name: "BotAtlas", exact: true }).click();
+    await expect(page.getByText(/historique initial simulé/)).toBeVisible();
+    await expect(page.getByText("Aucune confrontation terminée.")).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath("profil-bot.png") });
+    await page.goto("/");
+    const pseudo = (tab: Page) => tab.getByRole("textbox", { name: "Pseudo", exact: true });
+    const create = (tab: Page) => tab.getByRole("button", { name: "Créer un Hub", exact: true });
+    const rejected = (tab: Page) => tab.waitForEvent("dialog").then(async (dialog) => {
+      expect(dialog.message()).toContain("Ce pseudo est déjà utilisé");
+      await dialog.dismiss();
+    });
+    await pseudo(page).fill("botatlas");
+    await Promise.all([rejected(page), create(page).click()]);
+    await pseudo(page).fill("InviteLibre");
+    await create(page).click();
+    await expect(game(page)).toBeVisible();
+    await guest.goto("/");
+    await pseudo(guest).fill("invitelibre");
+    await Promise.all([rejected(guest), create(guest).click()]);
+    await page.getByRole("button", { name: "Ajouter un bot" }).click();
+    await expect(game(page)).toBeEnabled();
+    await game(page).click();
+    await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible();
+    const management = await openManagement(page);
+    await management.getByRole("button", { name: "Interrompre la partie" }).click();
+    await page.getByRole("button", { name: "Confirmer l’interruption" }).click();
+    await expect(ready(page)).toBeVisible();
+    await expect(page.getByText("Partie interrompue", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Partie interrompue", { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("bilan-invite.png") });
+  } finally { await guest.close(); }
+});
 
 async function signIn(page: Page, handle: string, register = false) {
   await page.goto("/compte");

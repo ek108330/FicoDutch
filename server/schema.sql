@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_handle ON accounts (lower(handle));
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_display_name ON accounts (lower(display_name));
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_demo_bot boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS account_sessions (
   token_hash text PRIMARY KEY,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS match_seats (
   UNIQUE (match_id, account_id)
 );
 CREATE INDEX IF NOT EXISTS match_seats_account ON match_seats (account_id, match_id);
+ALTER TABLE match_seats ADD COLUMN IF NOT EXISTS guest_token_hash text;
 
 CREATE TABLE IF NOT EXISTS player_stats (
   account_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,

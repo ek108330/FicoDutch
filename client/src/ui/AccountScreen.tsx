@@ -55,7 +55,7 @@ export default function AccountScreen({ account, onChange, navigate }: Props) {
             <label>Identifiant <input name="handle" required pattern={creating ? namePattern : "[A-Za-z][A-Za-z0-9]{4,14}"}
               minLength={5} maxLength={15} autoComplete="username" autoCapitalize="off"
               aria-describedby={creating ? "pseudo-format" : undefined} /></label>
-            <label>Mot de passe <input name="password" type="password" required minLength={12} maxLength={128}
+            <label>Mot de passe <input name="password" type="password" required minLength={5} maxLength={128}
               autoComplete={creating ? "new-password" : "current-password"} /></label>
           </>}
           {(account || creating) && <p id="pseudo-format">5 à 15 lettres ou chiffres, avec une majuscule au début.</p>}

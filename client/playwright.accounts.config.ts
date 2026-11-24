@@ -16,7 +16,7 @@ export default defineConfig({
   webServer: [
     {
       ...servers[0], url: `${serverUrl}/healthz`,
-      env: { ...servers[0].env, PORT: "15301", CLIENT_ORIGINS: clientUrl, FICODUTCH_LOCAL_DB: "memory://", DATABASE_URL: "" },
+      env: { ...servers[0].env, PORT: "15301", CLIENT_ORIGINS: clientUrl, FICODUTCH_LOCAL_DB: "memory://", DATABASE_URL: "", FICODUTCH_DEMO: "1" },
     },
     {
       ...servers[1], url: clientUrl,

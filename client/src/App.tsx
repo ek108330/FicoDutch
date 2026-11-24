@@ -18,8 +18,8 @@ import HubPreview from "./ui/HubPreview";
 import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
-import { MatchArchive, PublicProfile, RecentMatches } from "./ui/MatchArchive";
-import { matchPath, profilePath, readAccount, readMatch, type AccountSession } from "./network/accountApi";
+import { DemoBots, MatchArchive, PublicProfile, RecentMatches } from "./ui/MatchArchive";
+import { guestMatchToken, matchPath, profilePath, readAccount, readMatch, rememberGuestMatch, type AccountSession } from "./network/accountApi";
 import { logDeal, logMatch } from "./game/matchJournal";
 import { matchStatistics } from "./game/matchStatistics";
 
@@ -29,7 +29,7 @@ type HostRound = { hubId: string; gameNumber: number; state: GameState };
 function prepareGame(hub: Hub) {
   const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
     hub.variants, hub.endThreshold);
-  return hub.players.some(({ accountId }) => accountId)
+  return hub.tracked
     ? logDeal({ ...state, matchId: `${hub.id}:${hub.gameNumber}` }, performance.now()) : state;
 }
 
@@ -180,7 +180,8 @@ function App() {
     }
 
     function acceptMembership({ hub, session }: HubMembership, serverTime: number) {
-      const match = hub.gameStarted && hub.players.some(({ accountId }) => accountId) ? `${hub.id}:${hub.gameNumber}` : undefined;
+      const match = hub.gameStarted && hub.tracked ? `${hub.id}:${hub.gameNumber}` : undefined;
+      if (match && !hub.players.find(({ id }) => id === session.playerId)?.accountId) rememberGuestMatch(match, session.token);
       storeSession({ ...session, matchId: match });
       storeReady(true);
       setSessionNotice(null);
@@ -245,8 +246,11 @@ function App() {
         return;
       }
       applyHub(update, serverTime);
-      if (update.gameStarted && sessionRef.current && update.players.some(({ accountId }) => accountId)) {
+      if (update.gameStarted && sessionRef.current && update.tracked) {
         const id = `${update.id}:${update.gameNumber}`;
+        if (!update.players.find(({ id: seat }) => seat === sessionRef.current?.playerId)?.accountId) {
+          rememberGuestMatch(id, sessionRef.current.token);
+        }
         if (sessionRef.current.matchId !== id) storeSession({ ...sessionRef.current, matchId: id });
       }
     }
@@ -464,7 +468,7 @@ function App() {
   } : undefined;
 
   function canJoinHub(hub: Hub) {
-    return networkReady && (accountSession?.enabled ? !!account : !!pseudo.trim()) &&
+    return networkReady && (!!account || !!pseudo.trim()) &&
       (hub.status === "waiting" || hub.status === "in-progress");
   }
 
@@ -483,7 +487,8 @@ function App() {
       ...(currentHub?.gameFinished && { leaveTable: () => { leaveHub(); navigate("/"); } }),
     };
     if (profile) return <PublicProfile key={profile} id={profile} {...archiveProps} />;
-    if (path === "/compte" || (accountSession?.enabled && !account && (match || path === "/mes-parties"))) {
+    if (path === "/bots") return <DemoBots {...archiveProps} />;
+    if (path === "/compte" || (accountSession?.enabled && !account && ((match && !guestMatchToken(match)) || path === "/mes-parties"))) {
       return <AccountScreen account={account} onChange={changeAccount} navigate={navigate} />;
     }
     if (match && accountSession) return <MatchArchive key={match} id={match} {...archiveProps} />;
@@ -516,7 +521,7 @@ function App() {
           onInterrupt={interrupt}
           restarting={restarting}
           settings={settings}
-          archiveControl={currentHub.gameFinished && account && <a className="settings-trigger" aria-label="Statistiques de la partie"
+          archiveControl={currentHub.gameFinished && currentHub.tracked && <a className="settings-trigger" aria-label="Statistiques de la partie"
             href={matchPath(`${currentHub.id}:${currentHub.gameNumber}`)} onClick={(event) => {
               event.preventDefault();
               navigate(matchPath(`${currentHub.id}:${currentHub.gameNumber}`));
@@ -567,12 +572,16 @@ function App() {
                     <a href="/mes-parties" onClick={(event) => { event.preventDefault(); navigate("/mes-parties"); }}>Mes parties</a>
                     <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Mon compte</a>
                   </> : <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Se connecter ou créer un compte</a>}
-                </div> : accountSession?.enabled === false ? <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
+                </div> : null}
+                {accountSession?.demo && <div className="account-links">
+                  <a href="/bots" onClick={(event) => { event.preventDefault(); navigate("/bots"); }}>Bots de test</a>
+                </div>}
+                {accountSession && !account ? <input id="pseudo" type="text" aria-label="Pseudo" placeholder={accountSession.enabled ? "Pseudo invité" : "Pseudo"}
                   value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
-                  onChange={(event) => savePseudo(event.target.value)} /> : <button type="button" onClick={() => {
+                  onChange={(event) => savePseudo(event.target.value)} /> : !accountSession ? <button type="button" onClick={() => {
                     void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
-                  }}>Vérifier la connexion</button>}
-                <button className="primary-button" type="submit" disabled={!accountSession || (accountSession.enabled && !account)}>
+                  }}>Vérifier la connexion</button> : null}
+                <button className="primary-button" type="submit" disabled={!accountSession}>
                   <Plus size={19} aria-hidden="true" /> Créer un Hub
                 </button>
               </form>

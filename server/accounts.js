@@ -1,5 +1,6 @@
 const { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
+const { guestNameInUse, withPlayerName } = require("./hubManager");
 
 const derive = promisify(scrypt);
 const cookie = "ficodutch_account";
@@ -73,8 +74,8 @@ function mountAccounts(app, io, db, acceptsOrigin) {
   async function authenticate(request, response, register) {
     const { handle, password } = request.body ?? {};
     if (typeof handle !== "string" || !(register ? namePattern : /^[A-Za-z][A-Za-z0-9]{4,14}$/).test(handle) ||
-        typeof password !== "string" || password.length < 12 || password.length > 128) {
-      return response.status(400).json({ error: "Identifiant de 5 à 15 caractères et mot de passe de 12 à 128 caractères requis." });
+        typeof password !== "string" || password.length < 5 || password.length > 128) {
+      return response.status(400).json({ error: "Identifiant de 5 à 15 caractères et mot de passe de 5 à 128 caractères requis." });
     }
 
     hashing = true;
@@ -87,16 +88,18 @@ function mountAccounts(app, io, db, acceptsOrigin) {
         const salt = randomBytes(16);
         const key = await derive(password, salt, 32, hashOptions);
         const id = randomUUID();
-        row = await db.transaction(async (tx) => {
+        row = await withPlayerName(handle, () => db.transaction(async (tx) => {
+          if (guestNameInUse(handle)) return null;
           const { rows: created } = await tx.query(`
             INSERT INTO accounts (id, handle, display_name, password_hash) VALUES ($1, $2, $2, $3)
             RETURNING id, handle, display_name
           `, [id, handle, salt.toString("hex") + ":" + key.toString("hex")]);
           await tx.query("INSERT INTO player_stats (account_id) VALUES ($1)", [id]);
           return created[0];
-        });
+        }));
+        if (!row) return response.status(409).json({ error: "Ce nom est déjà utilisé." });
       } else {
-        row = rows[0];
+        row = rows.find(({ password_hash }) => password_hash);
         const [salt, expected] = row?.password_hash.split(":") ?? [];
         const key = await derive(password, salt ? Buffer.from(salt, "hex") : dummySalt, 32, hashOptions);
         if (!row || !timingSafeEqual(key, Buffer.from(expected, "hex"))) {
@@ -113,7 +116,10 @@ function mountAccounts(app, io, db, acceptsOrigin) {
   }
 
   app.get("/api/session", async (request, response) => {
-    response.set("Cache-Control", "no-store").json({ enabled: true, account: (await readAccount(request.headers))?.account ?? null });
+    response.set("Cache-Control", "no-store").json({
+      enabled: true, demo: process.env.FICODUTCH_DEMO === "1",
+      account: (await readAccount(request.headers))?.account ?? null,
+    });
   });
   app.post("/api/accounts", requireOrigin, limited, (request, response) => authenticate(request, response, true));
   app.post("/api/session", requireOrigin, limited, (request, response) => authenticate(request, response, false));
@@ -133,11 +139,11 @@ function mountAccounts(app, io, db, acceptsOrigin) {
       return response.status(400).json({ error: "Saisis 5 à 15 lettres ou chiffres, avec une majuscule au début." });
     }
     try {
-      const { rows } = await db.query(`
+      const { rows } = await withPlayerName(name, () => guestNameInUse(name) ? { rows: [] } : db.query(`
         UPDATE accounts SET display_name = $1 WHERE id = $2
         AND NOT EXISTS (SELECT 1 FROM accounts WHERE lower(handle) = lower($1) AND id <> $2)
         RETURNING id, handle, display_name
-      `, [name, session.account.id]);
+      `, [name, session.account.id]));
       if (rows.length) return response.json({ enabled: true, account: publicAccount(rows[0]) });
     } catch (error) {
       if (error.code !== "23505") throw error;

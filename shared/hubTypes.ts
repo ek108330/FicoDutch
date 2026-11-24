@@ -15,6 +15,7 @@ export type HubPlayer = {
 
 export type Hub = {
   id: string;
+  tracked?: true;
   name: string;
   hostId: string;
   hostPseudo: string;

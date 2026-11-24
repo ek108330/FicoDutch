@@ -6,7 +6,7 @@ type HandCard = { playerId: string; card: JournalCard };
 type RoundScore = { id: string; score: number; base: number; total: number; left: boolean };
 
 export type MatchEvent =
-  | { kind: "deal"; players: { id: string; accountId?: string; name: string; cards: JournalCard[] }[] }
+  | { kind: "deal"; players: { id: string; accountId?: string; name: string; isBot?: true; cards: JournalCard[] }[] }
   | { kind: "replace"; playerId: string; added: JournalCard; removed: JournalCard }
   | { kind: "discard"; playerId: string; card: JournalCard; reference: number }
   | { kind: "reaction"; playerId: string; card: JournalCard; reference: number; openedAt: number | null }
@@ -45,7 +45,7 @@ export function logMatch(state: GameState, at: number, ...events: MatchEvent[]):
 export function logDeal(state: GameState, at: number) {
   return logMatch(state, at, {
     kind: "deal",
-    players: state.players.map(({ id, accountId, pseudo, cards }) => ({ id, accountId, name: pseudo, cards: cards.map(journalCard) })),
+    players: state.players.map(({ id, accountId, pseudo, cards, isBot }) => ({ id, accountId, isBot, name: pseudo, cards: cards.map(journalCard) })),
   });
 }
 

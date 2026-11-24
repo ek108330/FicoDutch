@@ -10,6 +10,7 @@ const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay, findPlayerHub, getHub, getActiveMatchIds,
+  guestNameInUse, withPlayerName,
 } = require("./hubManager");
 
 const app = express();
@@ -31,6 +32,7 @@ const io = new Server(httpServer, {
 
 app.get("/healthz", (_request, response) => response.json({ status: "online" }));
 let matchStore;
+let demoBots = [];
 const closing = new Set();
 const recentCheckpoints = new WeakMap();
 
@@ -41,7 +43,7 @@ if (process.env.SERVE_CLIENT === "1") {
       if (path.extname(file) === ".html") response.setHeader("Cache-Control", "no-store");
     },
   }));
-  app.get(["/parties/:id", "/joueurs/:id", "/mes-parties", "/compte"], (_request, response) =>
+  app.get(["/parties/:id", "/joueurs/:id", "/mes-parties", "/compte", "/bots"], (_request, response) =>
     response.set("Cache-Control", "no-store").sendFile(path.join(clientFiles, "index.html")));
 }
 
@@ -93,13 +95,22 @@ function checkClientBuild(socket) {
   return false;
 }
 
-function seatIdentity(socket, data) {
-  if (!matchStore) {
-    const pseudo = readPseudo(data);
-    return pseudo && { pseudo };
-  }
+function accountIdentity(socket) {
   const session = socket.data.session;
   return session && session.expiresAt > Date.now() ? { id: session.account.id, pseudo: session.account.name } : null;
+}
+
+async function admit(socket, data, action) {
+  const identity = accountIdentity(socket);
+  if (identity) return action(identity);
+  const pseudo = readPseudo(data);
+  if (!pseudo) return socket.emit("hub:error", "Pseudo invalide.");
+  if (!matchStore) return action({ pseudo });
+  await withPlayerName(pseudo, async () => {
+    if (guestNameInUse(pseudo) || await matchStore.nameReserved(pseudo)) {
+      socket.emit("hub:error", "Ce pseudo est déjà utilisé. Choisis-en un autre ou connecte-toi.");
+    } else if (socket.connected) await action({ pseudo });
+  });
 }
 
 function socketError(socket, error, acknowledge) {
@@ -111,7 +122,7 @@ function socketError(socket, error, acknowledge) {
 async function persistEnd(socket, request, status, acknowledge) {
   const found = findPlayerHub(socket.id);
   const hub = found?.hub;
-  if (!found?.player.isHost || !seatIdentity(socket) || !hub.gameStarted || hub.id !== request?.hubId ||
+  if (!found?.player.isHost || !hub.gameStarted || hub.id !== request?.hubId ||
       hub.gameNumber !== request.gameNumber || !request.report || closing.has(hub.id)) {
     if (typeof acknowledge === "function") acknowledge(false);
     return;
@@ -159,33 +170,26 @@ io.on("connection", (socket) => {
 
   socket.on("hub:create", (data) => {
     if (!checkClientBuild(socket)) return;
-    const identity = seatIdentity(socket, data);
-    if (!identity) {
-      socket.emit("hub:error", matchStore ? "Connecte-toi pour créer un Hub." : "Pseudo invalide.");
-      return;
-    }
-    const membership = createHub(socket.id, identity.pseudo, identity.id);
-    if (!membership) {
-      socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
-      return;
-    }
-    socket.emit("hub:created", membership, Date.now());
-    broadcastHubs();
-    console.log("Hub créé :", membership.hub.name);
+    void admit(socket, data, (identity) => {
+      const membership = createHub(socket.id, identity.pseudo, identity.id, !!matchStore);
+      if (!membership) return socket.emit("hub:error", "Tu appartiens déjà à un Hub.");
+      socket.emit("hub:created", membership, Date.now());
+      broadcastHubs();
+      console.log("Hub créé :", membership.hub.name);
+    }).catch((error) => socketError(socket, error));
   });
 
   socket.on("hub:join", async (data) => {
     if (!checkClientBuild(socket)) return;
-    const identity = seatIdentity(socket, data);
     const hubId = data?.hubId;
-    if (!identity || typeof hubId !== "string" || !hubId) {
-      socket.emit("hub:error", matchStore && !identity ? "Connecte-toi pour rejoindre un Hub." : "Informations invalides.");
+    if (typeof hubId !== "string" || !hubId) {
+      socket.emit("hub:error", "Informations invalides.");
       return;
     }
-    try {
+    try { await admit(socket, data, async (identity) => {
       const hub = getHub(hubId);
       const id = matchStore && hub?.gameStarted ? matchId(hub) : null;
-      if (closing.has(hubId) || (id && await matchStore.hasSeat(id, identity.id))) {
+      if (closing.has(hubId) || (id && identity.id && await matchStore.hasSeat(id, identity.id))) {
         socket.emit("hub:error", "Ce compte a déjà une place dans cette partie, ou la table est en cours de fermeture.");
         return;
       }
@@ -206,6 +210,7 @@ io.on("connection", (socket) => {
       }
       socket.emit("hub:joined", membership, Date.now());
       broadcastHubs();
+    });
     } catch (error) {
       socketError(socket, error);
     }
@@ -213,8 +218,7 @@ io.on("connection", (socket) => {
 
   socket.on("hub:resume", (request, acknowledge) => {
     if (typeof acknowledge !== "function") return;
-    const identity = matchStore ? seatIdentity(socket) : null;
-    const resumed = (!matchStore || identity) && resumeHub(socket.id, request, Date.now(), identity?.id);
+    const resumed = resumeHub(socket.id, request, Date.now(), accountIdentity(socket)?.id);
     if (!resumed) {
       acknowledge(null, Date.now());
       return;
@@ -233,7 +237,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("hub:checkpoint", (request, acknowledge) => {
-    if (!matchStore || !seatIdentity(socket)) return;
+    if (!matchStore) return;
     const current = findPlayerHub(socket.id);
     const hub = current?.hub;
     if (!current?.player.isHost || !hub.gameStarted || hub.gameFinished || closing.has(hub.id) ||
@@ -276,7 +280,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("hub:add-bot", (request) => {
-    if (!addHubBot(socket.id, request?.hubId)) {
+    if (!addHubBot(socket.id, request?.hubId, demoBots)) {
       socket.emit("hub:error", "L’ajout d’un bot nécessite une place libre dans la salle d’attente de ton Hub.");
       return;
     }
@@ -368,6 +372,11 @@ async function start() {
   const db = await openDatabase();
   if (db) {
     matchStore = createMatchStore(db);
+    if (process.env.FICODUTCH_DEMO === "1") {
+      const { seedDemoPopulation } = require("./demoPopulation");
+      demoBots = await seedDemoPopulation(db, matchStore);
+      console.log(`Population de test disponible : ${demoBots.length} bots, 100 parties simulées.`);
+    }
     const readAccount = mountAccounts(app, io, db, acceptsOrigin);
     mountMatchRoutes(app, matchStore, readAccount);
     setInterval(async () => {

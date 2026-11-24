@@ -1,4 +1,7 @@
 const { uuidPattern } = require("./accounts");
+const { createHash } = require("node:crypto");
+const seatHash = (token) => typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token)
+  ? createHash("sha256").update(token).digest("hex") : null;
 
 const matchId = (hub) => `${hub.id}:${hub.gameNumber}`;
 const matchPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}:[1-9][0-9]{0,8}$/;
@@ -71,14 +74,13 @@ function ratingUpdates(players, ratings) {
 function createMatchStore(db) {
   async function addSeat(source, id, seat, starting = false) {
     await source.query(`
-      INSERT INTO match_seats (match_id, seat_id, account_id, name, starting) VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO match_seats (match_id, seat_id, account_id, name, starting, guest_token_hash) VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (match_id, seat_id) DO NOTHING
-    `, [id, seat.id, seat.accountId ?? null, seat.pseudo, starting]);
+    `, [id, seat.id, seat.accountId ?? null, seat.pseudo, starting, seat.accountId ? null : seatHash(seat.token)]);
   }
 
-  async function register(hub) {
+  async function register(hub, now = Date.now()) {
     const id = matchId(hub);
-    const now = Date.now();
     return db.transaction(async (tx) => {
       await tx.query("INSERT INTO matches (id, started_at, checkpoint_at) VALUES ($1, $2, $2) ON CONFLICT DO NOTHING", [id, now]);
       for (const seat of hub.players) await addSeat(tx, id, seat, true);
@@ -87,6 +89,11 @@ function createMatchStore(db) {
 
   async function hasSeat(id, accountId) {
     const { rows } = await db.query("SELECT 1 FROM match_seats WHERE match_id = $1 AND account_id = $2", [id, accountId]);
+    return rows.length > 0;
+  }
+
+  async function nameReserved(name) {
+    const { rows } = await db.query("SELECT 1 FROM accounts WHERE lower(handle) = lower($1) OR lower(display_name) = lower($1) LIMIT 1", [name]);
     return rows.length > 0;
   }
 
@@ -169,17 +176,17 @@ function createMatchStore(db) {
     });
   }
 
-  async function getMatch(id, accountId) {
+  async function getMatch(id, accountId, guestToken) {
     const { rows } = await db.query(`
       SELECT m.report, m.started_at, m.ended_at FROM matches m JOIN match_seats s ON s.match_id = m.id
-      WHERE m.id = $1 AND s.account_id = $2 AND m.ended_at IS NOT NULL
-    `, [id, accountId]);
+      WHERE m.id = $1 AND (s.account_id = $2 OR s.guest_token_hash = $3) AND m.ended_at IS NOT NULL LIMIT 1
+    `, [id, accountId ?? null, seatHash(guestToken)]);
     const row = rows[0];
     return row && { id, ...row.report, startedAt: Number(row.started_at), endedAt: Number(row.ended_at) };
   }
 
   async function getProfile(id) {
-    const { rows } = await db.query("SELECT a.display_name, s.* FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1", [id]);
+    const { rows } = await db.query("SELECT a.display_name, a.is_demo_bot, s.* FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1", [id]);
     const row = rows[0];
     if (!row) return null;
     const [history, encounters, rivalry] = await Promise.all([
@@ -206,7 +213,7 @@ function createMatchStore(db) {
       `, [id]),
     ]);
     return {
-      id, name: row.display_name, rating: row.rating, matches: row.matches, finished: row.finished, interrupted: row.interrupted,
+      id, name: row.display_name, demoBot: row.is_demo_bot, rating: row.rating, matches: row.matches, finished: row.finished, interrupted: row.interrupted,
       victories: row.victories, rounds: row.rounds, roundWins: row.round_wins, scoreSum: Number(row.score_sum),
       bestScore: row.best_score, dutch: row.dutch, dutchWon: row.dutch_won, reactions: row.reactions, penalties: row.penalties,
       exchanges: row.exchanges, rivals: rivalry.rows,
@@ -234,7 +241,15 @@ function createMatchStore(db) {
     return rows.map(({ id }) => id);
   }
 
-  return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, checkpoint, finish, getMatch, getProfile, listMatches, staleMatches };
+  async function listBots() {
+    const { rows } = await db.query(`
+      SELECT a.id, a.display_name AS name, s.matches FROM accounts a JOIN player_stats s ON a.id = s.account_id
+      WHERE a.is_demo_bot ORDER BY a.display_name
+    `);
+    return rows;
+  }
+
+  return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish, getMatch, getProfile, listMatches, listBots, staleMatches };
 }
 
 function mountMatchRoutes(app, store, readAccount) {
@@ -251,11 +266,15 @@ function mountMatchRoutes(app, store, readAccount) {
   });
   app.get("/api/matches/:id", async (request, response) => {
     const session = await readAccount(request.headers);
+    const guestToken = request.get("X-FicoDutch-Seat");
     response.set("Cache-Control", "no-store");
-    if (!session) return response.status(401).json({ error: "Connecte-toi pour consulter ce bilan." });
-    const match = matchPattern.test(request.params.id) && await store.getMatch(request.params.id, session.account.id);
+    if (!session && !seatHash(guestToken)) return response.status(401).json({ error: "Connecte-toi pour consulter ce bilan." });
+    const match = matchPattern.test(request.params.id) && await store.getMatch(request.params.id, session?.account.id, guestToken);
     if (!match) return response.status(404).json({ error: "Ce bilan est introuvable ou n’est pas encore disponible." });
     response.json(match);
+  });
+  app.get("/api/demo-bots", async (_request, response) => {
+    response.set("Cache-Control", "public, max-age=30").json(await store.listBots());
   });
   app.get("/api/players/:id", async (request, response) => {
     const profile = uuidPattern.test(request.params.id) && await store.getProfile(request.params.id);

@@ -2,6 +2,24 @@ const { randomBytes, randomUUID } = require("crypto");
 const { emojis, maxMessageLength } = require("../shared/hubSocial.json");
 
 const hubs = new Map();
+const nameOperations = new Map();
+const guestNameInUse = (name) => [...hubs.values()].some(({ players }) =>
+  players.some(({ pseudo, accountId, isBot }) => !accountId && !isBot && pseudo.toLowerCase() === name.toLowerCase()));
+
+async function withPlayerName(name, action) {
+  const key = name.toLowerCase();
+  const previous = nameOperations.get(key);
+  let release;
+  const next = new Promise((resolve) => { release = resolve; });
+  nameOperations.set(key, next);
+  try {
+    await previous;
+    return await action();
+  } finally {
+    release();
+    if (nameOperations.get(key) === next) nameOperations.delete(key);
+  }
+}
 const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
 const HOST_GRACE_MS = 120_000;
 const CHAT_INTERVAL_MS = 650;
@@ -73,11 +91,12 @@ function relayLobbyMessage(socketId, request, now = Date.now()) {
   };
 }
 
-function createHub(socketId, pseudo, accountId) {
+function createHub(socketId, pseudo, accountId, tracked = false) {
   if (findPlayerHub(socketId)) return null;
   const host = newPlayer(socketId, pseudo, true, accountId);
   const hub = {
     id: randomUUID(),
+    ...(tracked && { tracked: true }),
     name: `Hub de ${pseudo}`,
     hostId: host.id,
     hostPseudo: pseudo,
@@ -125,15 +144,18 @@ function updateHubSettings(socketId, settings) {
   return getPublicHub(hub);
 }
 
-function addHubBot(socketId, hubId) {
+function addHubBot(socketId, hubId, profiles = []) {
   const current = findPlayerHub(socketId);
   if (!current?.player.isHost || current.hub.id !== hubId || current.hub.gameStarted) return false;
   const { hub } = current;
   if (hub.players.length >= hub.maxPlayers) return false;
   let number = 1;
   while (hub.players.some(({ pseudo }) => pseudo === `Bot ${number}`)) number++;
+  const candidates = profiles.filter(({ id }) => !hub.players.some(({ accountId }) => accountId === id));
+  const profile = candidates[Math.floor(Math.random() * candidates.length)];
   hub.players.push({
-    id: randomUUID(), pseudo: `Bot ${number}`, isHost: false, isBot: true, connected: true, connectionVersion: 0,
+    id: randomUUID(), pseudo: profile?.name ?? `Bot ${number}`, ...(profile && { accountId: profile.id }),
+    isHost: false, isBot: true, connected: true, connectionVersion: 0,
   });
   return true;
 }
@@ -311,6 +333,7 @@ function resolveEncryptedRelay(socketId, request) {
 }
 
 module.exports = {
+  guestNameInUse, withPlayerName,
   findPlayerHub, getHub: (id) => hubs.get(id),
   getActiveMatchIds: () => [...hubs.values()].filter((hub) => hub.gameStarted).map((hub) => `${hub.id}:${hub.gameNumber}`),
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,

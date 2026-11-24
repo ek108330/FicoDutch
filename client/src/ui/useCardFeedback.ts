@@ -38,8 +38,8 @@ function playTrumpet(context: AudioContext) {
     brass.frequency.linearRampToValueAtTime(2_700, start + 0.04);
     brass.frequency.exponentialRampToValueAtTime(1_600, start + length);
     gain.gain.setValueAtTime(0.001, start);
-    gain.gain.linearRampToValueAtTime(0.32, start + 0.022);
-    gain.gain.setValueAtTime(0.25, start + length * 0.6);
+    gain.gain.linearRampToValueAtTime(0.16, start + 0.022);
+    gain.gain.setValueAtTime(0.125, start + length * 0.6);
     gain.gain.exponentialRampToValueAtTime(0.001, start + length);
     oscillator.connect(brass).connect(gain).connect(context.destination);
     oscillator.start(start);

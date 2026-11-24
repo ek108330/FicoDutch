@@ -37,6 +37,7 @@ export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: 
 export type Account = { id: string; handle: string; name: string };
 
 export type Profile = {
+  demoBot?: boolean;
   id: string;
   name: string;
   rating: number;

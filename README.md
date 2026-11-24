@@ -41,6 +41,10 @@ npm.cmd --prefix server start
 
 Ouvrez ensuite `http://localhost:3000`. Sans configuration de base de données, le jeu conserve l’accès par pseudo.
 
+Avec PostgreSQL, un invité peut aussi jouer avec un pseudo libre. Les identifiants et pseudos des comptes sont réservés, tout comme le pseudo d’un invité déjà à une table. Un invité retrouve le bilan dans l’onglet de sa partie.
+
+Définissez `FICODUTCH_DEMO=1` sur une base de test pour peupler dix profils de bots avec 100 parties jouées par le moteur. Le chargement ne rajoute pas de doublons au redémarrage. Ces profils sont accessibles via **Bots de test** et servent aux bots ajoutés dans les Hubs.
+
 L’appareil hôte conserve le journal privé et calcule les récompenses. Pendant la partie, il envoie un point de reprise sans données de cartes secrètes au plus une fois toutes les vingt secondes en cas de changement. La clôture enregistre le bilan calculé avant de fermer le Hub. Après une disparition de l’hôte, le bilan récupéré signale les données manquantes. Les bilans sont réservés aux participants connectés. Les profils publics présentent les statistiques et l’historique des confrontations. L’indice compare les participants humains présents du début à la fin d’une partie terminée et repose sur la validation de l’hôte.
 
 ## Préproduction
@@ -86,7 +90,7 @@ Si le Hub a une place libre, un nouvel invité peut la réserver et attendre la 
 
 Le bouton **Gérer la table** permet à l’hôte de retirer un invité du Hub. En cours de manche, sa main reste sur la table jusqu’à la prochaine distribution et le jeu passe au joueur suivant si c’était son tour. Le retrait annule la session de l’invité. Il peut rejoindre de nouveau tant que le Hub accepte des joueurs.
 
-En cours de partie, l’hôte peut aussi confirmer l’interruption. Avec les comptes activés, le Hub enregistre le bilan avant de se fermer et l’affiche aux participants. En mode pseudo, les joueurs reviennent à l’accueil.
+En cours de partie, l’hôte peut aussi confirmer l’interruption. Avec PostgreSQL, le Hub enregistre le bilan avant de se fermer et l’affiche aux participants. Sans base de données, les joueurs reviennent à l’accueil.
 
 ## Chat et emojis
 
