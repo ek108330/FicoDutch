@@ -306,7 +306,7 @@ function mountMatchRoutes(app, store, readAccount) {
   });
   app.get("/api/players", async (request, response) => {
     const { q = "", after = "" } = request.query;
-    if (![q, after].every((value) => typeof value === "string" && /^[A-Za-z0-9]{0,15}$/.test(value))) {
+    if (![q, after].every((value) => typeof value === "string" && /^[\p{L}0-9]{0,15}$/u.test(value))) {
       return response.status(400).json({ error: "Saisis au plus 15 lettres ou chiffres." });
     }
     response.set("Cache-Control", "public, max-age=30").json(await store.listPlayers(q.toLowerCase(), after.toLowerCase()));

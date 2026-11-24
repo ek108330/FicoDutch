@@ -26,11 +26,12 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.goBack();
     await page.getByRole("button", { name: "Autres joueurs" }).click();
     await expect(page.getByRole("listitem")).toHaveCount(10);
-    await page.getByRole("textbox", { name: "Rechercher un pseudo" }).fill("botat");
+    await page.screenshot({ path: testInfo.outputPath("dix-bots.png"), fullPage: true });
+    await page.getByRole("textbox", { name: "Rechercher un pseudo" }).fill("ChaBotté");
     await page.getByRole("button", { name: "Rechercher" }).click();
     await expect(page.getByRole("listitem")).toHaveCount(1);
     await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
-    await page.getByRole("link", { name: "BotAtlas", exact: true }).click();
+    await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
     await expect(page.getByText("Aucune confrontation terminée.")).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath("profil-bot.png") });
@@ -41,7 +42,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       expect(dialog.message()).toContain("Ce pseudo est déjà utilisé");
       await dialog.dismiss();
     });
-    await pseudo(page).fill("botatlas");
+    await pseudo(page).fill("chabotte");
     await Promise.all([rejected(page), create(page).click()]);
     await pseudo(page).fill("InviteLibre");
     await create(page).click();

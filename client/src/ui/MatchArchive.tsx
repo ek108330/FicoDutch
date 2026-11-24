@@ -306,7 +306,7 @@ export function PlayersDirectory(props: RouteProps) {
       setQuery(String(new FormData(event.currentTarget).get("name")).trim());
       setPages([""]);
     }}>
-      <label>Rechercher un pseudo <input name="name" maxLength={15} pattern="[A-Za-z0-9]+" /></label>
+      <label>Rechercher un pseudo <input name="name" maxLength={15} pattern="[\p{L}0-9]+" /></label>
       <button type="submit">Rechercher</button>
     </form>
     <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">

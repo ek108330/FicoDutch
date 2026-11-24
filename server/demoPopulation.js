@@ -1,5 +1,5 @@
-const handles = ["BotAtlas", "BotComete", "BotDelta", "BotEcho", "BotKumo", "BotLynx",
-  "BotNova", "BotOrion", "BotPixel", "BotSilex"];
+const names = ["ChaBotté", "BotEnTrain", "HarryBotter", "Botus", "RobinDesBots", "Botman",
+  "Botzilla", "JamesBot", "SherlockBot", "ValteriBotAs"];
 const accountId = (index) => `f1c0d001-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
 const hubId = (index) => `f1c0d002-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
 
@@ -11,11 +11,18 @@ async function seedDemoPopulation(db, store) {
   const { startNextRound } = await import("../client/src/game/roundCycle.ts");
   const { beginPlay, expireTurn, playTurn } = await import("../client/src/game/turn.ts");
   const bots = await db.transaction(async (tx) => {
-    for (const [index, handle] of handles.entries()) {
+    for (const [index, name] of names.entries()) {
+      const handle = name.normalize("NFD").replace(/\p{M}/gu, "");
       await tx.query(`
         INSERT INTO accounts (id, handle, display_name, password_hash, is_demo_bot)
-        VALUES ($1, $2, $2, '', true) ON CONFLICT DO NOTHING
-      `, [accountId(index), handle]);
+        SELECT $1, $2::text, $3::text, '', true
+        WHERE NOT EXISTS (
+          SELECT 1 FROM accounts WHERE id <> $1 AND
+            (lower(handle) IN (lower($2), lower($3)) OR lower(display_name) IN (lower($2), lower($3)))
+        )
+        ON CONFLICT (id) DO UPDATE SET handle = EXCLUDED.handle, display_name = EXCLUDED.display_name
+        WHERE accounts.is_demo_bot AND (accounts.handle <> EXCLUDED.handle OR accounts.display_name <> EXCLUDED.display_name)
+      `, [accountId(index), handle, name]);
     }
     const { rows } = await tx.query("SELECT id, display_name AS name FROM accounts WHERE is_demo_bot ORDER BY id");
     for (const { id } of rows) {
