@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from "react";
-import { Ban, Bot, Crown } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Ban, Bot, Check, Crown, Search, X } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
@@ -34,12 +34,49 @@ function PlayerConnectionNotice() {
     : "Connexion aux joueurs en cours…"}</p>;
 }
 
+function AdmissionQueue({ requests, connected, onDecision }: {
+  requests: NonNullable<Hub["joinRequests"]>;
+  connected: boolean;
+  onDecision: Props["onDecision"];
+}) {
+  const [search, setSearch] = useState("");
+  const list = useRef<HTMLUListElement>(null);
+  const query = search.trim().toLocaleLowerCase("fr");
+  const matches = requests.filter(({ pseudo }) => pseudo.toLocaleLowerCase("fr").includes(query));
+
+  return (
+    <section className="lobby-admission" aria-label="File d’attente">
+      <div className="admission-heading">
+        <h2>Demandes ({requests.length})</h2>
+        {(requests.length > 10 || search) && <div className="admission-search">
+          <Search size={14} aria-hidden="true" />
+          <input type="search" aria-label="Rechercher un pseudo" placeholder="Rechercher un pseudo"
+            autoComplete="off" value={search} onChange={(event) => {
+              setSearch(event.target.value);
+              if (list.current) list.current.scrollTop = 0;
+            }} />
+        </div>}
+      </div>
+      {matches.length ? <ul className="admission-queue" ref={list} aria-label="Demandes d’admission" tabIndex={0}>
+        {matches.map(({ id, pseudo }) => <li key={id}>
+          <strong title={pseudo}>{pseudo}</strong>
+          <button className="admission-accept" type="button" disabled={!connected} aria-label={`Accepter ${pseudo}`}
+            title={`Accepter ${pseudo}`} onClick={() => onDecision(id, true)}><Check size={16} aria-hidden="true" /></button>
+          <button className="admission-reject" type="button" disabled={!connected} aria-label={`Refuser ${pseudo}`}
+            title={`Refuser ${pseudo}`} onClick={() => onDecision(id, false)}><X size={16} aria-hidden="true" /></button>
+        </li>)}
+      </ul> : <p className="admission-empty">{query ? "Aucun pseudo trouvé." : "Aucune demande."}</p>}
+    </section>
+  );
+}
+
 export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, isHost, canStart,
   onStart, onAddBot, onLeave, onUpdate, onRemove, onDecision }: Props) {
   const thresholdId = useId();
   const points = hub.endThreshold === null ? "Sans limite" : `${hub.endThreshold} points`;
+  const managesAdmission = isHost && hub.isPrivate;
   return (
-    <section className="home-panel lobby-panel" aria-labelledby="lobby-title">
+    <section className={`home-panel lobby-panel${managesAdmission ? " private-lobby" : ""}`} aria-labelledby="lobby-title">
       <header className="lobby-heading">
         <h1 id="lobby-title"><HubName hub={hub} /></h1>
         <div className="lobby-meta">
@@ -76,28 +113,22 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
               const status = player.connected ? "Connecté" : "Déconnecté";
               return (
                 <li key={player.id}>
-                  {player.isBot ? <Bot className="player-bot" size={15} role="img" aria-label="Bot" />
-                    : <span className="player-connection" data-connected={player.connected} role="img"
-                      aria-label={status} title={status} />}
-                  <strong>{player.pseudo}</strong>
                   {isHost && !player.isHost && <button className="lobby-remove" type="button" disabled={!connected}
                     aria-label={`Retirer ${player.pseudo}`} title={`Retirer ${player.pseudo}`} onClick={() => onRemove(player.id)}>
                     <Ban size={15} aria-hidden="true" />
                   </button>}
+                  {player.isBot ? <Bot className="player-bot" size={15} role="img" aria-label="Bot" />
+                    : <span className="player-connection" data-connected={player.connected} role="img"
+                      aria-label={status} title={status} />}
+                  <strong>{player.pseudo}</strong>
                   {player.rating !== undefined && <small className="lobby-rn">RN {Math.round(player.rating)}</small>}
                   {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
                 </li>
               );
             })}
           </ul>
-          {isHost && !!hub.joinRequests?.length && <ul className="admission-queue" aria-label="Demandes d’admission">
-            {hub.joinRequests.map(({ id, pseudo }) => <li key={id}>
-              <strong>{pseudo}</strong>
-              <button type="button" disabled={!connected} aria-label={`Accepter ${pseudo}`} onClick={() => onDecision(id, true)}>Accepter</button>
-              <button type="button" disabled={!connected} aria-label={`Refuser ${pseudo}`} onClick={() => onDecision(id, false)}>Refuser</button>
-            </li>)}
-          </ul>}
         </div>
+        {managesAdmission && <AdmissionQueue requests={hub.joinRequests ?? []} connected={connected} onDecision={onDecision} />}
         <LobbyChat hubId={hub.id} connected={connected} />
       </div>
       <footer className="lobby-footer">

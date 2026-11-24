@@ -295,6 +295,14 @@ input {
   gap: 9px;
 }
 
+.home-content:has(.private-lobby) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.lobby-panel.private-lobby {
+  align-self: stretch;
+}
+
 .lobby-heading h1 {
   margin: 0 0 3px;
   font: 800 clamp(1.2rem, 5vw, 1.7rem)/1.12 var(--sans);
@@ -323,6 +331,10 @@ input {
   gap: 7px;
   min-width: 0;
   min-height: 0;
+}
+
+.private-lobby .lobby-body {
+  grid-template-rows: auto minmax(0, 1fr) clamp(92px, 17dvh, 165px);
 }
 
 .lobby-actions {
@@ -392,10 +404,64 @@ input {
   cursor: pointer;
 }
 
+.lobby-admission {
+  --request-height: 40px;
+  --request-gap: 4px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 4px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.admission-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.admission-heading h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.admission-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admission-search svg { flex: none; }
+
+.admission-search input {
+  width: min(100%, 180px);
+  min-width: 0;
+  height: 28px;
+  padding: 0 5px;
+  font-size: 0.78rem;
+}
+
+.admission-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .admission-queue {
   display: grid;
-  gap: 4px;
-  margin: 5px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: var(--request-height);
+  align-content: start;
+  gap: var(--request-gap);
+  min-height: 0;
+  max-height: calc(5 * var(--request-height) + 4 * var(--request-gap));
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
   padding: 0;
   list-style: none;
   font-size: 0.82rem;
@@ -404,23 +470,39 @@ input {
 .admission-queue li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 4px;
+  gap: 3px;
   align-items: center;
-  padding: 3px 5px;
+  padding: 1px 5px;
   border: 1px solid var(--line);
   border-radius: 6px;
 }
 
-.admission-queue strong { overflow-wrap: anywhere; }
+.admission-queue strong {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
 .admission-queue button {
-  min-height: 28px;
-  padding: 2px 5px;
-  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 1px solid currentColor;
   border-radius: 5px;
-  background: #e6eee6;
-  color: #174833;
   cursor: pointer;
 }
+
+.admission-accept { background: #e7f5e9; color: #16643a; }
+.admission-reject { background: #fff0ef; color: #a12420; }
+.admission-queue button:disabled { opacity: 0.55; cursor: default; }
+.admission-queue button:focus-visible { outline-offset: 0; }
 
 .lobby-players {
   display: grid;

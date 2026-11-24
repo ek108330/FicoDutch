@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { io } from "socket.io-client";
+import type { HubListing } from "../../shared/hubTypes";
 import { discard, drawDeck, drawnCard, expectScreenFits, fixDeckOrder, openLobby, openSettings, openTwoPlayerHub } from "./tableFlow";
 
 const privateHub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de SalonPrive" });
@@ -57,6 +59,81 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await expect(privateHub(outsider).getByRole("button", { name: "Rejoindre" })).toBeDisabled();
   } finally {
     await Promise.all([guest.close(), outsider.close()]);
+  }
+});
+
+test("une longue file privée défile et se filtre sans déplacer le bouton de lancement", async ({
+  page: host,
+}, testInfo) => {
+  await host.setViewportSize({ width: 390, height: 800 });
+  const applicants = Array.from({ length: 12 }, () => io("http://127.0.0.1:15300", {
+    autoConnect: false, reconnection: false,
+    auth: { buildRevision: "abcdef0123456789abcdef0123456789abcdef01" },
+  }));
+  try {
+    await openLobby(host, "FilePrivee");
+    await host.getByRole("button", { name: "Créer un Hub" }).click();
+    const privateSetting = host.getByRole("checkbox", { name: "Hub Privé" });
+    await privateSetting.click();
+    await expect(privateSetting).toBeChecked();
+    await host.getByRole("button", { name: "Ajouter un bot" }).click();
+    const botCard = host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem").filter({ hasText: "Bot 1" });
+    await expect(botCard.locator(":scope > :first-child")).toHaveAccessibleName("Retirer Bot 1");
+
+    const start = host.getByRole("button", { name: "Lancer la partie" });
+    await expect(start).toBeEnabled();
+    const before = await start.boundingBox();
+    const search = host.getByRole("searchbox", { name: "Rechercher un pseudo" });
+    const queue = host.getByRole("list", { name: "Demandes d’admission" });
+    for (const [index, client] of applicants.entries()) {
+      const hubId = await new Promise<string>((resolve, reject) => {
+        client.once("connect_error", reject);
+        client.once("hubs:update", (listings: HubListing[]) => {
+          const hub = listings.find(({ name }) => name === "Hub de FilePrivee");
+          if (hub) resolve(hub.id);
+          else reject(new Error("Hub privé absent"));
+        });
+        client.connect();
+      });
+      client.emit("hub:join", { hubId, pseudo: `Demandeur${String(index + 1).padStart(2, "0")}` });
+      await expect(queue.getByRole("listitem")).toHaveCount(index + 1);
+      expect(await start.boundingBox()).toEqual(before);
+      if (index === 9) await expect(search).toHaveCount(0);
+    }
+    await expect(search).toBeVisible();
+    const boxes = await Promise.all([0, 1, 2].map((index) => queue.getByRole("listitem").nth(index).boundingBox()));
+    expect(boxes[0]!.y).toEqual(boxes[1]!.y);
+    expect(boxes[0]!.x).toBeLessThan(boxes[1]!.x);
+    expect(boxes[0]!.y).toBeLessThan(boxes[2]!.y);
+    await expectScreenFits(host);
+    await host.screenshot({ path: testInfo.outputPath("file-privee-portrait.png") });
+
+    await host.setViewportSize({ width: 390, height: 1040 });
+    const rows = queue.getByRole("listitem");
+    await expect(rows.nth(9)).toBeInViewport({ ratio: 1 });
+    await expect(rows.nth(10)).not.toBeInViewport();
+    await queue.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    await expect(rows.last()).toBeInViewport({ ratio: 1 });
+    await host.screenshot({ path: testInfo.outputPath("file-privee-defilement.png") });
+
+    await host.setViewportSize({ width: 360, height: 640 });
+    await expect(search).toBeInViewport({ ratio: 1 });
+    await expect(start).toBeInViewport({ ratio: 1 });
+    await expectScreenFits(host);
+    await host.setViewportSize({ width: 390, height: 800 });
+    const beforeSearch = await start.boundingBox();
+    await search.fill("demandeur12");
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText("Demandeur12");
+    await expect(rows.first().getByRole("button", { name: "Accepter Demandeur12" })).toHaveText("");
+    await expect(rows.first().getByRole("button", { name: "Refuser Demandeur12" })).toHaveText("");
+    expect(await start.boundingBox()).toEqual(beforeSearch);
+    await host.screenshot({ path: testInfo.outputPath("file-privee-recherche.png") });
+    await rows.first().getByRole("button", { name: "Refuser Demandeur12" }).click();
+    await expect(host.getByText("Aucun pseudo trouvé.")).toBeVisible();
+    expect(await start.boundingBox()).toEqual(beforeSearch);
+  } finally {
+    applicants.forEach((client) => client.disconnect());
   }
 });
 
