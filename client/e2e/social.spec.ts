@@ -55,7 +55,13 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
       await expect(chat(page)).toHaveCount(0);
       await expect(page.getByRole("textbox", { name: "Message du Hub" })).toHaveCount(0);
     }
-    await expect(tableEmojis(host).getByRole("button")).toHaveCount(5);
+    await expect(tableEmojis(host).getByRole("button")).toHaveCount(9);
+    await guest.setViewportSize({ width: 320, height: 620 });
+    await expect(tableEmojis(guest)).toBeInViewport({ ratio: 1 });
+    for (const label of ["En pleurs", "Furieux", "Yeux en cœur", "Chut"]) {
+      await expect(emoji(guest, label)).toBeInViewport({ ratio: 1 });
+    }
+    await guest.screenshot({ path: testInfo.outputPath("09-emojis-portrait.png") });
     await expectToolbarBelowTable(guest);
     await emoji(host, "Bravo").click();
     const reaction = bubble(guest, "AliceChat · Bravo");
@@ -79,9 +85,9 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await expectToolbarBelowTable(guest);
     await expect(tableEmojis(guest).getByRole("button", { name: "Envoyer l’emoji Cœur" })).toBeInViewport();
     await guest.screenshot({ path: testInfo.outputPath("03-choix-emojis-paysage.png") });
-    await emoji(guest, "Cœur").click();
-    await expect(bubble(host, "BobChat · Cœur")).toBeVisible();
-    await expect(bubble(newcomer, "BobChat · Cœur")).toBeVisible();
+    await emoji(guest, "Chut").click();
+    await expect(bubble(host, "BobChat · Chut")).toBeVisible();
+    await expect(bubble(newcomer, "BobChat · Chut")).toBeVisible();
     await expect(drawDeck(newcomer)).toBeEnabled();
   } finally {
     await Promise.all([guest.close(), newcomer.close()]);

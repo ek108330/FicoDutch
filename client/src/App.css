@@ -1053,11 +1053,11 @@ input {
 
 .table-options .emoji-buttons {
   flex-wrap: nowrap;
-  gap: clamp(3px, 0.8vw, 6px);
+  gap: clamp(2px, 0.7vw, 5px);
 }
 
 .table-options .emoji-buttons button {
-  width: clamp(26px, 8vw, 36px);
+  width: clamp(24px, 8.3vw, 36px);
   height: var(--table-toolbar-height);
   background: #123b2a;
   font-size: clamp(0.95rem, 4.3vw, 1.2rem);
@@ -1437,8 +1437,10 @@ input {
 }
 
 .game-screen .game-table .position-top {
-  top: 12px;
+  top: 6px;
 }
+
+.game-screen .game-table .position-top .player-name { margin-bottom: 5px; }
 
 .game-screen .game-table .table-center {
   top: 50%;
@@ -1696,6 +1698,9 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
   font-size: 0.8em;
 }
 
+.game-table .card-face:not(.joker-face) { font-size: clamp(0.9rem, 3.95dvh, 2rem); }
+.game-table .card-face:not(.joker-face) b { font-size: 0.9em; }
+
 .card-face.joker-face {
   color: #24190c;
   font-size: clamp(0.75rem, 2.6dvh, 1.25rem);
@@ -1785,7 +1790,7 @@ button[data-look-card] { cursor: pointer; touch-action: manipulation; }
 
 @media (prefers-reduced-motion: no-preference) {
   .pile-card[data-gift-pending] { animation: gift-pulse 1.1s ease-in-out infinite alternate; }
-  .pile-card[data-turn-draw] { animation: turn-draw-pulse 1.35s ease-in-out infinite alternate; }
+  .pile-card[data-turn-draw] { animation: turn-draw-pulse 0.68s ease-in-out infinite alternate; }
 
   @keyframes gift-pulse {
     from { outline-color: rgb(255 227 154 / 40%); }
@@ -2603,7 +2608,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
     line-height: 1;
   }
 
-  .game-table .player-cards .card-face { font-size: clamp(10px, 54cqi, 29px); }
+  .game-table .player-cards .card-face { font-size: clamp(10px, 59cqi, 32px); }
   .game-table .player-cards .card-face.joker-face { font-size: clamp(7px, 24cqi, 15px); }
 
   .game-table .table-piles :is(.deck-placeholder, .discard-placeholder, .pile-card) {
@@ -2947,7 +2952,7 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
 @media (orientation: portrait) and (max-width: 600px) {
   .game-screen .game-table[data-player-count="2"] .position-top {
-    top: 52px;
+    top: 29px;
   }
 }
 
@@ -2967,12 +2972,16 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 }
 
 @media (orientation: portrait) and (max-height: 760px) {
-  .game-screen.table-screen .game-table.is-large-table { padding-top: 30px; }
+  .game-screen.table-screen .game-table.is-large-table { padding-top: 23px; }
+}
+
+@media (orientation: portrait) and (min-height: 761px) {
+  .game-screen.table-screen .game-table.is-large-table .position-top { translate: 0 -8px; }
 }
 
 @media (orientation: portrait) and (max-height: 600px) {
   .game-screen.table-screen .game-table[data-player-count="6"] {
-    padding-top: 24px;
+    padding-top: 19px;
     row-gap: 1px;
   }
 
@@ -3056,15 +3065,21 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .archive-actions a, .archive-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .archive-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 13px; font-size: 0.86rem; }
-.archive-meta strong { color: #ffdf91; font-size: 1rem; }
+.archive-meta span:first-child { color: #ffdf91; font-weight: 750; }
 .archive-screen .archive-note { margin-top: 10px; font-size: 0.9rem; }
 .archive-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 136px), 1fr)); gap: 8px; }
 .archive-card, .account-card { padding: 12px; border: 1px solid #6d9580; border-radius: 11px; background: #153e30; }
 .archive-card h2 { margin-top: 0; }
 .archive-card > svg { color: #f4cf75; }
-.archive-awards .archive-card > svg { display: block; margin-inline: auto; }
-.archive-awards h3 { margin: 3px 0; font-size: 0.95rem; }
-.archive-awards p { margin-top: 5px; font-size: 0.88rem; }
+.archive-awards .archive-card, .archive-interactions .archive-card {
+  min-width: 0;
+  padding: 8px;
+  border-color: rgb(149 184 165 / 36%);
+  border-radius: 8px;
+}
+.archive-awards h3 { display: flex; align-items: center; gap: 5px; font-size: 0.87rem; line-height: 1.2; }
+.archive-awards h3 svg { flex: none; color: #f4cf75; }
+.archive-awards p { margin-top: 4px; font-size: 0.84rem; line-height: 1.3; }
 .archive-screen .archive-home-button {
   display: flex;
   align-items: center;
@@ -3084,7 +3099,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .player-search label { display: grid; gap: 4px; }
 .player-search input { min-height: 37px; padding: 6px 9px; border: 1px solid #aacbb5; border-radius: 7px; font: inherit; width: 100%; }
 .archive-list + .archive-actions { margin-top: 10px; }
-.archive-interactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.archive-interactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; }
 .archive-interactions dt, .profile-numbers dt { font-weight: 700; }
 .archive-interactions dd, .profile-numbers dd { margin: 3px 0 0; font-size: 0.9rem; }
 .profile-numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; }

@@ -277,7 +277,7 @@ export default function RoundScreen({
         }
       />
       {emojisEnabled && <div className="table-options">
-        <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />
+        <EmojiButtons label="Emojis de la table" table onChoose={chooseEmoji} />
       </div>}
     </main>
   );

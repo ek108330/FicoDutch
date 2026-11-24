@@ -82,12 +82,13 @@ for (const count of [4, 5, 6]) {
       await fixDeckOrder(host);
       const guests = await Promise.all(Array.from({ length: count - 1 }, () => browser.newPage({ baseURL })));
       const hostName = `Table${count}C${cards}`;
+      const guestNames = guests.map((_, index) => `I${count}C${cards}J${index + 1}`);
       const joker = count === 6 && cards === 6;
       const seatsViewports = count === 6 ? [...viewports, { name: "portrait-320", width: 320, height: 568 }] : viewports;
       try {
-        const start = await openTwoPlayerHub(host, guests[0], hostName, "Invite1");
+        const start = await openTwoPlayerHub(host, guests[0], hostName, guestNames[0]);
         for (const [index, guest] of guests.slice(1).entries()) {
-          await openLobby(guest, `Invite${index + 2}`);
+          await openLobby(guest, guestNames[index + 1]);
           await guest.locator(".hub-item").filter({ hasText: `Hub de ${hostName}` })
             .getByRole("button", { name: "Rejoindre" }).click();
           await expect(guest.getByText("Salle d'attente")).toBeVisible();
@@ -101,7 +102,7 @@ for (const count of [4, 5, 6]) {
           for (const [width, height] of [[360, 640], [740, 360]]) {
             await host.setViewportSize({ width, height });
             await expectScreenFits(host);
-            await expect(host.getByRole("list", { name: "Joueurs présents" }).getByText("Invite5", { exact: true })).toBeInViewport({ ratio: 1 });
+            await expect(host.getByRole("list", { name: "Joueurs présents" }).getByText(guestNames.at(-1)!, { exact: true })).toBeInViewport({ ratio: 1 });
             await expect(host.getByRole("textbox", { name: "Message du Hub" })).toBeInViewport({ ratio: 1 });
             await expect(start).toBeInViewport({ ratio: 1 });
             await host.screenshot({ path: testInfo.outputPath(`hub-${width}.png`) });
@@ -117,7 +118,7 @@ for (const count of [4, 5, 6]) {
         } else await start.click();
         const last = guests.at(-1)!;
         await expectLocalTurn(last, 21_000);
-        const order = [hostName, ...guests.map((_, index) => `Invite${index + 1}`)];
+        const order = [hostName, ...guestNames];
         await Promise.all([host, ...guests].map((page, ownIndex) => expectClockwiseOrder(page, order, ownIndex)));
         for (const { name, width, height } of seatsViewports) {
           await last.setViewportSize({ width, height });
@@ -148,11 +149,13 @@ for (const count of [4, 5, 6]) {
         await expectCenteredTurnPanel(host);
         await host.screenshot({ path: testInfo.outputPath("joker-consigne-centree-740.png") });
         await host.getByRole("button", { name: "Carte de la pioche à donner" }).press("Enter");
-        await host.getByRole("button", { name: "Donner une carte à Invite5", exact: true }).press("Enter");
+        await expect(host.getByRole("button", { name: `Donner une carte à ${guestNames.at(-1)}`, exact: true })).toHaveCount(0);
+        await host.getByRole("button", { name: `Donner une carte à ${guestNames[0]}`, exact: true }).press("Enter");
+        const recipient = guests[0];
         for (const { name, width, height } of seatsViewports) {
-          await last.setViewportSize({ width, height });
-          await checkSeats(last, 6, 7);
-          await last.screenshot({ path: testInfo.outputPath(`${name}-joker.png`), fullPage: true });
+          await recipient.setViewportSize({ width, height });
+          await checkSeats(recipient, 6, 7);
+          await recipient.screenshot({ path: testInfo.outputPath(`${name}-joker.png`), fullPage: true });
         }
         for (const guest of guests.slice(0, -1)) {
           await expectLocalTurn(guest);
@@ -177,7 +180,7 @@ for (const count of [4, 5, 6]) {
             return text.top < card.top || text.bottom > card.bottom || text.left < card.left || text.right > card.right;
           }).map((face) => face.textContent));
           expect(clippedFaces, `Valeurs de carte à ${width} × ${height}`).toEqual([]);
-          await expect(host.getByRole("region", { name: "Main de Invite5" }).getByRole("img", { name: /Annonce Dutch/ })).toBeVisible();
+          await expect(host.getByRole("region", { name: `Main de ${guestNames.at(-1)}` }).getByRole("img", { name: /Annonce Dutch/ })).toBeVisible();
           const variants = host.getByRole("group", { name: "Variantes de la prochaine manche", exact: true }).getByRole("button");
           const rows = await variants.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
           expect(rows).toHaveLength(4);

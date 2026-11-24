@@ -69,6 +69,7 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await expectLocalTurn(guest, 20_000);
     const deck = guest.locator(".deck-slot");
     await expect(deck).toHaveCSS("animation-name", "turn-draw-pulse");
+    await expect(deck).toHaveCSS("animation-duration", "0.68s");
     await expect(host.locator(".deck-slot")).not.toHaveAttribute("data-turn-draw");
     await expect(guest.locator("html")).toHaveAttribute("data-test-turn-tones", "1");
     await guest.screenshot({ path: testInfo.outputPath("pioche-tour-actif.png") });
@@ -76,7 +77,9 @@ test("l’aperçu du Hub et les sons de jeu avec commande de coupure", async ({
     await guest.setViewportSize({ width: 390, height: 844 });
     const settingsBox = (await guest.locator(".game-actions .settings-trigger").boundingBox())!;
     const opponentName = (await guest.locator(".position-top .player-name").boundingBox())!;
-    expect(settingsBox.y + settingsBox.height).toBeLessThan(opponentName.y);
+    const overlaps = settingsBox.x < opponentName.x + opponentName.width && settingsBox.x + settingsBox.width > opponentName.x &&
+      settingsBox.y < opponentName.y + opponentName.height && settingsBox.y + settingsBox.height > opponentName.y;
+    expect(overlaps).toBe(false);
     await openSettings(guest);
     await expect(sound).toHaveAttribute("aria-pressed", "true");
     await closeSettings(guest);

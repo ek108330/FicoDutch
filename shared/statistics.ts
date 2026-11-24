@@ -33,7 +33,8 @@ export type MatchStats = {
   unfinished?: { round: number; reactions: number; penalties: number; exchanges: number; gifts: number };
 };
 
-export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number; scopeIncomplete?: boolean };
+export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number;
+  games?: number; totalRounds?: number; playerCount?: number; scopeIncomplete?: boolean };
 export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number; rating: number;
   avatarStyle: number | null; avatarPhotoId?: string | null };
 

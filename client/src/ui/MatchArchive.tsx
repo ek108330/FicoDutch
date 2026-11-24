@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
@@ -14,9 +14,9 @@ const date = new Intl.DateTimeFormat("fr", { dateStyle: "medium", timeStyle: "sh
 const number = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
 const seconds = new Intl.NumberFormat("fr", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const individual = [
-  ["shuriken", "Shuriken de la défausse", Swords], ["luckyLuke", "Lucky Lucke", Timer], ["boulet", "Le boulet", TriangleAlert],
-  ["cible", "La cible dans le dos", Crosshair], ["roisNoirs", "Mr. Roinoir", Crown],
-  ["distributeur", "Le distributeur de cartes", Gift],
+  ["shuriken", "Le défausseur", Swords], ["luckyLuke", "Lucky Lucke", Timer], ["boulet", "Le boulet", TriangleAlert],
+  ["cible", "Cible dans le dos", Crosshair], ["roisNoirs", "Mr. Roinoir", Crown],
+  ["distributeur", "Le distributeur", Gift],
 ] as const;
 const interactions: [AwardId, string][] = [
   ["victime", "Victime préférée"], ["rivalite", "Rivalité principale"],
@@ -73,10 +73,11 @@ function awardValue(id: AwardId, { value, extra }: Award) {
 }
 
 function exchangeCard(id: string) {
-  if (id.startsWith("joker-")) return "un Joker";
+  if (id.startsWith("joker-")) return "un joker";
   const [suit, rank] = id.split("-") as [keyof typeof suits, CardRank];
+  if (rank === "K" && (suit === "clubs" || suit === "spades")) return "un roi noir";
   const article = rank === "Q" ? "une" : "un";
-  return `${article} ${describeCardFace({ rank, suit })}`;
+  return `${article} ${describeCardFace({ rank }).toLocaleLowerCase("fr")}`;
 }
 
 function PlayerName({ player, navigate }: { player: MatchPlayer | undefined; navigate: Navigate }) {
@@ -91,7 +92,7 @@ function Interaction({ id, award, roster, navigate }: {
   const value = award.value;
   switch (id) {
     case "victime": return <>{a} a ciblé {b} dans {plural(value, "échange")}.</>;
-    case "rivalite": return <>{a} et {b} ont effectué {plural(value, "échange")} entre leurs mains.</>;
+    case "rivalite": return <>{a} et {b} ont effectué {plural(value, "échange")}.</>;
     case "pire": return award.exchange
       ? <>{a} a donné {exchangeCard(award.exchange.given)} à <PlayerName player={roster.get(award.exchange.opponentId)}
         navigate={navigate} /> contre {exchangeCard(award.exchange.received)}.</>
@@ -105,22 +106,23 @@ function Interaction({ id, award, roster, navigate }: {
 function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Navigate }) {
   const sorted = match.players.filter(({ rank }) => rank !== undefined).sort((a, b) => a.rank! - b.rank!);
   const roster = new Map(match.players.map((player) => [player.id, player]));
+  const rounds = match.totalRounds ?? match.rounds + Number(!!match.unfinished);
+  const activity = match.unfinished;
   const elapsed = Math.floor(Math.max(0, match.endedAt - match.startedAt) / 1_000);
   const duration = elapsed >= 60 ? `${Math.floor(elapsed / 60)} min ${elapsed % 60} s` : `${elapsed} s`;
   return <>
-    <div className="archive-meta">
-      <strong>{match.status === "finished" ? "Partie terminée" : "Partie interrompue"}</strong>
-      <time dateTime={new Date(match.startedAt).toISOString()}>{date.format(match.startedAt)}</time>
-      <span>{duration}</span><span>{plural(match.players.length, "joueur")}</span>
-      <span>{plural(match.rounds, "manche terminée", "manches terminées")}</span>
+    <div className="archive-meta" role="group" aria-label="Totaux">
+      <span>{duration}</span>
+      <span>{plural(match.playerCount ?? match.players.length, "joueur")}</span>
+      <span>{plural(rounds, "manche")}</span>
+      <span>{plural(match.games ?? 1, "partie")}</span>
     </div>
     {match.scopeIncomplete && <p className="archive-note">Seules les statistiques de la dernière partie sont disponibles pour cette ancienne table.</p>}
-    {match.status === "interrupted" && <p className="archive-note">{match.partial
-      ? "Bilan partiel établi avec les dernières données reçues. Certaines actions et valeurs peuvent manquer."
-      : "Les actions validées avant l’interruption sont incluses. Les victoires et les Dutch réussis proviennent des manches terminées."}</p>}
-    {match.unfinished && <section className="archive-card" aria-label={`Activité de la manche ${match.unfinished.round} interrompue`}>
-      <h2>Manche {match.unfinished.round} interrompue</h2>
-      <p>{plural(match.unfinished.reactions, "réaction valide", "réactions valides")} · {plural(match.unfinished.penalties, "pénalité")} · {plural(match.unfinished.exchanges, "échange")} · {plural(match.unfinished.gifts, "carte donnée", "cartes données")} (Joker +)</p>
+    {match.partial && <p className="archive-note">Bilan partiel établi avec les dernières données reçues. Certaines actions et valeurs peuvent manquer.</p>}
+    {activity && !!(activity.reactions || activity.penalties || activity.exchanges || activity.gifts) &&
+      <section className="archive-card" aria-label={`Activité de la manche ${activity.round} interrompue`}>
+      <h2>Manche {activity.round} interrompue</h2>
+      <p>{plural(activity.reactions, "réaction valide", "réactions valides")} · {plural(activity.penalties, "pénalité")} · {plural(activity.exchanges, "échange")} · {plural(activity.gifts, "carte donnée", "cartes données")} (Joker +)</p>
     </section>}
     {sorted.length > 0 && <section className="archive-card archive-ranking">
       <h2>Classement officiel</h2>
@@ -136,9 +138,12 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
       <div className="archive-awards">{individual.map(([id, title, Icon]) => {
         const awards = match.awards[id];
         return <article className="archive-card" key={id}>
-          <Icon size={23} aria-hidden="true" />
-          <h3>{title}</h3>
-          {awards?.length ? awards.map((award) => <p key={award.players[0]}>
+          <h3><Icon size={16} aria-hidden="true" />{title}</h3>
+          {awards?.length && id === "roisNoirs" ? <p>
+            <strong>{awards.map((award, index) => <Fragment key={award.players[0]}>
+              {index > 0 && " & "}<PlayerName player={roster.get(award.players[0])} navigate={navigate} />
+            </Fragment>)}</strong>{" "}{awardValue(id, awards[0])}.
+          </p> : awards?.length ? awards.map((award) => <p key={award.players[0]}>
             <strong><PlayerName player={roster.get(award.players[0])} navigate={navigate} /></strong>{" "}
             {awardValue(id, award)}.
           </p>) : <p className="archive-muted">Non attribuée</p>}
@@ -147,8 +152,8 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
     </section>
     <section aria-labelledby="interaction-title">
       <h2 id="interaction-title">Interactions et rivalités</h2>
-      <dl className="archive-card archive-interactions">
-        {interactions.map(([id, title]) => <div key={id}>
+      <dl className="archive-interactions">
+        {interactions.map(([id, title]) => <div className="archive-card" key={id}>
           <dt>{title}</dt>
           {(match.awards[id]?.length ? match.awards[id] : undefined)?.map((award) => <dd key={award.players.join(":")}>
             <Interaction id={id} award={award} roster={roster} navigate={navigate} />

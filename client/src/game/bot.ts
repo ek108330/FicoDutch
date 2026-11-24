@@ -114,9 +114,9 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
   const opponents = state.players.filter(({ id, hasLeft }) => id !== playerId && !hasLeft)
     .sort((a, b) => a.cards.length - b.cards.length || estimatedScore(bot, a) - estimatedScore(bot, b) || a.totalScore - b.totalScore);
   const worst = worstPosition(bot);
-  if (turn.power) return { playerId, action: playPower(state, bot, opponents, worst, turn.power), delay: 1_350 };
+  if (turn.power) return { playerId, action: playPower(state, bot, opponents, worst, turn.power), delay: 720 };
   if (!turn.drawnCard) return {
-    playerId, delay: 1_250,
+    playerId, delay: 650,
     action: state.drawPile.length || state.discardPile.length >= 2 ? { kind: "draw", source: "deck" } : { kind: "skip-empty" },
   };
 
@@ -126,11 +126,11 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
   const expectedScore = take ? handPoints - (knownPoints(bot, bot, worst) ?? unknownPoints) + drawnPoints : handPoints;
   if (!state.dutch && !turn.dutchArmed && opponents.length && expectedScore <= (bot.cards.length <= 2 ? 10 : 6) &&
       opponents.every((opponent) => estimatedScore(bot, opponent) >= expectedScore + 5)) {
-    return { playerId, action: { kind: "dutch-intent", enabled: true }, delay: 1_150 };
+    return { playerId, action: { kind: "dutch-intent", enabled: true }, delay: 630 };
   }
 
   return {
-    playerId, delay: 1_500,
+    playerId, delay: 820,
     action: take ? { kind: "replace", position: worst, handVersion: bot.handVersion } : { kind: "discard" },
   };
 }

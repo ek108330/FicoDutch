@@ -206,7 +206,8 @@ function createMatchStore(db) {
 
   async function getTableSummary(match) {
     const { rows } = await db.query(`
-      SELECT m.id, m.started_at, m.report->>'status' AS status, m.report->'players' AS players
+      SELECT m.id, m.started_at, m.report->>'status' AS status, m.report->'players' AS players,
+        m.report->'rounds' AS rounds, m.report ? 'unfinished' AS unfinished
       FROM matches m WHERE m.id LIKE $1 AND m.ended_at IS NOT NULL AND m.started_at <= $2
       ORDER BY m.started_at DESC, m.id DESC
     `, [match.id.split(":")[0] + ":%", match.startedAt]);
@@ -223,6 +224,9 @@ function createMatchStore(db) {
     });
     return { ...summary, players: [...players, ...ranks.values()],
       startedAt: Number(rows.at(-1)?.started_at ?? report.startedAt),
+      games: rows.length,
+      totalRounds: rows.reduce((total, { rounds, unfinished }) => total + rounds + Number(unfinished), 0),
+      playerCount: new Set(rows.flatMap(({ players }) => players.map(playerKey))).size,
       scopeIncomplete: rows.length > 1 && !table };
   }
 

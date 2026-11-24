@@ -64,7 +64,7 @@ test("le bot remplace sa pire carte uniquement si la carte tirée est meilleure 
   const take = table(["6", "4", "Q"], "3");
   const better = nextBot(take)!;
   assert.deepEqual(better.action, { kind: "replace", position: 2, handVersion: 0 });
-  assert.ok(better.delay > 1_000);
+  assert.ok(better.delay > 0 && better.delay < 1_000);
   const played = step(take);
   assert.deepEqual(played.players[0].cards.map(({ rank }) => rank), ["6", "4", "3"]);
   assert.equal(played.discardPile.at(-1)?.rank, "Q");
