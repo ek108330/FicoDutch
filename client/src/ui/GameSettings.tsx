@@ -1,5 +1,5 @@
 import { useId, useState, type RefObject } from "react";
-import { BookOpen, UserRound, Users, Volume2, VolumeX, X } from "lucide-react";
+import { BookOpen, LogOut, UserRound, Users, Volume2, VolumeX, X } from "lucide-react";
 import HubManagement, { type HubManagementOptions } from "./HubManagement";
 import Rules from "./Rules";
 
@@ -9,9 +9,10 @@ type Props = {
   toggleSound: () => void;
   management?: HubManagementOptions;
   onAccount?: () => void;
+  onLeave?: () => void;
 };
 
-export default function GameSettings({ dialog, sound, toggleSound, management, onAccount }: Props) {
+export default function GameSettings({ dialog, sound, toggleSound, management, onAccount, onLeave }: Props) {
   const title = useId();
   const [panel, setPanel] = useState<"settings" | "rules" | "table">("settings");
   const showRules = panel === "rules";
@@ -45,6 +46,9 @@ export default function GameSettings({ dialog, sound, toggleSound, management, o
                 <Users size={19} aria-hidden="true" /> Gérer la table
               </button>
             )}
+            {onLeave && <button type="button" onClick={() => { dialog.current?.close(); onLeave(); }}>
+              <LogOut size={19} aria-hidden="true" /> Quitter la table
+            </button>}
           </div>
         </>
       )}

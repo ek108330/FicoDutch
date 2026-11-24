@@ -112,9 +112,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     expect(insideFelt).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("table-six-en-jeu-320.png") });
     await page.setViewportSize({ width: 360, height: 640 });
-    const management = await openManagement(page);
-    await management.getByRole("button", { name: "Interrompre la partie" }).click();
-    await page.getByRole("button", { name: "Confirmer l’interruption" }).click();
+    await page.getByRole("button", { name: "Quitter la table", exact: true }).click();
     await expect(ready(page)).toBeVisible();
     await expect(page.getByRole("group", { name: "Totaux" })).toContainText("1 partie");
     await page.reload();
@@ -361,24 +359,28 @@ test("l’interruption d’une manche conserve une réaction et une pénalité s
   } finally { await guest.close(); }
 });
 
-test("la disparition de l’hôte produit un bilan partiel à l’expiration du délai de reconnexion", async ({ page: host, browser, baseURL }, testInfo) => {
-  test.setTimeout(175_000);
+test("la disparition du dernier humain ferme la table des bots avec un bilan partiel", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(40_000);
   await fixDeckOrder(host);
   const guest = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 } });
   try {
     await signIn(host, "AlicePause", true);
-    await signIn(guest, "BobbyPause", true);
+    await guest.goto("/");
     await host.getByRole("button", { name: "Créer un Hub" }).click();
-    await join(guest, "AlicePause");
+    await host.getByRole("button", { name: "Ajouter un bot" }).click();
     await expect(game(host)).toBeEnabled({ timeout: 12_000 });
     await game(host).click();
-    await expect(guest.getByRole("region", { name: "Mémorisation" })).toBeVisible();
-    await host.close();
-    await expect(guest.getByRole("heading", { name: "Partie en pause" })).toBeVisible();
-    await expect(ready(guest)).toBeVisible({ timeout: 132_000 });
-    await expect(guest.getByText(/Bilan partiel établi/)).toBeVisible();
-    await expect(guest.getByRole("group", { name: "Totaux" })).toContainText("1 partie");
-    await expect(guest.getByRole("heading", { name: "Classement officiel" })).toHaveCount(0);
-    await guest.screenshot({ path: testInfo.outputPath("01-bilan-partiel-apres-deconnexion.png"), fullPage: true });
+    await expect(host.getByRole("region", { name: "Mémorisation" })).toBeVisible();
+    await expect(guest.getByText("Hub de AlicePause", { exact: true })).toBeVisible();
+    await host.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await host.context().setOffline(true);
+    await expect(guest.getByText("Hub de AlicePause", { exact: true })).toHaveCount(0);
+    await host.context().setOffline(false);
+    await host.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect(ready(host)).toBeVisible();
+    await expect(host.getByText(/Bilan partiel établi/)).toBeVisible();
+    await expect(host.getByRole("group", { name: "Totaux" })).toContainText("1 partie");
+    await expect(host.getByRole("heading", { name: "Classement officiel" })).toHaveCount(0);
+    await host.screenshot({ path: testInfo.outputPath("01-bilan-partiel-apres-deconnexion.png"), fullPage: true });
   } finally { await guest.close(); }
 });

@@ -10,7 +10,7 @@ const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay, findPlayerHub, getHub, getActiveMatchIds,
-  guestNameInUse, withPlayerName, applyRoundRating,
+  guestNameInUse, withPlayerName, applyRoundRating, nextHumanHost, promoteHost,
 } = require("./hubManager");
 
 const app = express();
@@ -35,6 +35,8 @@ let matchStore;
 let demoBots = [];
 const closing = new Set();
 const recentCheckpoints = new WeakMap();
+const roundBackups = new WeakMap();
+const backupHolders = new WeakMap();
 
 if (process.env.SERVE_CLIENT === "1") {
   const clientFiles = path.resolve(__dirname, "../client/dist");
@@ -57,6 +59,70 @@ app.get("/", (req, res) => {
 
 function broadcastHubs() {
   io.emit("hubs:update", getAllHubs(), Date.now());
+}
+
+function saveRoundBackup(current, request, now = Date.now()) {
+  const { hub, player } = current;
+  if (!player.isHost || !hub.gameStarted || hub.gameFinished || hub.id !== request?.hubId ||
+      hub.gameNumber !== request.gameNumber || !Number.isSafeInteger(request.sequence) || request.sequence < 1 ||
+      !Buffer.isBuffer(request.bytes) || request.bytes.length <= 28 || request.bytes.length > 700_000) return;
+  const previous = roundBackups.get(hub);
+  if (previous?.hostId === player.id && previous.gameNumber === hub.gameNumber && previous.sequence >= request.sequence) return;
+  roundBackups.set(hub, { hostId: player.id, gameNumber: hub.gameNumber, sequence: request.sequence, bytes: request.bytes, at: now });
+}
+
+function sendPromotion(hub, socketId, snapshot, departedAt) {
+  if (snapshot?.gameNumber === hub.gameNumber) {
+    io.to(socketId).emit("hub:promotion", { hubId: hub.id, gameNumber: hub.gameNumber,
+      age: Math.max(0, departedAt - snapshot.at), bytes: snapshot.bytes });
+  }
+}
+
+async function departHost(socket, current, request, explicit) {
+  const { hub, player } = current;
+  const id = matchId(hub);
+  if (explicit) saveRoundBackup(current, request?.backup);
+  const successor = nextHumanHost(hub);
+  const snapshot = roundBackups.get(hub);
+  if (successor && snapshot?.gameNumber === hub.gameNumber &&
+      backupHolders.get(hub)?.get(successor.id) === successor.connectionVersion) {
+    const departedAt = hub.hostPause?.startedAt ?? Date.now();
+    if (!promoteHost(current, successor)) return false;
+    const pauseUntil = hub.hostPause.until;
+    backupHolders.get(hub).delete(player.id);
+    if (matchStore) await matchStore.recordDeparture(id, player.id, "left").catch((error) => socketError(socket, error));
+    broadcastHubs();
+    if (hub.hostId === successor.id && successor.socketId) {
+      sendPromotion(hub, successor.socketId, snapshot, departedAt);
+    }
+    scheduleHostExpiry(hub.id, pauseUntil);
+    return true;
+  }
+  if (successor) {
+    if (explicit) return false;
+    const { pauseUntil } = disconnectPlayer(socket.id);
+    broadcastHubs();
+    if (pauseUntil !== undefined) scheduleHostExpiry(hub.id, pauseUntil);
+    return true;
+  }
+  if (closing.has(hub.id)) return false;
+  closing.add(hub.id);
+  try {
+    if (matchStore) {
+      if (explicit && request?.rounds?.length) await persistRatings(hub, request.rounds);
+      const saved = explicit && request?.report &&
+        await matchStore.finish(id, "interrupted", request.report, Date.now(), request.table);
+      if (!saved) await matchStore.finish(id, "interrupted");
+    }
+    const sockets = interruptHub(socket.id, hub.id);
+    if (!sockets) return false;
+    io.to(sockets).emit("hub:ended", { hubId: hub.id, reason: "interrupted",
+      ...(matchStore && { matchId: id, tableSummary: true }) });
+    broadcastHubs();
+    return true;
+  } finally {
+    closing.delete(hub.id);
+  }
 }
 
 function scheduleHostExpiry(hubId, pauseUntil) {
@@ -256,10 +322,26 @@ io.on("connection", (socket) => {
     }
     acknowledge(membership, Date.now());
     broadcastHubs();
+    if (membership.session.isHost && membership.hub.hostPause?.transfer) {
+      const hub = getHub(membership.hub.id);
+      if (hub) sendPromotion(hub, socket.id, roundBackups.get(hub), hub.hostPause.startedAt);
+    }
   });
 
   socket.on("hub:host-ready", () => {
     if (completeHostResume(socket.id)) broadcastHubs();
+  });
+
+  socket.on("hub:backup-ready", (request) => {
+    const current = findPlayerHub(socket.id);
+    if (!current || current.player.isHost || current.hub.id !== request?.hubId || current.hub.hostId !== request.hostId) return;
+    if (!backupHolders.has(current.hub)) backupHolders.set(current.hub, new Map());
+    backupHolders.get(current.hub).set(current.player.id, current.player.connectionVersion);
+  });
+
+  socket.on("hub:backup-round", (request) => {
+    const current = findPlayerHub(socket.id);
+    if (current && !current.hub.hostPause) saveRoundBackup(current, request);
   });
 
   socket.on("hub:checkpoint", (request, acknowledge) => {
@@ -333,6 +415,7 @@ io.on("connection", (socket) => {
       return;
     }
     const hub = getHub(hubId);
+    if (hub) backupHolders.get(hub)?.delete(playerId);
     if (matchStore && hub?.gameStarted) {
       await matchStore.recordDeparture(matchId(hub), playerId, "removed").catch((error) => socketError(socket, error));
     }
@@ -373,6 +456,7 @@ io.on("connection", (socket) => {
       return;
     }
     const hub = getHub(result.hub.id);
+    saveRoundBackup(findPlayerHub(socket.id), request?.backup);
     closing.add(hub.id);
     try {
       if (matchStore) await matchStore.register(hub);
@@ -388,10 +472,20 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("hub:leave", async () => {
+  socket.on("hub:leave", async (request, acknowledge) => {
     const current = findPlayerHub(socket.id);
+    if (current?.player.isHost && current.hub.gameStarted && !current.hub.gameFinished) {
+      try {
+        const accepted = await departHost(socket, current, request, true);
+        if (typeof acknowledge === "function") acknowledge(accepted);
+      } catch (error) {
+        socketError(socket, error, acknowledge);
+      }
+      return;
+    }
     const result = removePlayer(socket.id);
     if (result) {
+      if (current) backupHolders.get(current.hub)?.delete(current.player.id);
       if (matchStore && current?.hub.gameStarted && !current.player.isHost) {
         await matchStore.recordDeparture(matchId(current.hub), current.player.id, "left").catch((error) => socketError(socket, error));
       }
@@ -403,6 +497,17 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("Déconnexion :", socket.id);
+    const current = findPlayerHub(socket.id);
+    if (current?.player.isHost && current.hub.gameStarted && !current.hub.gameFinished) {
+      void departHost(socket, current, null, false).catch((error) => {
+        console.error("Départ de l’hôte non enregistré :", error.code ?? error.name);
+        const fallback = disconnectPlayer(socket.id);
+        if (fallback?.pauseUntil !== undefined) scheduleHostExpiry(fallback.hubId, fallback.pauseUntil);
+        broadcastHubs();
+      });
+      return;
+    }
+    if (current) backupHolders.get(current.hub)?.delete(current.player.id);
     const result = disconnectPlayer(socket.id);
     if (!result) return;
     broadcastHubs();

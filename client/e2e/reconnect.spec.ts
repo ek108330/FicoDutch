@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openTwoPlayerHub, turnClock,
-  expectLocalTurn, expectClockFromTop } from "./tableFlow";
+import { discardDrawn, activeTurn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openLobby, openManagement,
+  openTwoPlayerHub, turnClock, expectLocalTurn } from "./tableFlow";
 
 async function setConnection(page: Page, online: boolean) {
   if (!online) await page.evaluate(() => window.dispatchEvent(new Event("offline")));
@@ -56,7 +56,7 @@ test("reconnexion de l’invité après une coupure et un rechargement", async (
   }
 });
 
-test("pause de la table et reprise du chronomètre après le retour de l’hôte", async ({ page: host, browser, baseURL }, testInfo) => {
+test("la déconnexion de l’hôte transmet les cartes et le chronomètre au joueur connecté", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(50_000);
   await fixDeckOrder(host);
   const guest = await browser.newPage({ baseURL });
@@ -67,28 +67,54 @@ test("pause de la table et reprise du chronomètre après le retour de l’hôte
     const before = await secondsLeft(guest);
 
     await setConnection(host, false);
-    await expect(guest.getByRole("heading", { name: "Partie en pause" })).toBeVisible();
-    await expect(guest.getByText("En attente du retour de l’hôte.")).toBeVisible();
-    await expect(guest.locator(".drawn-card[data-draggable]")).toHaveCount(0);
-    const delay = await secondsLeft(guest);
-    await expectClockFromTop(guest.getByRole("progressbar", { name: "Délai de reprise" }));
-    expect(delay).toBeGreaterThan(110);
-    expect(delay).toBeLessThanOrEqual(120);
     await guest.setViewportSize({ width: 390, height: 844 });
-    await guest.screenshot({ path: testInfo.outputPath("03-pause-hote-portrait.png") });
-    await expect.poll(() => secondsLeft(guest)).toBeLessThanOrEqual(delay - 4);
-
-    await guest.setViewportSize({ width: 844, height: 390 });
-    await setConnection(host, true);
-    await expectLocalTurn(guest);
-    await expect(activeTurn(host)).toHaveText("BobPause joue");
+    const management = await openManagement(guest);
+    await expect(management.getByRole("button", { name: "Retirer AlicePause" })).toHaveCount(0);
+    await guest.screenshot({ path: testInfo.outputPath("03-nouvel-hote-portrait.png") });
+    await management.getByRole("button", { name: "Fermer" }).click();
     expect(await secondsLeft(guest)).toBeGreaterThanOrEqual(before - 2);
     await expect(drawnCard(guest)).toHaveAccessibleName("Carte tirée, 5 de pique");
     await expectTableFits(guest);
+    await guest.setViewportSize({ width: 844, height: 390 });
     await guest.screenshot({ path: testInfo.outputPath("04-table-reprise-paysage.png") });
+    await setConnection(host, true);
+    await expect(host.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
     await discardDrawn(guest);
-    await expectLocalTurn(host);
+    await expectLocalTurn(guest);
   } finally {
     await guest.close();
+  }
+});
+
+test("le bouton quitter donne l’administration au premier humain connecté après l’hôte", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(50_000);
+  await fixDeckOrder(host);
+  const successor = await browser.newPage({ baseURL });
+  const last = await browser.newPage({ baseURL });
+  try {
+    await openLobby(host, "AliceDepart");
+    await host.getByRole("button", { name: "Créer un Hub" }).click();
+    await host.getByRole("button", { name: "Ajouter un bot" }).click();
+    for (const [page, name] of [[successor, "BobDepart"], [last, "ChloeDepart"]] as const) {
+      await openLobby(page, name);
+      await page.locator(".hub-item").filter({ hasText: "Hub de AliceDepart" }).getByRole("button", { name: "Rejoindre" }).click();
+      await expect(page.getByText("Salle d'attente")).toBeVisible();
+    }
+    await host.getByRole("button", { name: "Lancer la partie" }).click();
+    await expectLocalTurn(last, 22_000);
+    await drawDeck(last).click();
+    const card = await drawnCard(last).getAttribute("aria-label");
+    expect(card).toMatch(/^Carte tirée, /);
+    await host.getByRole("button", { name: "Quitter la table", exact: true }).click();
+    await expect(host.getByText("BobDepart a repris la table.")).toBeVisible();
+    const management = await openManagement(successor);
+    await expect(management.getByRole("button", { name: "Retirer ChloeDepart" })).toBeVisible();
+    await successor.screenshot({ path: testInfo.outputPath("admin-transmise-au-joueur.png") });
+    await expect(drawnCard(last)).toHaveAccessibleName(card!);
+    await discardDrawn(last);
+    await last.getByRole("button", { name: "Passer le pouvoir" }).click();
+    await expect(activeTurn(last)).not.toHaveText("ChloeDepart joue");
+  } finally {
+    await Promise.all([successor.close(), last.close()]);
   }
 });

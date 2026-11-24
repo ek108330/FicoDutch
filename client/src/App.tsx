@@ -5,11 +5,11 @@ import { Plus, Settings } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
+import { useHostTransfer } from "./network/useHostTransfer";
 import { readHubSession, saveHubSession } from "./network/hubSession";
 import type { Hub, HubEnd, HubMembership, HubSession, RestartHubRequest, StartHubRequest } from "../../shared/hubTypes";
 import { createRound } from "./game/createRound";
 import { resumeGameClock } from "./game/gameClock";
-import type { GameState } from "./game/gameTypes";
 import { applyDepartures } from "./game/turn";
 import type { UpdateHostRound } from "./game/useRoundTurn";
 import GameSettings from "./ui/GameSettings";
@@ -20,17 +20,27 @@ import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
 import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RatingPodium, RecentMatches } from "./ui/MatchArchive";
 import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, tableSummaryPath, type AccountSession } from "./network/accountApi";
-import { completedRoundsAfter, logDeal, logMatch, type MatchJournal } from "./game/matchJournal";
+import { completedRoundsAfter, logDeal, logMatch } from "./game/matchJournal";
+import type { HostRound } from "./game/roundBackup";
 import { matchStatistics } from "./game/matchStatistics";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
-type HostRound = { hubId: string; gameNumber: number; state: GameState; previousGames?: MatchJournal[] };
 
 function prepareGame(hub: Hub) {
   const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
     hub.variants, hub.endThreshold);
   return hub.tracked
     ? logDeal({ ...state, matchId: `${hub.id}:${hub.gameNumber}` }, performance.now()) : state;
+}
+
+function matchClosure(round: HostRound, hub: Hub, status: "finished" | "interrupted") {
+  const { state, previousGames } = round;
+  const journal = logMatch(state, performance.now(), { kind: "match-end", status }).journal;
+  return {
+    report: matchStatistics(journal, status),
+    rounds: completedRoundsAfter(state.journal, hub.roundRating?.number ?? 0),
+    ...(previousGames?.length && { table: matchStatistics(journal, "interrupted", false, previousGames) }),
+  };
 }
 
 function routeId(path: string, prefix: string) {
@@ -60,6 +70,7 @@ function App() {
   const readyRef = useRef(false);
   const hostRoundRef = useRef<HostRound | null>(null);
   const pausedAt = useRef<number | null>(null);
+  const leaving = useRef(false);
   const playerId = session?.playerId;
   const account = accountSession?.account ?? null;
   const peers = useHubPeers(currentHub, playerId, networkReady);
@@ -144,19 +155,43 @@ function App() {
     storeSession(null);
     storeHostRound(null);
     pausedAt.current = null;
+    leaving.current = false;
   }, [storeHub, storeHostRound, storeSession]);
 
   const updateHostRound = useCallback<UpdateHostRound>((hubId, update) => {
     const current = hostRoundRef.current;
     const hub = hubRef.current;
-    if (current?.hubId !== hubId || hub?.id !== hubId || current.gameNumber !== hub.gameNumber || !readyRef.current ||
+    if (current?.hubId !== hubId || hub?.id !== hubId || current.gameNumber !== hub.gameNumber || !readyRef.current || leaving.current ||
         pausedAt.current !== null || !socket.connected || sealed.current === current.state.matchId) return;
     const state = update(current.state, hub.players);
     if (state !== current.state) storeHostRound({ ...current, state });
   }, [storeHostRound]);
 
+  const restorePromotion = useCallback((round: HostRound) => {
+    const hub = hubRef.current;
+    if (!hub?.hostPause || hub.id !== round.hubId || hub.gameNumber !== round.gameNumber ||
+        hub.hostId !== sessionRef.current?.playerId || hostRoundRef.current?.hubId === hub.id) return;
+    const now = performance.now();
+    pausedAt.current = now;
+    const setup = round.state.phase === "memorization" && round.state.phaseDeadline === null && hub.memorizationDeadline !== undefined
+      ? { ...round.state, phase: "dealing" as const, phaseDeadline: hub.memorizationDeadline - GAME_CONFIG.round.memorizationMs }
+      : round.state;
+    const state = applyDepartures(setup, new Set(hub.players.map(({ id }) => id)), now);
+    storeHostRound({ ...round, state });
+  }, [storeHostRound]);
+  const createBackup = useHostTransfer(currentHub, playerId, hostRound, networkReady, peers, restorePromotion);
+
   useEffect(() => {
     let resumeRetry: number | undefined;
+
+    function recoverMatch(saved: HubSession | null) {
+      if (!saved?.matchId) return;
+      void readMatch(saved.matchId).then((match) => {
+        if (match.status === "interrupted" && !sessionRef.current && pathRef.current === "/") {
+          navigate(tableSummaryPath(match.id));
+        }
+      }, () => {});
+    }
 
     function applyHub(update: Hub, serverTime: number) {
       const receivedAt = performance.now();
@@ -195,6 +230,10 @@ function App() {
         if (state !== round.state) storeHostRound({ ...round, gameNumber: update.gameNumber, state, previousGames });
       }
       storeHub({ ...update, memorizationDeadline, pauseDeadline });
+      const saved = sessionRef.current;
+      if (saved?.hubId === update.id && saved.isHost !== (saved.playerId === update.hostId)) {
+        storeSession({ ...saved, isHost: saved.playerId === update.hostId });
+      }
     }
 
     function acceptMembership({ hub, session }: HubMembership, serverTime: number) {
@@ -231,13 +270,7 @@ function App() {
             const hostWithoutRound = saved.isHost && !hostRoundRef.current;
             clearTable();
             storeReady(true);
-            if (saved.matchId) {
-              void readMatch(saved.matchId).then((match) => {
-                if (match.status === "interrupted" && !sessionRef.current && pathRef.current === "/") {
-                  navigate(tableSummaryPath(match.id));
-                }
-              }, () => {});
-            }
+            recoverMatch(saved);
             setSessionNotice(hostWithoutRound
               ? "Pour reprendre une partie en tant qu’hôte, garde son onglet d’origine ouvert."
               : "La reprise de ce Hub n’est plus disponible.");
@@ -253,11 +286,13 @@ function App() {
       if (!current) return;
       const update = updatedHubs.find(({ id }) => id === current.id);
       if (!update?.players.some(({ id }) => id === sessionRef.current?.playerId)) {
+        const saved = sessionRef.current;
         clearTable();
         if (socket.connected) storeReady(true);
-        if (current.gameStarted) setSessionNotice(current.hostPause
-          ? "La partie est terminée. L’hôte n’est pas revenu à temps."
-          : "Le Hub de la partie a été fermé.");
+        if (!update) recoverMatch(saved);
+        if (current.gameStarted) setSessionNotice(update && update.hostId !== current.hostId
+          ? `${update.hostPseudo} a repris la table.`
+          : current.hostPause ? "La partie est terminée. L’hôte n’est pas revenu à temps." : "Le Hub de la partie a été fermé.");
         return;
       }
       applyHub(update, serverTime);
@@ -330,7 +365,7 @@ function App() {
     const activeIds = new Set(hostRoundRef.current.state.players.filter(({ hasLeft }) => !hasLeft).map(({ id }) => id));
     const others = currentHub.players.filter(({ id, connected, isBot }) => !isBot && connected && id !== playerId && activeIds.has(id));
     if (others.every(({ id }) => peers.connectedPeers.includes(id))) socket.emit("hub:host-ready");
-  }, [currentHub, networkReady, peers.connectedPeers, playerId]);
+  }, [currentHub, hostRound?.hubId, networkReady, peers.connectedPeers, playerId]);
 
   const publishMatch = useCallback((status: "finished" | "interrupted") => {
     const hub = hubRef.current;
@@ -340,11 +375,8 @@ function App() {
     if (!hub || !round || !state || !id || round.hubId !== hub.id || round.gameNumber !== hub.gameNumber ||
         !readyRef.current || !socket.connected || sealed.current === id) return;
     sealed.current = id;
-    const journal = logMatch(state, performance.now(), { kind: "match-end", status }).journal;
     socket.timeout(8_000).emit(status === "finished" ? "hub:finish" : "hub:interrupt", {
-      hubId: hub.id, gameNumber: hub.gameNumber, report: matchStatistics(journal, status),
-      rounds: completedRoundsAfter(state.journal, hub.roundRating?.number ?? 0),
-      ...(round.previousGames?.length && { table: matchStatistics(journal, "interrupted", false, round.previousGames) }),
+      hubId: hub.id, gameNumber: hub.gameNumber, ...matchClosure(round, hub, status),
     }, (error: Error | null, accepted?: boolean) => {
       if (sealed.current === id) sealed.current = null;
       if (status === "interrupted" && (error || !accepted) && hubRef.current?.id === hub.id) {
@@ -455,21 +487,28 @@ function App() {
     });
   }
 
-  function startGame(hub: Hub) {
+  async function startGame(hub: Hub) {
     if (!networkReady || hostRoundRef.current?.hubId === hub.id) return;
 
     const state = prepareGame(hub);
     const preparedRound = { hubId: hub.id, gameNumber: hub.gameNumber, state };
+    storeHostRound(preparedRound);
+    const backup = hub.players.some(({ id, isBot }) => id !== hub.hostId && !isBot)
+      ? await createBackup(preparedRound).catch(() => undefined) : undefined;
+    if (hostRoundRef.current !== preparedRound || !socket.connected) {
+      if (hostRoundRef.current === preparedRound) storeHostRound(null);
+      return;
+    }
     const request: StartHubRequest = {
       hubId: hub.id,
       variants: state.variants,
       endThreshold: state.endThreshold,
+      backup,
       cardCounts: Object.fromEntries(
         state.players.map(({ id, cards }) => [id, cards.length])
       ),
     };
 
-    storeHostRound(preparedRound);
     socket.emit("hub:start", request, (accepted: boolean) => {
       if (!accepted && hostRoundRef.current === preparedRound) storeHostRound(null);
     });
@@ -487,7 +526,29 @@ function App() {
     socket.timeout(5_000).emit("hub:restart", request, () => setRestarting(false));
   }
 
-  function leaveHub() {
+  async function leaveHub() {
+    const hub = hubRef.current;
+    const round = hostRoundRef.current;
+    if (leaving.current) return;
+    if (networkReady && hub?.gameStarted && !hub.gameFinished && hub.hostId === playerId) {
+      leaving.current = true;
+      const backup = round && hub.players.some(({ id, connected, isBot }) => id !== playerId && connected && !isBot)
+        ? await createBackup(round).catch(() => undefined) : undefined;
+      if (!socket.connected || hubRef.current?.id !== hub.id) {
+        leaving.current = false;
+        return;
+      }
+      socket.timeout(8_000).emit("hub:leave", {
+        backup,
+        ...(round?.state.journal && matchClosure(round, hub, "interrupted")),
+      }, (error: Error | null, accepted?: boolean) => {
+        leaving.current = false;
+        if (hubRef.current?.id !== hub.id) return;
+        if (accepted && !error) clearTable();
+        else window.alert("La reprise n’est pas encore prête. Réessaie dans un instant.");
+      });
+      return;
+    }
     if (networkReady) socket.emit("hub:leave");
     clearTable();
   }
@@ -561,7 +622,7 @@ function App() {
           playSound={playSound}
           clockVersion={currentHub.clockVersion}
           pause={currentHub.hostPause
-            ? { reason: "host", deadline: currentHub.pauseDeadline }
+            ? { reason: currentHub.hostPause.transfer ? "transfer" : "host", deadline: currentHub.pauseDeadline }
             : !networkReady ? { reason: "local" } : null}
           canLeave={networkReady}
         />
@@ -653,6 +714,7 @@ function App() {
     <>
       {renderScreen()}
       <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
+        onLeave={currentHub?.gameStarted && !currentHub.gameFinished && networkReady ? leaveHub : undefined}
         onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined} />
     </>
   );

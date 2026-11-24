@@ -7,7 +7,7 @@ const noPeers: string[] = [];
 
 export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready: boolean) {
   const transport = useRef<ReturnType<typeof connectHubPeers> | null>(null);
-  const listener = useRef<MessageListener | null>(null);
+  const listeners = useRef(new Set<MessageListener>());
   const [connected, setConnected] = useState<{ generation: string; ids: string[]; relays: string[] } | null>(null);
   const hubId = hub?.id;
   const hostId = hub?.hostId;
@@ -16,7 +16,7 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
   const ownVersion = local?.connected ? local.connectionVersion : undefined;
   const host = players?.find(({ id }) => id === hostId && id !== playerId);
   const hostVersion = host?.connected ? host.connectionVersion : undefined;
-  const generation = `${hubId}/${playerId}/${ownVersion}/${hostVersion}`;
+  const generation = `${hubId}/${hostId}/${playerId}/${ownVersion}/${hostVersion}`;
   const connectedPeers = connected?.generation === generation ? connected.ids : noPeers;
   const relayedPeers = connected?.generation === generation ? connected.relays : noPeers;
 
@@ -29,7 +29,7 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
       playerId,
       ownVersion,
       hostVersion,
-      (senderId, message) => listener.current?.(senderId, message),
+      (senderId, message) => { for (const listener of listeners.current) listener(senderId, message); },
       (peerId, isConnected, route) => setConnected((current) => {
         const ids = current?.generation === generation ? current.ids : noPeers;
         const relays = current?.generation === generation ? current.relays : noPeers;
@@ -57,8 +57,8 @@ export function useHubPeers(hub: Hub | null, playerId: string | undefined, ready
     return transport.current?.send(peerId, message) ?? false;
   }, []);
   const subscribe = useCallback((onMessage: MessageListener) => {
-    listener.current = onMessage;
-    return () => { listener.current = null; };
+    listeners.current.add(onMessage);
+    return () => { listeners.current.delete(onMessage); };
   }, []);
 
   return {

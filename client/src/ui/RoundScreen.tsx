@@ -33,7 +33,7 @@ type RoundScreenProps = {
   playSound: PlayGameSound;
   canLeave: boolean;
   clockVersion: number;
-  pause: { reason: "host" | "local"; deadline?: number } | null;
+  pause: { reason: "host" | "transfer" | "local"; deadline?: number } | null;
 };
 
 type Memorization = { roundNumber: number; chosen: number[]; visible: number[] };
@@ -132,16 +132,17 @@ export default function RoundScreen({
   </div>;
 
   if (pause || !scene || turn.waitingForClock || !connectionReady) {
-    const hostPaused = pause?.reason === "host";
+    const transfer = pause?.reason === "transfer";
+    const hostPaused = pause?.reason === "host" || transfer;
     return (
       <main className="game-screen">
         <div className="game-actions">{settings}</div>
         <section className="round-results" aria-labelledby="pause-title">
           {hostPaused && pause.deadline !== undefined && <PerimeterClock remaining={pause.deadline - now}
             duration={GAME_CONFIG.network.reconnectGracePeriodSeconds * 1_000} label="Délai de reprise" radius={15} />}
-          <h1 id="pause-title">{hostPaused ? "Partie en pause" : "Reconnexion à la table"}</h1>
-          <p role="status">{hostPaused ? "En attente du retour de l’hôte." : "Ta place est conservée."}</p>
-          {canLeave && playerId !== hostId && <button type="button" onClick={onLeave}>Quitter la table</button>}
+          <h1 id="pause-title">{transfer ? "Transfert de la table" : hostPaused ? "Partie en pause" : "Reconnexion à la table"}</h1>
+          <p role="status">{transfer ? "Le nouvel hôte reprend la partie." : hostPaused ? "En attente du retour de l’hôte." : "Ta place est conservée."}</p>
+          {canLeave && <button type="button" onClick={onLeave}>Quitter la table</button>}
         </section>
       </main>
     );
@@ -223,7 +224,7 @@ export default function RoundScreen({
 
   return (
     <main className="game-screen table-screen">
-      {canLeave && playerId !== hostId && <div className="game-actions">
+      {canLeave && <div className="game-actions">
         <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>
       </div>}
       <GameTable

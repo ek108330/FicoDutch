@@ -28,7 +28,7 @@ export type Hub = {
   gameStarted: boolean;
   gameFinished: boolean;
   gameNumber: number;
-  hostPause: { startedAt: number; until: number } | null;
+  hostPause: { startedAt: number; until: number; transfer?: true } | null;
   clockVersion: number;
   roundRating?: { number: number };
   initialCardCounts?: Record<string, number>;
@@ -64,6 +64,7 @@ export type JoinHubRequest = {
 export type StartHubRequest = Pick<Hub, "variants" | "endThreshold"> & {
   hubId: string;
   cardCounts: Record<string, number>;
+  backup?: { hubId: string; gameNumber: number; sequence: number; bytes: Uint8Array };
 };
 
 export type RestartHubRequest = Pick<Hub, "gameNumber" | "variants"> & { hubId: string };

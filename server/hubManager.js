@@ -204,6 +204,22 @@ function interruptHub(socketId, hubId) {
   return socketIds;
 }
 
+function nextHumanHost(hub) {
+  return hub.players.find(({ isHost, isBot, connected, socketId }) => !isHost && !isBot && connected && socketId);
+}
+
+function promoteHost(current, successor, now = Date.now()) {
+  const { hub, player } = current;
+  if (!player.isHost || successor !== nextHumanHost(hub) || !successor) return false;
+  hub.players.splice(hub.players.indexOf(player), 1);
+  successor.isHost = true;
+  hub.hostId = successor.id;
+  hub.hostPseudo = successor.pseudo;
+  hub.clockVersion++;
+  hub.hostPause = { startedAt: now, until: now + HOST_GRACE_MS, transfer: true };
+  return true;
+}
+
 function disconnectPlayer(socketId, now = Date.now()) {
   const current = findPlayerHub(socketId);
   if (!current || !current.hub.gameStarted) return removePlayer(socketId);
@@ -230,7 +246,7 @@ function resumeHub(socketId, request, now = Date.now(), accountId) {
   const hub = hubs.get(hubId);
   const player = hub?.players.find((entry) => entry.token === token);
   if (!player || player.accountId !== accountId || (hub.hostPause && now >= hub.hostPause.until) ||
-      (player.isHost && hub.gameStarted && hasHostState !== true)) return null;
+      (player.isHost && hub.gameStarted && hasHostState !== true && !hub.hostPause?.transfer)) return null;
 
   const current = findPlayerHub(socketId);
   if (current && current.player !== player) return null;
@@ -352,5 +368,5 @@ module.exports = {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
   finishHubGame, restartHubGame, resolveEncryptedRelay,
-  addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, applyRoundRating,
+  addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, applyRoundRating, nextHumanHost, promoteHost,
 };

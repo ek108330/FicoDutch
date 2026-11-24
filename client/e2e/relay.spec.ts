@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
+import { discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openManagement, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
 test("la partie démarre avec le relais quand la liaison directe ne répond pas", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(60_000);
@@ -56,7 +56,13 @@ test("la partie démarre avec le relais quand la liaison directe ne répond pas"
     expect(pile.y + pile.height + 7).toBeLessThan(name.y);
     await host.screenshot({ path: testInfo.outputPath("04-tour-paysage-compact.png") });
     expect(received.some((frame) => frame.includes('"ciphertext"'))).toBe(true);
-    expect(received.every((frame) => !frame.includes('"drawnCard"') && !frame.includes('"round-view"'))).toBe(true);
+    expect(received.every((frame) => !frame.includes('"drawnCard"') && !frame.includes('"round-view"') &&
+      !frame.includes('"host-transfer-key"'))).toBe(true);
+    await host.getByRole("button", { name: "Quitter la table", exact: true }).click();
+    await expectLocalTurn(guest);
+    await expect(discard(guest)).toHaveAccessibleName("Défausse, 5 de pique");
+    await openManagement(guest);
+    await guest.screenshot({ path: testInfo.outputPath("05-reprise-apres-relais.png") });
   } finally {
     await guest.close();
   }
