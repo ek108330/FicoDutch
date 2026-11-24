@@ -65,7 +65,8 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
-    await expect(page.locator(".profile-identity .player-avatar")).toHaveCSS("width", "128px");
+    await expect(page.locator(".profile-identity .player-avatar")).toBeVisible();
+    await expect(page.locator(".profile-headline")).toContainText("Manches gagnées");
     await expect(page.getByRole("heading", { name: "Historique des confrontations" })).toHaveCount(0);
     await expect(page.getByText("Aucune manche classée.")).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("profil-bot.png") });
@@ -76,7 +77,11 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       const ratings = [45, 48, 46, 52, 54].map((rating, index) => ({
         rating, date: Date.UTC(2026, 0, index + 1),
       }));
-      await route.fulfill({ response, json: { ...profile, ratings } });
+      const rivals = [
+        { ...profile.rivals[0], name: "RivalFort", played: 10, wins: 1, losses: 6 },
+        { ...profile.rivals[1], name: "RivalFaible", played: 10, wins: 7, losses: 2 },
+      ];
+      await route.fulfill({ response, json: { ...profile, ratings, rivals } });
     });
     await page.reload();
     const ratingChart = page.getByRole("img", { name: "Évolution du RN sur les dernières manches classées" });
@@ -86,6 +91,16 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(ratingChart.locator("polyline")).toHaveCount(1);
     await expect(page.locator(".archive-card").filter({ has: ratingChart }).getByRole("list")).toHaveCount(0);
     await ratingChart.screenshot({ path: testInfo.outputPath("graphique-rn.png") });
+    const blackBeasts = page.getByRole("region", { name: "Bêtes noires" });
+    await expect(blackBeasts.getByRole("img", { name: "1 victoire" })).toBeVisible();
+    await expect(blackBeasts.getByRole("img", { name: "6 défaites" })).toBeVisible();
+    await expect(blackBeasts).toContainText("60 % de défaites");
+    await expect(page.getByRole("region", { name: "Joueurs dominés" })).not.toContainText("de défaites");
+    const columns = await page.locator(".profile-rivals").evaluateAll((lists) =>
+      lists.map((list) => Array.from(list.querySelectorAll("li:first-child > span"), (cell) => cell.getBoundingClientRect().x)));
+    expect(columns).toHaveLength(3);
+    expect(columns).toEqual([columns[0], columns[0], columns[0]]);
+    await page.screenshot({ path: testInfo.outputPath("profil-rivalites-portrait.png"), fullPage: true });
     await page.unroute("**/api/players/*");
     await page.goto("/");
     const pseudo = (tab: Page) => tab.getByRole("textbox", { name: "Pseudo", exact: true });
@@ -314,9 +329,13 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     const profileUrl = (await link.getAttribute("href"))!;
     await link.click();
     await expect(otherDevice.getByRole("heading", { name: "BobbyMobile" })).toBeVisible();
-    await expect(otherDevice.locator(".profile-numbers")).toContainText("Parties jouées2");
-    await expect(otherDevice.locator(".profile-numbers")).toContainText("Manches terminées1");
-    await expect(otherDevice.locator(".profile-numbers")).toContainText("Indice RN48");
+    await expect(otherDevice.getByRole("region", { name: "Parties", exact: true }).getByRole("heading")).toHaveText("Parties 2");
+    await expect(otherDevice.getByRole("region", { name: "Manches", exact: true }).getByRole("heading")).toHaveText("Manches 1");
+    await expect(otherDevice.getByRole("region", { name: "Dutch", exact: true })).toContainText("Taux de réussite");
+    await expect(otherDevice.locator(".profile-headline")).toContainText("Indice RN48");
+    await expect(otherDevice.locator(".profile-headline")).toContainText("0 %");
+    await expect(otherDevice.getByText("Interrompues", { exact: true })).toHaveCount(0);
+    await expect(otherDevice.getByText("Terminées", { exact: true })).toHaveCount(0);
     await expect(otherDevice.getByRole("img", { name: "Évolution du RN sur les dernières manches classées" })
       .locator("circle")).toHaveCount(1);
     await otherDevice.screenshot({ path: testInfo.outputPath("03-profil-apres-renommage.png"), fullPage: true });

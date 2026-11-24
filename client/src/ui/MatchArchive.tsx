@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowDownRight, ArrowLeft, ArrowUpRight, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
   readTableSummary, tableSummaryPath } from "../network/accountApi";
@@ -248,41 +248,85 @@ function RatingHistory({ ratings }: Pick<Profile, "ratings">) {
   </svg>;
 }
 
+function outcomeRate(successes: number, total: number) {
+  return total ? percent.format(successes / total) : "—";
+}
+
+function RivalResults({ wins, losses }: Pick<Profile["rivals"][number], "wins" | "losses">) {
+  const victories = plural(wins, "victoire");
+  const defeats = plural(losses, "défaite");
+  return <div className="rival-results">
+    <span className="rival-wins" role="img" aria-label={victories} title={victories}>
+      <Trophy size={14} aria-hidden="true" />{number.format(wins)}
+    </span>
+    <span className="rival-losses" role="img" aria-label={defeats} title={defeats}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2.1 0 4.7-1.2 6.4-2.8a1 1 0 0 1 1.2 0C14.3 3.8 16.9 5 19 5a1 1 0 0 1 1 1Z" />
+        <path d="m13 6-4 6 5 1-3 5" />
+      </svg>{number.format(losses)}
+    </span>
+  </div>;
+}
+
 function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Navigate }) {
   const rating = Math.round(profile.rating);
-  const values: Array<[string, string | number]> = [
-    ["Indice RN", `${rating} · ${ratingLevel(rating)}`], ["Parties jouées", profile.matches], ["Terminées", profile.finished],
-    ["Interrompues", profile.interrupted], ["Victoires", profile.victories],
-    ["Taux de victoire", profile.finished ? number.format(100 * profile.victories / profile.finished) + " %" : "—"],
-    ["Manches terminées", profile.rounds], ["Manches gagnées", profile.roundWins],
+  const roundWinRate = outcomeRate(profile.roundWins, profile.rounds);
+  const totals = [
+    { title: "Parties", played: profile.matches, wins: profile.victories, rate: outcomeRate(profile.victories, profile.finished),
+      rateTitle: "Sur les parties terminées" },
+    { title: "Manches", played: profile.rounds, wins: profile.roundWins, rate: roundWinRate },
+    { title: "Dutch", played: profile.dutch, wins: profile.dutchWon, rate: outcomeRate(profile.dutchWon, profile.dutch) },
+  ];
+  const details: [string, string | number][] = [
     ["Score moyen par manche", profile.rounds ? number.format(profile.scoreSum / profile.rounds) : "—"],
-    ["Meilleur score de manche", profile.bestScore ?? "—"], ["Dutch réussis / annoncés", `${profile.dutchWon} / ${profile.dutch}`],
+    ["Meilleur score de manche", profile.bestScore ?? "—"],
     ["Réactions réussies", profile.reactions], ["Pénalités de réaction", profile.penalties], ["Échanges initiés", profile.exchanges],
   ];
-  const groups: [string, Profile["rivals"]][] = [
-    ["Rivaux réguliers", profile.rivals.filter(({ played }) => played >= 3).slice(0, 12)],
-    ["Joueurs dominés", profile.rivals.filter(({ played, wins, losses }) => played >= 3 && wins > losses).slice(0, 8)],
-    ["Bêtes noires", profile.rivals.filter(({ played, wins, losses }) => played >= 3 && losses > wins).slice(0, 8)],
+  const groups = [
+    { title: "Rivaux réguliers", rivals: profile.rivals.filter(({ played }) => played >= 3).slice(0, 12) },
+    { title: "Joueurs dominés", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && wins > losses).slice(0, 8) },
+    { title: "Bêtes noires", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && losses > wins).slice(0, 8),
+      showLossRate: true },
   ];
   return <>
-    <div className="profile-identity">
-      <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} photoId={profile.avatarPhotoId} />
-      <h2>{profile.name}</h2>
+    <div className="profile-overview">
+      <div className="profile-identity">
+        <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} photoId={profile.avatarPhotoId} />
+        <h2>{profile.name}</h2>
+      </div>
+      <dl className="archive-card profile-headline" aria-label="Indicateurs du profil">
+        <div><dt>Indice RN</dt><dd>{rating}<small>{ratingLevel(rating)}</small></dd></div>
+        <div><dt>Manches gagnées</dt><dd>{roundWinRate}</dd></div>
+      </dl>
     </div>
     {profile.demoBot && <p className="archive-muted">Bot de démonstration · historique initial simulé</p>}
-    <dl className="archive-card profile-numbers">{values.map(([label, value]) =>
+    <div className="profile-stat-groups">
+      {totals.map(({ title, played, wins, rate, rateTitle }) => <section key={title} className="archive-card profile-stat-group"
+        aria-label={title}>
+        <h2>{title} <strong>{number.format(played)}</strong></h2>
+        <dl>
+          <div><dt>{title === "Dutch" ? "Dont réussis" : "Dont gagnées"}</dt><dd>{number.format(wins)}</dd></div>
+          <div><dt title={rateTitle}>{title === "Dutch" ? "Taux de réussite" : "Taux de victoire"}</dt><dd>{rate}</dd></div>
+        </dl>
+      </section>)}
+    </div>
+    <dl className="archive-card profile-numbers">{details.map(([label, value]) =>
       <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <section className="archive-card">
       <h2>Évolution de l’indice RN</h2>
       <RatingHistory ratings={profile.ratings} />
     </section>
-    {groups.map(([title, rivals]) => <section key={title} className="archive-card">
+    {groups.map(({ title, rivals, showLossRate }) => <section key={title} className="archive-card" aria-label={title}>
       <h2>{title}</h2>
       {rivals.length ? <ul className="archive-list profile-rivals">{rivals.map((rival) => <li key={rival.id}>
         <Link path={profilePath(rival.id)} navigate={navigate}>{rival.name}</Link>
         <span>RN {Math.round(rival.rating)}</span>
         <span>{plural(rival.played, "partie")}</span>
-        <span>{rival.wins} V / {rival.losses} D / {rival.played - rival.wins - rival.losses} N</span>
+        <div className="rival-record">
+          <RivalResults wins={rival.wins} losses={rival.losses} />
+          {showLossRate && <span className="rival-loss-rate">{outcomeRate(rival.losses, rival.played)} de défaites</span>}
+        </div>
       </li>)}</ul> : <p className="archive-muted">Aucun résultat à afficher.</p>}
     </section>)}
   </>;
