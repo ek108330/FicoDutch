@@ -12,7 +12,8 @@ type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () =
 type Loader<T> = (signal: AbortSignal) => Promise<T>;
 const date = new Intl.DateTimeFormat("fr", { dateStyle: "medium", timeStyle: "short" });
 const number = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
-const percent = new Intl.NumberFormat("fr", { style: "percent", maximumFractionDigits: 1 });
+const percent = new Intl.NumberFormat("fr", { style: "percent", maximumFractionDigits: 0 });
+const weeklyRatingDelta = new Intl.NumberFormat("fr", { maximumFractionDigits: 0, signDisplay: "exceptZero" });
 const seconds = new Intl.NumberFormat("fr", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const individual = [
   ["shuriken", "Le défausseur", Swords], ["luckyLuke", "Lucky Lucke", Timer], ["boulet", "Le boulet", TriangleAlert],
@@ -414,10 +415,10 @@ export function PlayersDirectory(props: RouteProps) {
             </span></th>
             <td>{number.format(player.rounds)}</td><td>{percent.format(player.roundWinRate)}</td>
             <td><strong>{Math.round(player.rating)}</strong></td>
-            <td data-change={change == null ? undefined : Math.sign(change)}
+            <td data-change={change != null && Math.abs(change) >= 0.5 ? Math.sign(change) : undefined}
               title={weekStart == null ? "Aucune manche classée ces sept derniers jours" :
-                `RN au début de la période · ${number.format(weekStart)}`}>
-              {change == null ? "—" : formatRatingChange(change)}
+                `RN au début de la période · ${Math.round(weekStart)}`}>
+              {change == null ? "—" : weeklyRatingDelta.format(change)}
             </td>
           </tr>;
         })}</tbody>

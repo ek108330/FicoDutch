@@ -102,6 +102,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(blackBeasts.getByRole("img", { name: "1 victoire" })).toBeVisible();
     await expect(blackBeasts.getByRole("img", { name: "6 défaites" })).toBeVisible();
     await expect(blackBeasts).toContainText("60 % de défaites");
+    await expect(blackBeasts.getByText("78 % de défaites", { exact: true })).toHaveCount(2);
     await expect(page.getByRole("region", { name: "Joueurs dominés" })).not.toContainText("de défaites");
     for (const group of ["Rivaux réguliers", "Joueurs dominés", "Bêtes noires"]) {
       await expect(page.getByRole("region", { name: group }).getByRole("listitem")).toHaveCount(3);
