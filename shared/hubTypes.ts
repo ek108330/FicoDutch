@@ -32,6 +32,7 @@ export type Hub = {
   gameFinished: boolean;
   gameNumber: number;
   hostPause: { startedAt: number; until: number; transfer?: true } | null;
+  manualPause?: { startedAt: number; resumeAt?: number };
   clockVersion: number;
   roundRating?: { number: number };
   initialCardCounts?: Record<string, number>;

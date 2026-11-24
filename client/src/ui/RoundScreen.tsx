@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Pause, Play } from "lucide-react";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { HubPlayer } from "../../../shared/hubTypes";
+import { pauseResumeMs } from "../../../shared/roundTiming.json";
 import { memorizationLimit } from "../game/memorization";
 import type { CardTarget, GameState } from "../game/gameTypes";
 import { useRoundTurn, type UpdateHostRound } from "../game/useRoundTurn";
@@ -32,7 +34,8 @@ type RoundScreenProps = {
   playSound: PlayGameSound;
   connected: boolean;
   clockVersion: number;
-  pause: { reason: "host" | "transfer" | "local"; deadline?: number } | null;
+  pause: { reason: "host" | "transfer" | "local" | "manual"; deadline?: number; startedAt?: number } | null;
+  onTogglePause?: () => void;
 };
 
 type Memorization = { roundNumber: number; chosen: number[]; visible: number[] };
@@ -40,7 +43,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onRestart, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause,
+  peers, updateHostRound, onRestart, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
@@ -50,8 +53,9 @@ export default function RoundScreen({
   const heardDutch = useRef<string>(null);
   const heardTurn = useRef<string>(null);
   const paused = pause !== null;
+  const manualPause = pause?.reason === "manual" ? pause : null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
-    hostRound, peers, updateHostRound, now, paused, clockVersion });
+    hostRound, peers, updateHostRound, now: manualPause?.startedAt ?? now, paused, clockVersion });
   const { scene, deadline, receive: receiveTurn } = turn;
   const phase = scene?.phase;
   const roundNumber = scene?.roundNumber ?? 0;
@@ -130,12 +134,34 @@ export default function RoundScreen({
     setMemory({ roundNumber, chosen: chosen.includes(position) ? chosen : [...chosen, position], visible: [...visible, position] });
   }
 
+  const pauseLabel = manualPause ? "Reprendre la partie" : "Mettre la partie en pause";
   const toolbar = <div className="table-options">
-    {emojisEnabled && <EmojiButtons label="Emojis de la table" onChoose={chooseEmoji} />}
+    {(emojisEnabled || manualPause || phase === "dealing") &&
+      <EmojiButtons label="Emojis de la table" disabled={!emojisEnabled} onChoose={chooseEmoji} />}
+    {onTogglePause && (manualPause || (phase && phase !== "waiting" && phase !== "results")) &&
+      <button type="button" className="pause-trigger" aria-label={pauseLabel} title={pauseLabel}
+        disabled={manualPause?.deadline !== undefined} onClick={onTogglePause}>
+        {manualPause ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
+      </button>}
     {settings}
   </div>;
 
-  if (pause || !scene || turn.waitingForClock || !connectionReady) {
+  const pauseRemaining = manualPause?.deadline === undefined ? null : Math.max(0, manualPause.deadline - now);
+  const pauseOverlay = manualPause && <div className="table-pause-overlay">
+    <section className="table-pause-panel" aria-labelledby="table-pause-title">
+      <h1 id="table-pause-title" aria-live="polite">{pauseRemaining === null ? "Partie en pause" : "Reprise de la partie"}</h1>
+      {pauseRemaining !== null && <>
+        <PerimeterClock remaining={pauseRemaining} duration={pauseResumeMs} label="Reprise dans" />
+        <strong aria-hidden="true">{Math.ceil(Math.max(1, Math.min(pauseResumeMs, pauseRemaining)) / 1_000)}</strong>
+      </>}
+    </section>
+  </div>;
+
+  if (manualPause && (!scene || turn.waitingForClock || phase === "waiting" || phase === "results" || !connectionReady)) {
+    return <main className="game-screen table-screen">{pauseOverlay}{toolbar}</main>;
+  }
+
+  if ((!manualPause && pause) || !scene || turn.waitingForClock || !connectionReady) {
     const transfer = pause?.reason === "transfer";
     const hostPaused = pause?.reason === "host" || transfer;
     return (
@@ -278,6 +304,7 @@ export default function RoundScreen({
           )
         }
       />
+      {pauseOverlay}
       {toolbar}
     </main>
   );

@@ -9,7 +9,7 @@ type Promotion = { hubId: string; gameNumber: number; age: number; bytes: ArrayB
 
 export function useHostTransfer(
   hub: Hub | null, playerId: string | undefined, round: HostRound | null, ready: boolean,
-  peers: ReturnType<typeof useHubPeers>, restore: (round: HostRound) => void,
+  peers: ReturnType<typeof useHubPeers>, restore: (round: HostRound) => void, frozenClock?: number,
 ) {
   const stored = useRef<StoredKey | null>(null);
   const seq = useRef(0);
@@ -57,9 +57,8 @@ export function useHostTransfer(
     return () => window.clearInterval(timer);
   }, [connectedPeers, hubId, isHost, keyFor, ready, send]);
 
-  const backup = useCallback(async (current: HostRound) => {
+  const backup = useCallback(async (current: HostRound, clock = performance.now()) => {
     const sequence = ++seq.current;
-    const clock = performance.now();
     const bytes = await encodeRoundBackup(current, await keyFor(current.hubId).key, clock);
     if (bytes.length > 700_000) throw new Error("La sauvegarde dépasse la taille prise en charge par le relais.");
     return { hubId: current.hubId, gameNumber: current.gameNumber, sequence, bytes };
@@ -70,14 +69,14 @@ export function useHostTransfer(
         round.hubId !== hubId || round.gameNumber !== gameNumber) return;
     let obsolete = false;
     const save = () => {
-      void backup(round).then((checkpoint) => {
+      void backup(round, frozenClock).then((checkpoint) => {
         if (!obsolete && socket.connected) socket.emit("hub:backup-round", checkpoint);
       }, () => {});
     };
     save();
     const timer = window.setInterval(save, 8_000);
     return () => { obsolete = true; window.clearInterval(timer); };
-  }, [active, backup, connectedPeers, gameNumber, hubId, isHost, ready, round]);
+  }, [active, backup, connectedPeers, frozenClock, gameNumber, hubId, isHost, ready, round]);
 
   useEffect(() => {
     function promote(message: Promotion) {

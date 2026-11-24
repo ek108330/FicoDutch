@@ -26,7 +26,7 @@ import { completedRoundsAfter, logDeal, logMatch } from "./game/matchJournal";
 import type { HostRound } from "./game/roundBackup";
 import { matchStatistics } from "./game/matchStatistics";
 
-type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
+type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number; manualResumeDeadline?: number; manualPauseClock?: number };
 
 function prepareGame(hub: Hub) {
   const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
@@ -182,7 +182,8 @@ function App() {
     const state = applyDepartures(setup, new Set(hub.players.map(({ id }) => id)), now);
     storeHostRound({ ...round, state });
   }, [storeHostRound]);
-  const createBackup = useHostTransfer(currentHub, playerId, hostRound, networkReady, peers, restorePromotion);
+  const createBackup = useHostTransfer(currentHub, playerId, hostRound, networkReady, peers, restorePromotion,
+    currentHub?.manualPauseClock);
 
   useEffect(() => {
     let resumeRetry: number | undefined;
@@ -208,6 +209,15 @@ function App() {
           ? previous.pauseDeadline
           : receivedAt + Math.max(0, update.hostPause.until - serverTime)
         : undefined;
+      const resumeAt = update.manualPause?.resumeAt;
+      const manualPauseClock = update.manualPause
+        ? previous?.manualPause?.startedAt === update.manualPause.startedAt
+          ? previous.manualPauseClock ?? receivedAt : receivedAt
+        : undefined;
+      const manualResumeDeadline = resumeAt === undefined ? undefined
+        : previous?.manualPause?.resumeAt === resumeAt && previous.manualResumeDeadline !== undefined
+          ? previous.manualResumeDeadline
+          : receivedAt + Math.max(0, resumeAt - serverTime);
 
       const round = hostRoundRef.current;
       if (round?.hubId === update.id && update.gameStarted) {
@@ -221,7 +231,7 @@ function App() {
             state.phaseDeadline === null && memorizationDeadline !== undefined) {
           state = { ...state, phase: "dealing", phaseDeadline: memorizationDeadline - GAME_CONFIG.round.memorizationMs };
         }
-        if (update.hostPause) {
+        if (update.hostPause || update.manualPause) {
           pausedAt.current ??= receivedAt;
         } else if (pausedAt.current !== null && readyRef.current) {
           state = resumeGameClock(state, receivedAt - pausedAt.current);
@@ -232,7 +242,8 @@ function App() {
         state = applyDepartures(state, presentIds, pausedAt.current ?? receivedAt);
         if (state !== round.state) storeHostRound({ ...round, gameNumber: update.gameNumber, state, previousGames });
       }
-      storeHub({ ...update, memorizationDeadline, pauseDeadline });
+      storeHub({ ...update, memorizationDeadline, pauseDeadline, manualResumeDeadline,
+        manualPauseClock: update.manualPause ? pausedAt.current ?? manualPauseClock : undefined });
       const saved = sessionRef.current;
       if (saved?.hubId === update.id && saved.isHost !== (saved.playerId === update.hostId)) {
         storeSession({ ...saved, isHost: saved.playerId === update.hostId });
@@ -407,7 +418,7 @@ function App() {
     function saveRounds() {
       const hub = hubRef.current;
       const round = hostRoundRef.current;
-      if (sending || !hub || !round || hub.hostPause || round.state.matchId !== pendingRatingMatch ||
+      if (sending || !hub || !round || hub.hostPause || hub.manualPause || round.state.matchId !== pendingRatingMatch ||
           pendingRatingMatch !== `${hub.id}:${hub.gameNumber}` || sealed.current === pendingRatingMatch) return;
       const rounds = completedRoundsAfter(round.state.journal, hub.roundRating?.number ?? 0);
       if (!rounds.length) return;
@@ -546,7 +557,7 @@ function App() {
     if (networkReady && hub?.gameStarted && !hub.gameFinished && hub.hostId === playerId) {
       leaving.current = true;
       const backup = round && hub.players.some(({ id, connected, isBot }) => id !== playerId && connected && !isBot)
-        ? await createBackup(round).catch(() => undefined) : undefined;
+        ? await createBackup(round, pausedAt.current ?? undefined).catch(() => undefined) : undefined;
       if (!socket.connected || hubRef.current?.id !== hub.id) {
         leaving.current = false;
         return;
@@ -633,9 +644,14 @@ function App() {
           settings={settings}
           playSound={playSound}
           clockVersion={currentHub.clockVersion}
+          onTogglePause={currentHub.hostId === playerId && networkReady && !currentHub.gameFinished
+            ? () => socket.emit("hub:pause", { hubId: currentHub.id, gameNumber: currentHub.gameNumber,
+              action: currentHub.manualPause ? "resume" : "pause" }) : undefined}
           pause={currentHub.hostPause
             ? { reason: currentHub.hostPause.transfer ? "transfer" : "host", deadline: currentHub.pauseDeadline }
-            : !networkReady ? { reason: "local" } : null}
+            : !networkReady ? { reason: "local" }
+              : currentHub.manualPause ? { reason: "manual", deadline: currentHub.manualResumeDeadline,
+                startedAt: currentHub.manualPauseClock } : null}
           connected={networkReady}
         />
       );

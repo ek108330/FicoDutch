@@ -1,4 +1,5 @@
 {
   "dealingMs": 1900,
-  "memorizationMs": 15000
+  "memorizationMs": 15000,
+  "pauseResumeMs": 3000
 }

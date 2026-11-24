@@ -4,6 +4,7 @@ const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
 const {
   addHubBot, completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
   relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, restartHubGame, resumeHub, startHubGame, updateHubSettings,
+  changeManualPause, finishManualResume,
 } = require("./hubManager");
 
 function openTable(t, hostSocket, guestSocket) {
@@ -25,6 +26,34 @@ function signal(hubId, recipient, type, senderVersion = 1, recipientVersion = 1)
     negotiationId: "test", description: { type, sdp: "v=0" },
   };
 }
+
+test("seul l’hôte déclenche la pause et la reprise après trois secondes", (t) => {
+  const hostSocket = "manual-host";
+  const guestSocket = "manual-guest";
+  const { hub, request } = openTable(t, hostSocket, guestSocket);
+  const pause = { hubId: hub.id, gameNumber: hub.gameNumber, action: "pause" };
+  const resume = { ...pause, action: "resume" };
+  assert.equal(changeManualPause(hostSocket, pause, 1_000), null);
+  assert.ok(startHubGame(hostSocket, request).hub);
+  assert.equal(changeManualPause(guestSocket, pause, 1_000), null);
+  const table = changeManualPause(hostSocket, pause, 1_000);
+  assert.deepEqual(table.manualPause, { startedAt: 1_000 });
+  assert.equal(changeManualPause(guestSocket, resume, 3_000), null);
+  assert.equal(changeManualPause(hostSocket, resume, 3_000).manualPause.resumeAt, 6_000);
+  assert.equal(changeManualPause(hostSocket, resume, 4_000), null);
+  assert.equal(finishManualResume(table, 6_000, 5_999), false);
+  assert.equal(finishManualResume(table, 6_000, 6_000), true);
+  assert.equal(table.manualPause, undefined);
+  assert.equal(table.clockVersion, 1);
+
+  changeManualPause(hostSocket, pause, 7_000);
+  changeManualPause(hostSocket, resume, 8_000);
+  disconnectPlayer(hostSocket, 9_000);
+  assert.equal(finishManualResume(table, 11_000, 11_000), false);
+  assert.deepEqual(table.manualPause, { startedAt: 7_000 });
+  assert.equal(table.hostPause.startedAt, 9_000);
+  t.after(() => expireHostPause(hub.id, table.hostPause.until, table.hostPause.until));
+});
 
 test("seul l’hôte peut ajouter des bots dans les places libres de son Hub", (t) => {
   const { hub } = openTable(t, "bot-host", "bot-guest");

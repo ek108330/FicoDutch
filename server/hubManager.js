@@ -29,7 +29,7 @@ async function withPlayerName(name, action) {
     if (nameOperations.get(key) === next) nameOperations.delete(key);
   }
 }
-const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
+const { dealingMs, memorizationMs, pauseResumeMs } = require("../shared/roundTiming.json");
 const HOST_GRACE_MS = 120_000;
 const CHAT_INTERVAL_MS = 3_000;
 
@@ -232,6 +232,7 @@ function promoteHost(current, successor, now = Date.now()) {
   hub.hostPseudo = successor.pseudo;
   hub.clockVersion++;
   hub.hostPause = { startedAt: now, until: now + HOST_GRACE_MS, transfer: true };
+  if (hub.manualPause) delete hub.manualPause.resumeAt;
   return true;
 }
 
@@ -243,6 +244,7 @@ function disconnectPlayer(socketId, now = Date.now()) {
   player.connected = false;
   if (player.isHost) {
     hub.hostPause ??= { startedAt: now, until: now + HOST_GRACE_MS };
+    if (hub.manualPause) delete hub.manualPause.resumeAt;
     return { hubId: hub.id, pauseUntil: hub.hostPause.until };
   }
   return { hubId: hub.id };
@@ -269,6 +271,7 @@ function resumeHub(socketId, request, now = Date.now(), accountId) {
   if (player.socketId !== socketId) {
     if (previousSocketId && player.isHost && hub.gameStarted) {
       hub.hostPause ??= { startedAt: now, until: now + HOST_GRACE_MS };
+      if (hub.manualPause) delete hub.manualPause.resumeAt;
     }
     player.socketId = socketId;
     player.connected = true;
@@ -282,6 +285,26 @@ function completeHostResume(socketId, now = Date.now()) {
   if (!current?.player.isHost || !current.hub.hostPause || now >= current.hub.hostPause.until) return false;
   current.hub.hostPause = null;
   current.hub.clockVersion++;
+  return true;
+}
+
+function changeManualPause(socketId, request, now = Date.now()) {
+  const current = findPlayerHub(socketId);
+  const hub = current?.hub;
+  if (!current?.player.isHost || hub.id !== request?.hubId || hub.gameNumber !== request.gameNumber ||
+      !hub.gameStarted || hub.gameFinished || hub.hostPause) return null;
+  if (request.action === "pause" && !hub.manualPause) {
+    hub.manualPause = { startedAt: now };
+  } else if (request.action === "resume" && hub.manualPause && hub.manualPause.resumeAt === undefined) {
+    hub.manualPause.resumeAt = now + pauseResumeMs;
+  } else return null;
+  return hub;
+}
+
+function finishManualResume(hub, resumeAt, now = Date.now()) {
+  if (hubs.get(hub.id) !== hub || hub.manualPause?.resumeAt !== resumeAt || now < resumeAt) return false;
+  delete hub.manualPause;
+  hub.clockVersion++;
   return true;
 }
 
@@ -323,6 +346,7 @@ function restartHubGame(socketId, request) {
   hub.initialCardCounts = Object.fromEntries(hub.players.map(({ id }) => [id, cardsPerPlayer]));
   hub.memorizationEndsAt = Date.now() + dealingMs + memorizationMs;
   hub.gameFinished = false;
+  delete hub.manualPause;
   delete hub.roundRating;
   hub.gameNumber++;
   hub.clockVersion++;
@@ -334,6 +358,7 @@ function finishHubGame(socketId, gameNumber) {
   if (!current?.player.isHost || !current.hub.gameStarted || current.hub.gameFinished ||
       current.hub.gameNumber !== gameNumber) return false;
   current.hub.gameFinished = true;
+  delete current.hub.manualPause;
   return true;
 }
 
@@ -381,7 +406,7 @@ module.exports = {
   findPlayerHub, getHub: (id) => hubs.get(id),
   getActiveMatchIds: () => [...hubs.values()].filter((hub) => hub.gameStarted).map((hub) => `${hub.id}:${hub.gameNumber}`),
   getAllHubs, privateHubMembers, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,
-  disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay,
+  disconnectPlayer, resumeHub, completeHostResume, expireHostPause, resolvePeerRelay, changeManualPause, finishManualResume,
   finishHubGame, restartHubGame, resolveEncryptedRelay,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, applyRoundRating, nextHumanHost, promoteHost,
 };

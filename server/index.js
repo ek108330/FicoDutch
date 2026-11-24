@@ -10,6 +10,7 @@ const { createMatchStore, mountMatchRoutes, matchId } = require("./matchStore");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
+  changeManualPause, finishManualResume,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay, findPlayerHub, getHub, getActiveMatchIds,
   guestNameInUse, withPlayerName, applyRoundRating, nextHumanHost, promoteHost, privateHubMembers,
 } = require("./hubManager");
@@ -105,8 +106,9 @@ function saveRoundBackup(current, request, now = Date.now()) {
 
 function sendPromotion(hub, socketId, snapshot, departedAt) {
   if (snapshot?.gameNumber === hub.gameNumber) {
+    const stoppedAt = Math.min(departedAt, hub.manualPause?.startedAt ?? departedAt);
     io.to(socketId).emit("hub:promotion", { hubId: hub.id, gameNumber: hub.gameNumber,
-      age: Math.max(0, departedAt - snapshot.at), bytes: snapshot.bytes });
+      age: Math.max(0, stoppedAt - snapshot.at), bytes: snapshot.bytes });
   }
 }
 
@@ -420,6 +422,22 @@ io.on("connection", (socket) => {
     if (completeHostResume(socket.id)) broadcastHubs();
   });
 
+  socket.on("hub:pause", (request) => {
+    if (closing.has(request?.hubId)) return;
+    const hub = changeManualPause(socket.id, request);
+    if (!hub) return;
+    broadcastHubs();
+    const resumeAt = hub.manualPause?.resumeAt;
+    if (resumeAt === undefined) return;
+    function resume() {
+      const now = Date.now();
+      if (hub.manualPause?.resumeAt !== resumeAt || getHub(hub.id) !== hub) return;
+      if (now < resumeAt) setTimeout(resume, resumeAt - now);
+      else if (finishManualResume(hub, resumeAt, now)) broadcastHubs();
+    }
+    setTimeout(resume, Math.max(0, resumeAt - Date.now()));
+  });
+
   socket.on("hub:backup-ready", (request) => {
     const current = findPlayerHub(socket.id);
     if (!current || current.player.isHost || current.hub.id !== request?.hubId || current.hub.hostId !== request.hostId) return;
@@ -458,7 +476,7 @@ io.on("connection", (socket) => {
     const current = findPlayerHub(socket.id);
     const hub = current?.hub;
     if (typeof acknowledge !== "function") return;
-    if (!matchStore || !current?.player.isHost || !hub.gameStarted || hub.hostPause || closing.has(hub.id) ||
+    if (!matchStore || !current?.player.isHost || !hub.gameStarted || hub.hostPause || hub.manualPause || closing.has(hub.id) ||
         hub.id !== request?.hubId || hub.gameNumber !== request.gameNumber) return acknowledge(null);
     void persistRatings(hub, request.rounds).then(acknowledge).catch((error) => {
       console.error("Indice RN non enregistré :", error.code ?? error.name);
