@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Ban, Bot, Check, Crown, Search, X } from "lucide-react";
+import { Ban, Check, Crown, Search, X } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
 import HubName from "./HubName";
+import PlayerAvatar from "./PlayerAvatar";
 
 type Props = {
   hub: Hub;
@@ -119,7 +120,9 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
                     aria-label={`Retirer ${player.pseudo}`} title={`Retirer ${player.pseudo}`} onClick={() => onRemove(player.id)}>
                     <Ban size={15} aria-hidden="true" />
                   </button>}
-                  {player.isBot ? <Bot className="player-bot" size={15} role="img" aria-label="Bot" />
+                  {player.isBot ? <span className="player-bot" role="img" aria-label="Bot">
+                    <PlayerAvatar id={player.accountId ?? player.id} name={player.pseudo} style={player.avatarStyle} isBot mini />
+                  </span>
                     : <span className="player-connection" data-connected={player.connected} role="img"
                       aria-label={status} title={status} />}
                   <strong>{player.pseudo}</strong>

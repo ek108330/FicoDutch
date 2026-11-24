@@ -214,9 +214,11 @@ function RatingHistory({ ratings }: Pick<Profile, "ratings">) {
   const values = ratings.map(({ rating }) => rating);
   const best = Math.max(...values);
   const lowest = Math.min(...values);
-  const step = [5, 10, 20].find((interval) => best - lowest <= 4 * interval) ?? 25;
-  const floor = Math.max(0, Math.floor((lowest - 1) / step) * step);
-  const ceiling = Math.min(100, Math.ceil((best + 1) / step) * step);
+  const step = [10, 20].find((interval) => best - lowest <= 4 * interval) ?? 25;
+  const minSpan = 40;
+  const padding = Math.max(1, (minSpan - (best - lowest)) / 2);
+  const floor = Math.max(0, Math.min(100 - minSpan, Math.floor((lowest - padding) / step) * step));
+  const ceiling = Math.min(100, Math.max(floor + minSpan, Math.ceil((best + padding) / step) * step));
   const left = 40;
   const right = 308;
   const top = 12;
@@ -284,15 +286,15 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
     ["Réactions réussies", profile.reactions], ["Pénalités de réaction", profile.penalties], ["10 et Valets utilisés", profile.exchanges],
   ];
   const groups = [
-    { title: "Rivaux réguliers", rivals: profile.rivals.filter(({ played }) => played >= 3).slice(0, 12) },
-    { title: "Joueurs dominés", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && wins > losses).slice(0, 8) },
-    { title: "Bêtes noires", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && losses > wins).slice(0, 8),
+    { title: "Rivaux réguliers", rivals: profile.rivals.filter(({ played }) => played >= 3).slice(0, 3) },
+    { title: "Joueurs dominés", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && wins > losses).slice(0, 3) },
+    { title: "Bêtes noires", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && losses > wins).slice(0, 3),
       showLossRate: true },
   ];
   return <>
     <div className="profile-overview">
       <div className="profile-identity">
-        <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} photoId={profile.avatarPhotoId} />
+        <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} photoId={profile.avatarPhotoId} isBot={profile.demoBot} />
         <h2>{profile.name}</h2>
       </div>
       <dl className="archive-card profile-headline" aria-label="Indicateurs du profil">
@@ -307,7 +309,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
         <h2>{title} <strong>{number.format(played)}</strong></h2>
         <dl>
           <div className="profile-stat-count"><dt>{title === "Dutch" ? "Dont réussis" : "Dont gagnées"}</dt><dd>{number.format(wins)}</dd></div>
-          <div><dt title={rateTitle}>{title === "Dutch" ? "Taux de réussite" : "Taux de victoire"}</dt><dd>{rate}</dd></div>
+          <div className="profile-stat-count"><dt title={rateTitle}>{title === "Dutch" ? "Réussite" : "Victoires"}</dt><dd>{rate}</dd></div>
         </dl>
       </section>)}
     </div>
@@ -407,7 +409,7 @@ export function PlayersDirectory(props: RouteProps) {
           const change = weekStart == null ? null : player.rating - weekStart;
           return <tr key={player.id}>
             <th scope="row"><span className="directory-player">
-              <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} mini />
+              <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} isBot={player.demoBot} mini />
               <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
             </span></th>
             <td>{number.format(player.rounds)}</td><td>{percent.format(player.roundWinRate)}</td>
@@ -437,10 +439,10 @@ export function RatingPodium({ navigate }: { navigate: Navigate }) {
   }, []);
   if (!players.length) return null;
   return <section className="home-podium" aria-label="Podium RN">
-    <ol>{players.map(({ id, name, avatarStyle, avatarPhotoId, rating }, index) =>
+    <ol>{players.map(({ id, name, avatarStyle, avatarPhotoId, rating, demoBot }, index) =>
       <li key={id} data-place={index + 1}>
         <Link path={profilePath(id)} navigate={navigate}>
-          <PlayerAvatar id={id} name={name} style={avatarStyle} photoId={avatarPhotoId} mini />
+          <PlayerAvatar id={id} name={name} style={avatarStyle} photoId={avatarPhotoId} isBot={demoBot} mini />
           <span className="podium-name" title={name}>{name}</span>
           <small>RN {Math.round(rating)}</small>
           <span className="podium-step"><span className="sr-only">Rang </span>{index + 1}</span>

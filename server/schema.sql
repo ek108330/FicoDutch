@@ -10,9 +10,10 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_demo_bot boolean NOT NULL DEFAU
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_style smallint;
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'accounts'::regclass AND conname = 'accounts_avatar_style_range') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'accounts'::regclass AND conname = 'accounts_avatar_palette_range') THEN
     ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_avatar_style_check;
-    ALTER TABLE accounts ADD CONSTRAINT accounts_avatar_style_range CHECK (avatar_style BETWEEN 0 AND 231);
+    ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_avatar_style_range;
+    ALTER TABLE accounts ADD CONSTRAINT accounts_avatar_palette_range CHECK (avatar_style BETWEEN 0 AND 1191);
   END IF;
 END
 $$;

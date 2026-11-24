@@ -546,7 +546,7 @@ input {
   flex-shrink: 0;
 }
 
-.player-bot { color: #1b6545; }
+.player-bot { display: inline-flex; }
 
 .player-host {
   color: #896415;
@@ -2238,11 +2238,10 @@ button.pile-slot:not(:disabled) .pile-card,
 }
 
 .player-avatar > img { height: 100%; width: 100%; object-fit: cover; }
-.player-avatar > span:first-child { font-size: 1.55em; }
+.avatar-symbol { width: 1.55em; height: 1.55em; flex: none; }
 .player-avatar-mini { width: 22px; height: 22px; border-width: 1px; font-size: 0.69rem; }
-.player-avatar-mini > span:last-child { display: none; }
 .game-table .player-avatar-mini { width: 1.12em; height: 1.12em; font-size: inherit; }
-.game-table .player-avatar-mini > span:first-child { font-size: 1em; }
+.game-table .player-avatar-mini .avatar-symbol { width: 1em; height: 1em; }
 .profile-identity, .directory-player { display: flex; align-items: center; gap: 9px; }
 .account-avatar-form .player-avatar { justify-self: center; }
 .account-photo-form .player-avatar { justify-self: center; }
@@ -3366,7 +3365,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
   align-items: baseline;
   gap: 3px;
 }
-.profile-stat-count dd { white-space: nowrap; }
+.profile-stat-count dd { font-size: clamp(0.72rem, 3.3vw, 1rem); white-space: nowrap; }
 .profile-stat-group dt { color: #d1e2d6; font-size: clamp(0.66rem, 2.8vw, 0.81rem); }
 .profile-stat-group :is(h2 strong, dd) { color: #ffdf91; font-weight: 750; }
 .archive-list { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }

@@ -17,8 +17,9 @@ test("l’hôte peut gérer cinq bots et jouer seul à une table complète", asy
   }
   await expect(add).toBeDisabled();
   await expect(roster.getByRole("img", { name: "Bot", exact: true })).toHaveCount(5);
-  await openManagement(page);
-  await page.getByRole("button", { name: "Retirer Bot 5", exact: true }).click();
+  await expect(roster.locator("[data-avatar-mark='robot']")).toHaveCount(5);
+  const management = await openManagement(page);
+  await management.getByRole("button", { name: "Retirer Bot 5", exact: true }).click();
   await page.getByRole("button", { name: "Confirmer le retrait", exact: true }).click();
   await expect(add).toBeEnabled();
   await add.click();
@@ -30,6 +31,7 @@ test("l’hôte peut gérer cinq bots et jouer seul à une table complète", asy
   await launch.click();
 
   await expect(activeTurn(page)).toHaveText("Bot 5 joue", { timeout: 18_000 });
+  await expect(page.locator(".game-table [data-avatar-mark='robot']")).toHaveCount(5);
   const drawn = page.getByRole("img", { name: "Carte tirée par Bot 5, face cachée" });
   await expect(drawn).toBeVisible();
   await expect(drawn.locator(".card-face")).toHaveCount(0);

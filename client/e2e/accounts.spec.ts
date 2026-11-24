@@ -66,6 +66,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
     await expect(page.locator(".profile-identity .player-avatar")).toBeVisible();
+    await expect(page.locator(".profile-identity [data-avatar-mark='robot']")).toBeVisible();
     await expect(page.locator(".profile-headline")).toContainText("Manches gagnées");
     await expect(page.getByRole("heading", { name: "Historique des confrontations" })).toHaveCount(0);
     await expect(page.getByText("Aucune manche classée.")).toBeVisible();
@@ -80,6 +81,10 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       const rivals = [
         { ...profile.rivals[0], name: "RivalFort", played: 10, wins: 1, losses: 6 },
         { ...profile.rivals[1], name: "RivalFaible", played: 10, wins: 7, losses: 2 },
+        ...Array.from({ length: 6 }, (_, index) => ({
+          id: `rival-${index}`, name: `Rival${index}`, played: 9,
+          wins: index < 3 ? 2 : 6, losses: index < 3 ? 7 : 1, rating: 50,
+        })),
       ];
       await route.fulfill({ response, json: { ...profile, ratings, rivals } });
     });
@@ -89,6 +94,8 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(ratingChart.getByText("Indice RN", { exact: true })).toBeVisible();
     await expect(ratingChart.getByText("Manches classées", { exact: true })).toBeVisible();
     await expect(ratingChart.locator("polyline")).toHaveCount(1);
+    const ratingTicks = (await ratingChart.locator("text[dominant-baseline='central']").allTextContents()).map(Number);
+    expect(ratingTicks.at(-1)! - ratingTicks[0]).toBeGreaterThanOrEqual(40);
     await expect(page.locator(".archive-card").filter({ has: ratingChart }).getByRole("list")).toHaveCount(0);
     await ratingChart.screenshot({ path: testInfo.outputPath("graphique-rn.png") });
     const blackBeasts = page.getByRole("region", { name: "Bêtes noires" });
@@ -96,6 +103,9 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(blackBeasts.getByRole("img", { name: "6 défaites" })).toBeVisible();
     await expect(blackBeasts).toContainText("60 % de défaites");
     await expect(page.getByRole("region", { name: "Joueurs dominés" })).not.toContainText("de défaites");
+    for (const group of ["Rivaux réguliers", "Joueurs dominés", "Bêtes noires"]) {
+      await expect(page.getByRole("region", { name: group }).getByRole("listitem")).toHaveCount(3);
+    }
     const columns = await page.locator(".profile-rivals").evaluateAll((lists) =>
       lists.map((list) => Array.from(list.querySelectorAll("li:first-child > span"), (cell) => cell.getBoundingClientRect().x)));
     expect(columns).toHaveLength(3);
@@ -107,7 +117,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       const value = row.querySelector("dd")!.getBoundingClientRect();
       return label.right <= value.left && label.bottom > value.top && value.bottom > label.top;
     }));
-    expect(inlineCounts).toEqual([true, true, true]);
+    expect(inlineCounts).toEqual([true, true, true, true, true, true]);
     await page.setViewportSize({ width: 360, height: 640 });
     await page.screenshot({ path: testInfo.outputPath("profil-rivalites-portrait.png"), fullPage: true });
     await page.unroute("**/api/players/*");
@@ -132,6 +142,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible();
     await expect(page.locator(".position-bottom .player-avatar")).toHaveCount(0);
     await expect(page.locator(".position-top .player-avatar-mini")).toHaveCount(1);
+    await expect(page.locator(".position-top [data-avatar-mark='robot']")).toBeVisible();
     await expect(page.locator(".player-credentials .table-rn")).toHaveCount(5);
     for (const [width, height] of [[320, 568], [740, 360]]) {
       await page.setViewportSize({ width, height });
@@ -220,9 +231,11 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     const renderedIcon = profileIcon.locator(".player-avatar");
     const icon = () => renderedIcon.evaluate((element) => {
       const style = getComputedStyle(element);
-      return [element.firstElementChild?.textContent, style.backgroundColor, style.color];
+      return [element.querySelector("svg")?.getAttribute("data-avatar-mark"), style.backgroundColor, style.color];
     });
     const initial = await icon();
+    expect(initial[1]).not.toEqual(initial[2]);
+    await expect(renderedIcon.locator(".avatar-symbol path")).toHaveAttribute("stroke", "#000");
     await expect(profileIcon.getByRole("combobox")).toHaveCount(0);
     await profileIcon.getByRole("button", { name: "Générer une icône" }).click();
     await expect(host.getByRole("status")).toHaveText("Icône enregistrée.");
@@ -340,7 +353,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expect(otherDevice.getByRole("heading", { name: "BobbyMobile" })).toBeVisible();
     await expect(otherDevice.getByRole("region", { name: "Parties", exact: true }).getByRole("heading")).toHaveText("Parties 2");
     await expect(otherDevice.getByRole("region", { name: "Manches", exact: true }).getByRole("heading")).toHaveText("Manches 1");
-    await expect(otherDevice.getByRole("region", { name: "Dutch", exact: true })).toContainText("Taux de réussite");
+    await expect(otherDevice.getByRole("region", { name: "Dutch", exact: true })).toContainText("Réussite");
     await expect(otherDevice.locator(".profile-headline")).toContainText("Indice RN48");
     await expect(otherDevice.locator(".profile-headline")).toContainText("0 %");
     await expect(otherDevice.getByText("Interrompues", { exact: true })).toHaveCount(0);

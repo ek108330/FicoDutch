@@ -1,6 +1,8 @@
 const { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
 const { findPlayerHub, guestNameInUse, withPlayerName } = require("./hubManager");
+const { colors, legacyStyleCount } = require("../shared/avatarPalette.json");
+const avatarStyleCount = legacyStyleCount + 4 * colors.length * (colors.length - 1);
 
 const derive = promisify(scrypt);
 const cookie = "ficodutch_account";
@@ -191,7 +193,7 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
     const session = await readAccount(request.headers);
     if (!session) return response.status(401).json({ error: "Connecte-toi pour modifier ton icône." });
     const style = request.body?.style;
-    if (style !== null && (!Number.isInteger(style) || style < 0 || style > 231)) {
+    if (style !== null && (!Number.isInteger(style) || style < 0 || style >= avatarStyleCount)) {
       return response.status(400).json({ error: "Cette icône est invalide." });
     }
     const { rows } = await db.query(`

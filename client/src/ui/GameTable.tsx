@@ -29,7 +29,7 @@ export type TablePlayer = {
 type GameTableProps = {
   localPlayerId: string;
   players: TablePlayer[];
-  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number; avatarPhotoId?: string; rating?: number }>;
+  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number; avatarPhotoId?: string; rating?: number; isBot?: boolean }>;
   controls: ReactNode;
   piles?: ReactNode;
   activePlayerId?: string;
@@ -217,8 +217,9 @@ export default function GameTable({
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
             <div className="player-name">
               <span className="player-identity">
-                {member?.accountId && <span className="player-credentials">
-                  <PlayerAvatar id={member.accountId} name={player.pseudo} style={member.avatarStyle} photoId={member.avatarPhotoId} mini />
+                {(member?.accountId || member?.isBot) && <span className="player-credentials">
+                  <PlayerAvatar id={member.accountId ?? player.id} name={player.pseudo} style={member.avatarStyle}
+                    photoId={member.avatarPhotoId} isBot={member.isBot} mini />
                   {member.rating !== undefined && <small className="table-rn" aria-label={`Indice RN ${Math.round(member.rating)}`}
                     title={`Indice RN ${Math.round(member.rating)}`}>{Math.round(member.rating)}</small>}
                 </span>}

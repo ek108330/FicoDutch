@@ -1,52 +1,53 @@
-const legacyStyles = [
-  { name: "Pique", symbol: "♠", background: "#183e3b", ink: "#e2f5dc" },
-  { name: "Cœur", symbol: "♥", background: "#8f283c", ink: "#fff0e9" },
-  { name: "Trèfle", symbol: "♣", background: "#24624a", ink: "#fff3c4" },
-  { name: "Carreau", symbol: "♦", background: "#b45729", ink: "#fff5dd" },
-  { name: "Pique bleu", symbol: "♠", background: "#263d75", ink: "#edf4ff" },
-  { name: "Cœur violet", symbol: "♥", background: "#62417f", ink: "#fff0fd" },
-  { name: "Trèfle doré", symbol: "♣", background: "#edcc72", ink: "#352810" },
-  { name: "Carreau noir", symbol: "♦", background: "#302c39", ink: "#ffd296" },
-];
+import { colors, legacyStyleCount } from "../../../shared/avatarPalette.json";
 
-const pastelColors = [
-  ["#d5e2d5", "#456454"], ["#dbe5ef", "#496587"], ["#f0e2ad", "#765e2c"], ["#efd6d8", "#8b4b56"],
-  ["#e2e0df", "#575960"], ["#e5daed", "#755785"], ["#eedbc9", "#8a583c"], ["#f8f4e9", "#fffcf4"],
+// Saved avatars keep their suit and use the closest colors in the new palette.
+const earlyStyles = [
+  [2, 0, 5], [3, 12, 13], [0, 3, 6], [1, 9, 7],
+  [2, 1, 13], [3, 12, 6], [0, 7, 15], [1, 15, 8],
 ];
-const symbols = ["♣", "♦", "♠", "♥"];
-const colorsPerShape = pastelColors.length * (pastelColors.length - 1);
+const legacyColors = [4, 0, 6, 11, 14, 12, 9, 13];
+const symbols = ["clubs", "diamonds", "spades", "hearts"] as const;
+const colorsPerShape = colors.length * (colors.length - 1);
 const combinations = symbols.length * colorsPerShape;
 
-function automaticStyle(id: string) {
+function encodeStyle(shape: number, background: number, ink: number) {
+  return shape * colorsPerShape + background * (colors.length - 1) + (ink < background ? ink : ink - 1);
+}
+
+function styleIndex(id: string, style?: number | null) {
+  if (style != null && Number.isInteger(style) && style >= 0 && style < legacyStyleCount + combinations) {
+    if (style >= legacyStyleCount) return style - legacyStyleCount;
+    const early = earlyStyles[style];
+    if (early) return encodeStyle(early[0], early[1], early[2]);
+    const index = style - earlyStyles.length;
+    const background = Math.floor(index / (legacyColors.length - 1)) % legacyColors.length;
+    const ink = index % (legacyColors.length - 1);
+    return encodeStyle(Math.floor(index / (legacyColors.length * (legacyColors.length - 1))),
+      legacyColors[background], legacyColors[ink < background ? ink : ink + 1]);
+  }
   let hash = 2166136261;
   for (const character of id) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0;
-  const background = (hash >>> 2) % pastelColors.length;
-  const foreground = (background + 1 + (hash >>> 10) % (pastelColors.length - 1)) % pastelColors.length;
-  const otherColor = foreground < background ? foreground : foreground - 1;
-  return legacyStyles.length + (hash % symbols.length) * colorsPerShape +
-    background * (pastelColors.length - 1) + otherColor;
+  const background = (hash >>> 2) % colors.length;
+  const ink = (background + 1 + (hash >>> 10) % (colors.length - 1)) % colors.length;
+  return encodeStyle(hash % symbols.length, background, ink);
 }
 
 export function getAvatarStyle(id: string, style?: number | null) {
-  const selected = style != null && Number.isInteger(style) && style >= 0 && style < legacyStyles.length + combinations
-    ? style : automaticStyle(id);
-  if (legacyStyles[selected]) return legacyStyles[selected];
-  const index = selected - legacyStyles.length;
-  const background = Math.floor(index / (pastelColors.length - 1)) % pastelColors.length;
-  const otherColor = index % (pastelColors.length - 1);
-  const foreground = otherColor < background ? otherColor : otherColor + 1;
+  const index = styleIndex(id, style);
+  const background = Math.floor(index / (colors.length - 1)) % colors.length;
+  const otherColor = index % (colors.length - 1);
   return {
     symbol: symbols[Math.floor(index / colorsPerShape)],
-    background: pastelColors[background][foreground === pastelColors.length - 1 ? 1 : 0],
-    ink: pastelColors[foreground][1],
+    background: colors[background],
+    ink: colors[otherColor < background ? otherColor : otherColor + 1],
+    initials: background < 3 || background === colors.length - 1 ? "#fff" : "#000",
   };
 }
 
 export function generateAvatarStyle(id: string, style?: number) {
-  const current = (style ?? automaticStyle(id)) - legacyStyles.length;
-  const canRepeat = current >= 0 && current < combinations;
-  const draw = Math.floor(Math.random() * (combinations - Number(canRepeat)));
-  return legacyStyles.length + draw + Number(canRepeat && draw >= current);
+  const current = styleIndex(id, style);
+  const draw = Math.floor(Math.random() * (combinations - 1));
+  return legacyStyleCount + draw + Number(draw >= current);
 }
 
 export const tablePlayerName = (name: string, accountId?: string) =>
