@@ -203,7 +203,7 @@ function Rules({ onBack, titleId }: RulesProps) {
           <ul>
             <li>Les autres joueurs disposent d'un dernier tour.</li>
             <li>Le joueur ayant annoncé Dutch ne rejoue pas.</li>
-            <li>Il est protégé contre les échanges forcés de ses cartes.</li>
+            <li>Il est protégé contre les échanges forcés et les cartes supplémentaires du Joker+.</li>
             <li>Le Valet peut toujours consulter ses cartes. L’échange est alors indisponible.</li>
             <li>Il peut néanmoins participer aux réactions.</li>
           </ul>

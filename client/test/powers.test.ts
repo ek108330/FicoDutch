@@ -148,6 +148,20 @@ test("le Joker+ donne une carte cachée à un adversaire dont la main est encore
   assert.deepEqual(view?.cardMotion?.move, { kind: "gift", target: { playerId: "bob", position: 4 } });
 });
 
+test("Dutch bloque le Joker+ contre l’annonceur et laisse les autres cibles disponibles", () => {
+  const state = startWithCard("JOKER", true);
+  const dutch = { announcerId: "bob", remainingPlayerIds: ["alice", "charlie"], announcedAt: 0 };
+  const power = activate({ ...state, dutch });
+  assert.equal(power.turn?.power?.kind, "give-card");
+  assert.equal(playTurn(power, "alice", 1, { kind: "power-player", playerId: "bob" }, 1_200), power);
+  const result = playTurn(power, "alice", 1, { kind: "power-player", playerId: "charlie" }, 1_200);
+  assert.equal(result.players[1].cards.length, 4);
+  assert.equal(result.players[2].cards.length, 5);
+  const duel = activate({ ...state, dutch: { ...dutch, remainingPlayerIds: ["alice"] }, players: state.players.slice(0, 2) });
+  assert.equal(duel.turn?.power, null);
+  assert.equal(duel.turn?.finalReaction, true);
+});
+
 test("l’expiration du pouvoir masque les cartes et conserve la défausse sans échanger", () => {
   const initial = activate(startWithCard("J"));
   const selected = choose(choose(initial, own), other);

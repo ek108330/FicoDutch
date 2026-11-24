@@ -75,5 +75,8 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.equal(summary.awards.shuriken[0].value, 8);
   assert.equal(summary.players[0].rank, 1);
   assert.equal(await store.getMatch(second, randomUUID()), undefined);
-  assert.deepEqual((await store.listPlayers("alice", "")).players.map(({ name }) => name), ["Alice22"]);
+  assert.deepEqual((await store.listPlayers("alice")).players.map(({ name }) => name), ["Alice22"]);
+  const ranking = (await store.listPlayers("")).players;
+  assert.deepEqual(ranking.map(({ name, rating }) => [name, rating]), [["Alice22", 1516], ["Bobby", 1484]]);
+  assert.deepEqual((await store.listPlayers("", ranking[0])).players, [ranking[1]]);
 });

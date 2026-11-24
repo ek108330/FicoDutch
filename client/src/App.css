@@ -2006,7 +2006,9 @@ button.pile-slot:not(:disabled) .pile-card,
 
 .player-name-label {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
   max-width: 100%;
   padding-inline: 5px;
 }
@@ -2014,6 +2016,31 @@ button.pile-slot:not(:disabled) .pile-card,
 .player-name-label > .perimeter-clock { inset-block-start: -3px; height: calc(100% + 6px); }
 
 .player-name-text { position: relative; }
+
+.player-avatar {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 55%);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1px;
+  font-weight: 800;
+  line-height: 1;
+  font-size: 1.9rem;
+}
+
+.player-avatar > span:first-child { font-size: 1.55em; }
+.player-avatar-mini { width: 22px; height: 22px; border-width: 1px; font-size: 0.69rem; }
+.player-avatar-mini > span:last-child { display: none; }
+.game-table .player-avatar-mini { width: 1.45em; height: 1.45em; font-size: inherit; }
+.game-table .player-avatar-mini > span:first-child { font-size: 1em; }
+.profile-identity, .directory-player { display: flex; align-items: center; gap: 9px; }
+.account-avatar-form .player-avatar { justify-self: center; }
+.account-avatar-form select { width: 100%; padding: 7px; border-radius: 7px; font: inherit; }
 
 .leader-crown {
   position: absolute;

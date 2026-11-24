@@ -62,16 +62,18 @@ function PowerControls({ power, act }: {
 }
 
 export function TurnPanel({
-  view, canPlay, act, remaining, piles,
+  view, canPlay, act, remaining, piles, displayName,
 }: TurnControlsProps & {
   remaining: number;
   piles: ReactNode;
+  displayName: (id: string, name: string) => string;
 }) {
   const power = canPlay ? view.power : null;
   const showCenter = canPlay || view.finalReaction;
-  const turnLabel = view.finalReaction ? "Dernières réactions" : `${view.playerName} joue`;
+  const turnLabel = view.finalReaction ? "Dernières réactions" : `${displayName(view.playerId, view.playerName)} joue`;
   const notice = view.reaction.notice;
-  const reactor = notice && view.players.find(({ id }) => id === notice.playerId)?.pseudo;
+  const player = notice && view.players.find(({ id }) => id === notice.playerId);
+  const reactor = player && displayName(player.id, player.pseudo);
   const feedback = reactor && notice ? {
     played: `${reactor} a réagi.`,
     penalty: `${reactor} reçoit une carte de pénalité.`,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { HubPlayer } from "../../../shared/hubTypes";
 import { memorizationLimit } from "../game/memorization";
@@ -13,6 +13,7 @@ import { TurnPanel, TurnPiles } from "./TurnControls";
 import RoundResults from "./RoundResults";
 import PerimeterClock from "./PerimeterClock";
 import { CardBackMark } from "./PlayingCard";
+import { tablePlayerName } from "./playerAvatarConfig";
 
 type RoundScreenProps = {
   hubId: string;
@@ -43,6 +44,7 @@ export default function RoundScreen({
   peers, updateHostRound, onLeave, onRestart, onInterrupt, restarting, settings, playSound, canLeave, clockVersion, pause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
+  const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const [now, setNow] = useState(() => performance.now());
   const [memory, setMemory] = useState<Memorization>(emptySelection);
   const visibleMemory = useRef(0);
@@ -160,7 +162,7 @@ export default function RoundScreen({
       return (
         <main className="game-screen table-screen">
           {gameActions()}
-          <GameTable localPlayerId={playerId} cardMotion={turn.finalMotion} playSound={playSound} leaderIds={scene.leaderIds}
+          <GameTable localPlayerId={playerId} members={membersById} cardMotion={turn.finalMotion} playSound={playSound} leaderIds={scene.leaderIds}
             players={scene.result.players.map(({ id, pseudo, cards, handLayout }) => ({ id, pseudo, cardCount: cards.length, handLayout }))}
             controls={<section className="round-panel"><strong>Manche {roundNumber}</strong></section>} />
         </main>
@@ -216,6 +218,7 @@ export default function RoundScreen({
       {gameActions(canLeave && playerId !== hostId && <button type="button" className="game-leave" onClick={onLeave}>Quitter la table</button>)}
       <GameTable
         localPlayerId={playerId}
+        members={membersById}
         playSound={playSound}
         players={scene.phase === "playing" ? scene.turn.players : scene.players}
         memorization={memorization}
@@ -226,7 +229,7 @@ export default function RoundScreen({
           !turnControls.view.finalReaction && !power?.lookTarget && !power?.pendingSwap
           ? { turn: turnControls.view.number, remaining: turn.remaining } : undefined}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
-        dutchAnnouncement={announcement?.pseudo}
+        dutchAnnouncement={announcement && tablePlayerName(announcement.pseudo, membersById.get(announcement.id)?.accountId)}
         dutchControl={turnControls?.canPlay && turnControls.view.canAnnounceDutch ? {
           armed: turnControls.view.dutchArmed,
           toggle: () => turn.act({ kind: "dutch-intent", enabled: !turnControls.view.dutchArmed }),
@@ -253,6 +256,7 @@ export default function RoundScreen({
           turnControls ? (
             <TurnPanel
               {...turnControls}
+              displayName={(id, name) => tablePlayerName(name, membersById.get(id)?.accountId)}
               remaining={turn.remaining}
               piles={<TurnPiles {...turnControls} feedback={feedback} onGiftSlide={() => playSound("slide")} />}
             />

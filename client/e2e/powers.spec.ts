@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discard, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openLobby, openTwoPlayerHub, turnClock, expectLocalTurn,
+import { discard, discardDrawn, drawDeck, drawnCard, expectTableFits, fixDeckOrder, openLobby, openTwoPlayerHub, turnClock, expectLocalTurn,
   expectCenteredTurnPanel, expectClockFromTop } from "./tableFlow";
 
 const faceUpHands = (page: Page) => page.locator(".player-cards .face-up");
@@ -226,6 +226,41 @@ test("joker ajoute une septième carte cachée", async ({ page: host, browser, b
     await host.screenshot({ path: testInfo.outputPath("02-joker-sept-cartes.png") });
   } finally {
     await guest.close();
+  }
+});
+
+test("le Joker+ ne propose pas le joueur qui a annoncé Dutch", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(55_000);
+  await host.setViewportSize({ width: 390, height: 844 });
+  await fixDeckOrder(host);
+  const guest = await browser.newPage({ baseURL });
+  const announcer = await browser.newPage({ baseURL });
+  try {
+    const start = await openTwoPlayerHub(host, guest, "AliceJokerDutch", "BobJokerDutch");
+    await openLobby(announcer, "ChloeJokerDutch");
+    await announcer.locator(".hub-item").filter({ hasText: "Hub de AliceJokerDutch" })
+      .getByRole("button", { name: "Rejoindre", exact: true }).click();
+    await expect(host.getByRole("list", { name: "Joueurs présents" })).toContainText("ChloeJokerDutch");
+    await host.getByRole("button", { name: "Joker +", exact: true }).click();
+    await expect(announcer.getByRole("button", { name: "Joker +", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await start.click();
+    await expectLocalTurn(announcer, 20_000);
+    await drawDeck(announcer).click();
+    await announcer.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();
+    await discardDrawn(announcer);
+    await playSpecialCard(host, 1, "Joker+");
+
+    await expect(host.getByRole("img", { name: "ChloeJokerDutch a annoncé Dutch" })).toBeVisible();
+    await expect(host.getByRole("button", { name: "Donner une carte à ChloeJokerDutch" })).toHaveCount(0);
+    const recipient = host.getByRole("button", { name: "Donner une carte à BobJokerDutch" });
+    await expect(recipient).toBeVisible();
+    await host.screenshot({ path: testInfo.outputPath("protection-dutch-joker.png") });
+    await recipient.press("Enter");
+    await expect(guest.locator(".position-bottom .playing-card")).toHaveCount(5);
+    await expect(announcer.locator(".position-bottom .playing-card")).toHaveCount(4);
+  } finally {
+    await guest.close();
+    await announcer.close();
   }
 });
 

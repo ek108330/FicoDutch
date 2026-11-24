@@ -69,7 +69,7 @@ function App() {
 
   const navigate = useCallback((destination: string) => {
     if (destination === pathRef.current) return;
-    window.history.pushState({ ficoDutch: true }, "", destination);
+    window.history.pushState({ ficoDutch: true, previous: pathRef.current }, "", destination);
     pathRef.current = destination;
     setPath(destination);
     window.scrollTo(0, 0);
@@ -80,11 +80,20 @@ function App() {
     if ((pathRef.current === "/compte" || pathRef.current === "/mes-stats") && !window.history.state?.ficoDutch) {
       const destination = window.location.href;
       window.history.replaceState({ ficoDutch: true }, "", "/");
-      window.history.pushState({ ficoDutch: true }, "", destination);
+      window.history.pushState({ ficoDutch: true, previous: "/" }, "", destination);
     }
     const onHistory = () => {
       pathRef.current = window.location.pathname;
       setPath(pathRef.current);
+    };
+    const onAndroidBack = (event: Event) => {
+      event.preventDefault();
+      if (pathRef.current === "/") return;
+      if (window.history.state?.previous) window.history.back();
+      else {
+        window.history.replaceState({ ficoDutch: true }, "", "/");
+        onHistory();
+      }
     };
     const load = () => void readAccount(controller.signal).then(setAccountSession, () => {
       if (!controller.signal.aborted) setSessionNotice("Impossible de vérifier la connexion au compte. Réessaie.");
@@ -92,10 +101,12 @@ function App() {
     load();
     window.addEventListener("online", load);
     window.addEventListener("popstate", onHistory);
+    window.addEventListener("ficodutch:back", onAndroidBack);
     return () => {
       controller.abort();
       window.removeEventListener("online", load);
       window.removeEventListener("popstate", onHistory);
+      window.removeEventListener("ficodutch:back", onAndroidBack);
     };
   }, []);
 
@@ -603,7 +614,7 @@ function App() {
               </div>
               {accountSession?.enabled && <nav className="home-stats" aria-label="Statistiques">
                 <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
-                <button type="button" onClick={() => navigate("/joueurs")}>Autres joueurs</button>
+                <button type="button" onClick={() => navigate("/joueurs")}>Classement</button>
               </nav>}
             </div>
           )}

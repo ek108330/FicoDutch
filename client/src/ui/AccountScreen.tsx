@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, UserRound } from "lucide-react";
 import type { Account } from "../../../shared/statistics";
-import { profilePath, rename, signIn, signOut, type AccountSession } from "../network/accountApi";
+import { profilePath, rename, saveAvatar, signIn, signOut, type AccountSession } from "../network/accountApi";
+import PlayerAvatar from "./PlayerAvatar";
+import { avatarStyles } from "./playerAvatarConfig";
 
 type Props = {
   account: Account | null;
@@ -48,6 +50,18 @@ export default function AccountScreen({ account, onChange, navigate, forStats }:
         </a>
         <h1><UserRound aria-hidden="true" /> {account ? "Mon compte" : creating ? "Créer un compte" : "Connexion"}</h1>
         {forStats && <p>Connecte-toi pour retrouver tes statistiques personnelles.</p>}
+        {account && <form className="account-avatar-form" onSubmit={(event) => {
+          event.preventDefault();
+          const style = new FormData(event.currentTarget).get("avatar");
+          void run(() => saveAvatar(style === "auto" ? null : Number(style)), () => setNotice("Icône enregistrée."));
+        }}>
+          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} />
+          <label>Icône du profil <select name="avatar" defaultValue={account.avatarStyle ?? "auto"}>
+            <option value="auto">Automatique</option>
+            {avatarStyles.map(({ name, symbol }, i) => <option key={name} value={i}>{symbol} {name}</option>)}
+          </select></label>
+          <button type="submit" disabled={busy}>Enregistrer l’icône</button>
+        </form>}
         <form onSubmit={submit} key={account?.id ?? String(creating)}>
           {account ? <>
             <p>Identifiant de connexion <strong>{account.handle}</strong></p>

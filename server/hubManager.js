@@ -32,10 +32,10 @@ function findPlayerHub(socketId) {
   return null;
 }
 
-function newPlayer(socketId, pseudo, isHost = false, accountId) {
+function newPlayer(socketId, pseudo, isHost = false, accountId, avatarStyle) {
   return {
     id: randomUUID(), pseudo, isHost, connected: true, connectionVersion: 1,
-    socketId, token: randomBytes(32).toString("base64url"), accountId,
+    socketId, token: randomBytes(32).toString("base64url"), accountId, avatarStyle,
   };
 }
 
@@ -48,8 +48,8 @@ function getHubStatus(hub) {
 function getPublicHub(hub) {
   return {
     ...hub,
-    players: hub.players.map(({ id, pseudo, accountId, isHost, isBot, connected, connectionVersion }) => ({
-      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }), ...(accountId && { accountId }),
+    players: hub.players.map(({ id, pseudo, accountId, avatarStyle, isHost, isBot, connected, connectionVersion }) => ({
+      id, pseudo, isHost, connected, connectionVersion, ...(isBot && { isBot }), ...(accountId && { accountId, avatarStyle }),
     })),
     status: getHubStatus(hub),
   };
@@ -91,9 +91,9 @@ function relayLobbyMessage(socketId, request, now = Date.now()) {
   };
 }
 
-function createHub(socketId, pseudo, accountId, tracked = false) {
+function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle) {
   if (findPlayerHub(socketId)) return null;
-  const host = newPlayer(socketId, pseudo, true, accountId);
+  const host = newPlayer(socketId, pseudo, true, accountId, avatarStyle);
   const hub = {
     id: randomUUID(),
     ...(tracked && { tracked: true }),
@@ -115,14 +115,14 @@ function createHub(socketId, pseudo, accountId, tracked = false) {
   return membership(hub, host);
 }
 
-function joinHub(hubId, socketId, pseudo, accountId) {
+function joinHub(hubId, socketId, pseudo, accountId, avatarStyle) {
   const existing = findPlayerHub(socketId);
   if (existing) return existing.hub.id === hubId ? membership(existing.hub, existing.player) : null;
 
   const hub = hubs.get(hubId);
   if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers ||
       (accountId && hub.players.some((player) => player.accountId === accountId))) return null;
-  const player = newPlayer(socketId, pseudo, false, accountId);
+  const player = newPlayer(socketId, pseudo, false, accountId, avatarStyle);
   hub.players.push(player);
   return membership(hub, player);
 }

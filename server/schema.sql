@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_handle ON accounts (lower(handle));
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_display_name ON accounts (lower(display_name));
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_demo_bot boolean NOT NULL DEFAULT false;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar_style smallint CHECK (avatar_style BETWEEN 0 AND 7);
 
 CREATE TABLE IF NOT EXISTS account_sessions (
   token_hash text PRIMARY KEY,
@@ -56,6 +57,8 @@ CREATE TABLE IF NOT EXISTS player_stats (
   penalties integer NOT NULL DEFAULT 0,
   exchanges integer NOT NULL DEFAULT 0
 );
+
+CREATE INDEX IF NOT EXISTS player_stats_elo ON player_stats (rating DESC, account_id);
 
 CREATE TABLE IF NOT EXISTS account_matches (
   account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,

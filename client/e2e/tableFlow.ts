@@ -120,6 +120,6 @@ export async function discardDrawn(page: Page) {
 }
 
 export async function expectLocalTurn(page: Page, timeout?: number) {
-  const pseudo = (await page.locator(".position-bottom .player-name-label").innerText()).replace(/ \(Moi\)$/, "");
+  const pseudo = await page.locator(".position-bottom .player-name-text").innerText();
   await expect(activeTurn(page)).toHaveText(`${pseudo} joue`, { timeout });
 }

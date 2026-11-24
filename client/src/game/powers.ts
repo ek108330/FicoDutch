@@ -55,6 +55,7 @@ export function powerCardCount(kind: PowerKind) {
 }
 
 export function canTargetCard(kind: PowerKind, actorId: string, targetId: string, protectedId?: string) {
+  if (kind === "give-card") return actorId !== targetId && targetId !== protectedId;
   if (kind === "look-own") return actorId === targetId;
   if (kind === "look-other") return actorId !== targetId;
   if (kind === "blind-swap") return targetId !== protectedId || targetId === actorId;
@@ -71,7 +72,7 @@ export function startPower(state: GameState, actorId: string, discarded: Card): 
 
   if (kind === "give-card") {
     if (!state.variants.jokerPlus || (!state.drawPile.length && state.discardPile.length < 2) ||
-        !state.players.some(({ id }) => id !== actorId)) return null;
+        !state.players.some(({ id }) => canTargetCard(kind, actorId, id, state.dutch?.announcerId))) return null;
   } else {
     const count = state.players
       .filter(({ id }) => canTargetCard(kind, actorId, id, state.dutch?.announcerId))
@@ -141,7 +142,7 @@ export function resolveBlindSwap(state: GameState, power: Power | null, now: num
 
 function giveCard(state: GameState, actorId: string, recipient: unknown, now: number): GameState | null {
   const target = state.players.find(({ id }) => id === recipient);
-  if (!target || target.id === actorId) return null;
+  if (!target || !canTargetCard("give-card", actorId, target.id, state.dutch?.announcerId)) return null;
   const drawn = takeFromPile(state.drawPile, state.discardPile);
   if (!drawn) return null;
 

@@ -20,6 +20,8 @@ export const signIn = (handle: string, password: string, create: boolean) =>
   request<AccountSession>(create ? "/accounts" : "/session", { method: "POST", body: JSON.stringify({ handle, password }) });
 export const signOut = () => request<AccountSession>("/session", { method: "DELETE" });
 export const rename = (name: string) => request<AccountSession>("/account", { method: "PATCH", body: JSON.stringify({ name }) });
+export const saveAvatar = (style: number | null) =>
+  request<AccountSession>("/account/avatar", { method: "PATCH", body: JSON.stringify({ style }) });
 export function guestMatchToken(id: string) {
   try { return sessionStorage.getItem("ficodutch-match:" + id); }
   catch { return null; }

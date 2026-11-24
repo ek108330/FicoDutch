@@ -28,10 +28,17 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     const settings = await openSettings(page);
     await settings.getByRole("button", { name: "Mon compte", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Connexion", exact: true })).toBeVisible();
-    await page.goBack();
+    const nativeBack = () => page.evaluate(() => window.dispatchEvent(new Event("ficodutch:back", { cancelable: true })));
+    expect(await nativeBack()).toBe(false);
     await expect(page.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Autres joueurs" }).click();
+    expect(await nativeBack()).toBe(false);
+    expect(await nativeBack()).toBe(false);
+    await expect(page.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Classement", exact: true }).click();
     await expect(page.getByRole("listitem")).toHaveCount(10);
+    const ratings = (await page.getByRole("listitem").getByText(/Elo$/).allTextContents())
+      .map((value) => Number(value.replace(/\D/g, "")));
+    expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
     await page.screenshot({ path: testInfo.outputPath("dix-bots.png"), fullPage: true });
     await page.getByRole("textbox", { name: "Rechercher un pseudo" }).fill("ChaBotté");
     await page.getByRole("button", { name: "Rechercher" }).click();
@@ -39,6 +46,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
+    await expect(page.locator(".profile-identity .player-avatar")).toHaveCSS("width", "128px");
     await expect(page.getByText("Aucune confrontation terminée.")).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath("profil-bot.png") });
     await page.goto("/");
@@ -60,6 +68,8 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(game(page)).toBeEnabled();
     await game(page).click();
     await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible();
+    await expect(page.locator(".position-bottom .player-avatar")).toHaveCount(0);
+    await expect(page.locator(".position-top .player-avatar-mini")).toHaveCount(1);
     const management = await openManagement(page);
     await management.getByRole("button", { name: "Interrompre la partie" }).click();
     await page.getByRole("button", { name: "Confirmer l’interruption" }).click();
@@ -93,6 +103,14 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await signIn(host, "AliceCompte", true);
     await signIn(guest, "BobbyCompte", true);
     await signIn(otherDevice, "bobbycompte");
+    await (await openSettings(host)).getByRole("button", { name: "Mon compte", exact: true }).click();
+    await host.getByLabel("Icône du profil").selectOption("6");
+    await host.getByRole("button", { name: "Enregistrer l’icône" }).click();
+    await expect(host.getByRole("status")).toHaveText("Icône enregistrée.");
+    await host.reload();
+    await expect(host.getByLabel("Icône du profil")).toHaveValue("6");
+    await host.screenshot({ path: testInfo.outputPath("icone-compte.png") });
+    await host.getByRole("link", { name: "Accueil", exact: true }).click();
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     await join(guest, "AliceCompte");
     await expect(game(host)).toBeEnabled({ timeout: 12_000 });
@@ -107,6 +125,9 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await host.getByRole("button", { name: "6 cartes", exact: true }).click();
     await expect(guest.getByRole("button", { name: "6 cartes", exact: true })).toHaveAttribute("aria-pressed", "true");
     await game(host).click();
+    await expect(guest.locator(".position-top .player-name-text")).toHaveText("AliceCompt");
+    await expect(guest.locator(".position-top .player-avatar-mini")).toHaveCSS("background-color", "rgb(237, 204, 114)");
+    await guest.screenshot({ path: testInfo.outputPath("icones-en-jeu.png") });
     await expectLocalTurn(guest, 20_000);
     await drawDeck(guest).click();
     await guest.getByRole("button", { name: "Annoncer Dutch en fin de tour" }).click();

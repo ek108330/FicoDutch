@@ -101,6 +101,8 @@ test("le Valet évite un échange défavorable et le Joker vise la main la plus 
   const joker = table(["Q", "6", "4"], undefined, "give-card");
   assert.deepEqual(nextBot(joker)?.action, { kind: "power-player", playerId: "alice" });
   assert.equal(step(joker).players[1].cards.length, 3);
+  const protectedTable = { ...joker, dutch: { announcerId: "alice", remainingPlayerIds: ["bot", "bob"], announcedAt: 0 } };
+  assert.deepEqual(nextBot(protectedTable)?.action, { kind: "power-player", playerId: "bob" });
 });
 
 test("le bot annonce Dutch avec une main faible et une marge sur chaque adversaire", () => {

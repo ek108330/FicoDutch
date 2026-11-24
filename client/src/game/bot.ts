@@ -56,7 +56,8 @@ function playPower(state: GameState, bot: GamePlayer, opponents: GamePlayer[], w
   const { kind, selected } = power;
   const pass: TurnAction = { kind: "power-pass" };
   if (kind === "give-card") {
-    return opponents.length ? { kind: "power-player", playerId: opponents[0].id } : pass;
+    const recipient = opponents.find(({ id }) => canTargetCard(kind, bot.id, id, state.dutch?.announcerId));
+    return recipient ? { kind: "power-player", playerId: recipient.id } : pass;
   }
   if (kind === "look-own") {
     if (selected.length) return { kind: "power-hide" };

@@ -221,19 +221,21 @@ function createMatchStore(db) {
       scopeIncomplete: rows.length > 1 && !table };
   }
 
-  async function listPlayers(query, after) {
+  async function listPlayers(query, cursor = null) {
     const { rows } = await db.query(`
-      SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches
+      SELECT a.id, a.display_name AS name, a.is_demo_bot AS "demoBot", s.matches, s.rating, a.avatar_style AS "avatarStyle"
       FROM accounts a JOIN player_stats s ON a.id = s.account_id
-      WHERE lower(a.display_name) LIKE $1 AND lower(a.display_name) > $2
-      ORDER BY lower(a.display_name) LIMIT 31
-    `, [query + "%", after]);
+      WHERE lower(a.display_name) LIKE $1 AND
+        ($2::int IS NULL OR s.rating < $2 OR (s.rating = $2 AND a.id > $3::uuid))
+      ORDER BY s.rating DESC, s.account_id LIMIT 31
+    `, [query + "%", cursor?.rating ?? null, cursor?.id ?? null]);
     const players = rows.slice(0, 30);
-    return { players, next: rows.length > players.length ? players.at(-1).name.toLowerCase() : null };
+    const last = players.at(-1);
+    return { players, next: rows.length > players.length ? `${last.rating}/${last.id}` : null };
   }
 
   async function getProfile(id) {
-    const { rows } = await db.query("SELECT a.display_name, a.is_demo_bot, s.* FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1", [id]);
+    const { rows } = await db.query("SELECT a.display_name, a.is_demo_bot, a.avatar_style, s.* FROM player_stats s JOIN accounts a ON a.id = s.account_id WHERE a.id = $1", [id]);
     const row = rows[0];
     if (!row) return null;
     const [history, encounters, rivalry] = await Promise.all([
@@ -261,6 +263,7 @@ function createMatchStore(db) {
     ]);
     return {
       id, name: row.display_name, demoBot: row.is_demo_bot, rating: row.rating, matches: row.matches, finished: row.finished, interrupted: row.interrupted,
+      ...(row.avatar_style != null && { avatarStyle: row.avatar_style }),
       victories: row.victories, rounds: row.rounds, roundWins: row.round_wins, scoreSum: Number(row.score_sum),
       bestScore: row.best_score, dutch: row.dutch, dutchWon: row.dutch_won, reactions: row.reactions, penalties: row.penalties,
       exchanges: row.exchanges, rivals: rivalry.rows,
@@ -330,10 +333,15 @@ function mountMatchRoutes(app, store, readAccount) {
   });
   app.get("/api/players", async (request, response) => {
     const { q = "", after = "" } = request.query;
-    if (![q, after].every((value) => typeof value === "string" && /^[\p{L}0-9]{0,15}$/u.test(value))) {
+    if (typeof q !== "string" || !/^[\p{L}0-9]{0,15}$/u.test(q)) {
       return response.status(400).json({ error: "Saisis au plus 15 lettres ou chiffres." });
     }
-    response.set("Cache-Control", "public, max-age=30").json(await store.listPlayers(q.toLowerCase(), after.toLowerCase()));
+    const [rating, id, extra] = typeof after === "string" ? after.split("/") : [];
+    if (after !== "" && (!/^\d{1,10}$/.test(rating ?? "") || Number(rating) > 2_147_483_647 || !uuidPattern.test(id ?? "") || extra !== undefined)) {
+      return response.status(400).json({ error: "Page de classement invalide." });
+    }
+    response.set("Cache-Control", "public, max-age=30").json(await store.listPlayers(q.toLowerCase(),
+      after ? { rating: Number(rating), id } : null));
   });
   app.get("/api/players/:id", async (request, response) => {
     const profile = uuidPattern.test(request.params.id) && await store.getProfile(request.params.id);

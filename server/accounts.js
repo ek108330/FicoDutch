@@ -1,6 +1,6 @@
 const { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
-const { guestNameInUse, withPlayerName } = require("./hubManager");
+const { findPlayerHub, guestNameInUse, withPlayerName } = require("./hubManager");
 
 const derive = promisify(scrypt);
 const cookie = "ficodutch_account";
@@ -11,7 +11,8 @@ const hashOptions = { N: 131_072, r: 8, p: 1, maxmem: 144 * 1024 * 1024 };
 const dummySalt = randomBytes(16);
 
 function publicAccount(row) {
-  return row && { id: row.id, handle: row.handle, name: row.display_name };
+  return row && { id: row.id, handle: row.handle, name: row.display_name,
+    ...(row.avatar_style != null && { avatarStyle: row.avatar_style }) };
 }
 
 function sessionHash(headers) {
@@ -20,7 +21,7 @@ function sessionHash(headers) {
   return token && /^[A-Za-z0-9_-]{43}$/.test(token) ? createHash("sha256").update(token).digest("hex") : null;
 }
 
-function mountAccounts(app, io, db, acceptsOrigin) {
+function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
   const secure = Boolean(process.env.RENDER_EXTERNAL_URL || process.env.NODE_ENV === "production");
   const cookieOptions = { httpOnly: true, secure, sameSite: "strict", path: "/" };
   const attempts = new Map();
@@ -36,7 +37,7 @@ function mountAccounts(app, io, db, acceptsOrigin) {
     const token = sessionHash(headers);
     if (!token) return null;
     const { rows } = await db.query(`
-      SELECT a.id, a.handle, a.display_name, s.expires_at FROM account_sessions s
+      SELECT a.id, a.handle, a.display_name, a.avatar_style, s.expires_at FROM account_sessions s
       JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = $1 AND s.expires_at > $2
     `, [token, Date.now()]);
     return rows[0] ? { account: publicAccount(rows[0]), token, expiresAt: Number(rows[0].expires_at) } : null;
@@ -82,7 +83,7 @@ function mountAccounts(app, io, db, acceptsOrigin) {
     let row;
     try {
       const { rows } = await db.query(
-        "SELECT id, handle, display_name, password_hash FROM accounts WHERE lower(handle) = lower($1)", [handle]);
+        "SELECT id, handle, display_name, password_hash, avatar_style FROM accounts WHERE lower(handle) = lower($1)", [handle]);
       if (register) {
         if (rows.length) return response.status(409).json({ error: "Ce nom est déjà utilisé." });
         const salt = randomBytes(16);
@@ -142,7 +143,7 @@ function mountAccounts(app, io, db, acceptsOrigin) {
       const { rows } = await withPlayerName(name, () => guestNameInUse(name) ? { rows: [] } : db.query(`
         UPDATE accounts SET display_name = $1 WHERE id = $2
         AND NOT EXISTS (SELECT 1 FROM accounts WHERE lower(handle) = lower($1) AND id <> $2)
-        RETURNING id, handle, display_name
+        RETURNING id, handle, display_name, avatar_style
       `, [name, session.account.id]));
       if (rows.length) return response.json({ enabled: true, account: publicAccount(rows[0]) });
     } catch (error) {
@@ -151,10 +152,35 @@ function mountAccounts(app, io, db, acceptsOrigin) {
     response.status(409).json({ error: "Ce nom est déjà utilisé." });
   });
 
+  app.patch("/api/account/avatar", requireOrigin, async (request, response) => {
+    const session = await readAccount(request.headers);
+    if (!session) return response.status(401).json({ error: "Connecte-toi pour modifier ton icône." });
+    const style = request.body?.style;
+    if (style !== null && (!Number.isInteger(style) || style < 0 || style > 7)) {
+      return response.status(400).json({ error: "Choisis une icône proposée." });
+    }
+    const { rows } = await db.query(`
+      UPDATE accounts SET avatar_style = $1 WHERE id = $2 RETURNING id, handle, display_name, avatar_style
+    `, [style, session.account.id]);
+    const account = publicAccount(rows[0]);
+    let seated = false;
+    for (const socket of await io.in("profile:" + account.id).fetchSockets()) {
+      if (!socket.data.session) continue;
+      socket.data.session.account = account;
+      const current = findPlayerHub(socket.id);
+      if (current?.player.accountId === account.id) {
+        current.player.avatarStyle = account.avatarStyle;
+        seated = true;
+      }
+    }
+    if (seated) broadcastHubs();
+    response.set("Cache-Control", "no-store").json({ enabled: true, account });
+  });
+
   io.use((socket, next) => {
     readAccount(socket.request.headers).then((session) => {
       socket.data.session = session;
-      if (session) socket.join("account:" + session.token);
+      if (session) socket.join(["account:" + session.token, "profile:" + session.account.id]);
       next();
     }, next);
   });

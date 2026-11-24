@@ -3,6 +3,7 @@ import { ArrowLeft, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from 
 import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
   readTableSummary, tableSummaryPath } from "../network/accountApi";
+import PlayerAvatar from "./PlayerAvatar";
 
 type Navigate = (path: string) => void;
 type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () => void };
@@ -170,7 +171,10 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
     ["Bêtes noires", profile.rivals.filter(({ played, wins, losses }) => played >= 3 && losses > wins).slice(0, 8)],
   ];
   return <>
-    <h2>{profile.name}</h2>
+    <div className="profile-identity">
+      <PlayerAvatar id={profile.id} name={profile.name} style={profile.avatarStyle} />
+      <h2>{profile.name}</h2>
+    </div>
     {profile.demoBot && <p className="archive-muted">Bot de démonstration · historique initial simulé</p>}
     <dl className="archive-card profile-numbers">{values.map(([label, value]) =>
       <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
@@ -233,7 +237,7 @@ export function PlayersDirectory(props: RouteProps) {
   const [pages, setPages] = useState([""]);
   const cursor = pages.at(-1) ?? "";
   const loader = useCallback((signal: AbortSignal) => readPlayers(query, cursor, signal), [query, cursor]);
-  return <ArchiveFrame title="Autres joueurs" {...props}>
+  return <ArchiveFrame title="Classement" {...props}>
     <form className="archive-actions player-search" onSubmit={(event) => {
       event.preventDefault();
       setQuery(String(new FormData(event.currentTarget).get("name")).trim());
@@ -244,8 +248,11 @@ export function PlayersDirectory(props: RouteProps) {
     </form>
     <Load key={query + ":" + cursor} loader={loader}>{({ players, next }) => <section className="archive-card">
       {players.length ? <ul className="archive-list">{players.map((player) => <li key={player.id}>
-        <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
-        <span>{player.demoBot && "Bot · "}{plural(player.matches, "partie")}</span>
+        <span className="directory-player">
+          <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} mini />
+          <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
+        </span>
+        <span>{player.demoBot && "Bot · "}{plural(player.matches, "partie")} · <strong>{number.format(player.rating)} Elo</strong></span>
       </li>)}</ul> : <p>Aucun joueur trouvé.</p>}
       {(pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages des joueurs">
         {pages.length > 1 && <button type="button" onClick={() => setPages(pages.slice(0, -1))}>Précédent</button>}

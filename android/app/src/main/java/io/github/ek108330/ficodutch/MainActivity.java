@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -59,7 +60,7 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             backCallback = this::goBackInGame;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+                    OnBackInvokedDispatcher.PRIORITY_OVERLAY, backCallback);
         }
         loadGame();
     }
@@ -67,13 +68,23 @@ public final class MainActivity extends Activity {
     private void goBackInGame() {
         WebView current = browser;
         if (current == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsets insets = current.getRootWindowInsets();
+            WindowInsetsController controller = current.getWindowInsetsController();
+            if (insets != null && controller != null && insets.isVisible(WindowInsets.Type.ime())) {
+                controller.hide(WindowInsets.Type.ime());
+                return;
+            }
+        }
         current.evaluateJavascript("""
                 (() => {
                   const dialog = document.querySelector('dialog[open]');
-                  if (!dialog) return false;
-                  if (typeof dialog.requestClose === 'function') dialog.requestClose();
-                  else dialog.close();
-                  return true;
+                  if (dialog) {
+                    if (typeof dialog.requestClose === 'function') dialog.requestClose();
+                    else dialog.close();
+                    return true;
+                  }
+                  return !window.dispatchEvent(new Event('ficodutch:back', {cancelable: true}));
                 })()
                 """, handled -> {
             if (current != browser || "true".equals(handled)) return;

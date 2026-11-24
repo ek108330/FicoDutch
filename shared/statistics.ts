@@ -33,14 +33,15 @@ export type MatchStats = {
 };
 
 export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number; scopeIncomplete?: boolean };
-export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number };
+export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number; rating: number; avatarStyle: number | null };
 
-export type Account = { id: string; handle: string; name: string };
+export type Account = { id: string; handle: string; name: string; avatarStyle?: number };
 
 export type Profile = {
   demoBot?: boolean;
   id: string;
   name: string;
+  avatarStyle?: number;
   rating: number;
   matches: number;
   finished: number;

@@ -63,6 +63,8 @@ try {
   capture("01-accueil-android");
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await find("Créer un Hub");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await find("Créer un Hub");
   await tap("Mes stats");
   await find("Identifiant");
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
@@ -79,6 +81,8 @@ try {
   playing = true;
   await find("Mémorisation");
   capture("03-table-portrait");
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  await find("TestFicoAndroid");
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   await find("TestFicoAndroid");
 

@@ -5,6 +5,7 @@ export type HubStatus = "waiting" | "in-progress" | "full" | "finished";
 export type HubPlayer = {
   id: string;
   accountId?: string;
+  avatarStyle?: number;
   pseudo: string;
   isHost: boolean;
   isBot?: true;

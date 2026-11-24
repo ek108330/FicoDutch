@@ -16,6 +16,8 @@ import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
 import { useTapAction } from "./useTapAction";
 import PerimeterClock from "./PerimeterClock";
+import PlayerAvatar from "./PlayerAvatar";
+import { tablePlayerName } from "./playerAvatarConfig";
 
 export type TablePlayer = {
   id: string;
@@ -27,6 +29,7 @@ export type TablePlayer = {
 type GameTableProps = {
   localPlayerId: string;
   players: TablePlayer[];
+  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number }>;
   controls: ReactNode;
   piles?: ReactNode;
   activePlayerId?: string;
@@ -82,6 +85,7 @@ function DutchButton({ armed, toggle }: NonNullable<GameTableProps["dutchControl
 export default function GameTable({
   localPlayerId,
   players,
+  members,
   controls,
   piles,
   activePlayerId,
@@ -197,10 +201,11 @@ export default function GameTable({
         const react = position === "bottom" ? reaction : undefined;
         const active = player.id === activePlayerId;
         const clock = active && opponentClock;
-        const giveToPlayer = power?.kind === "give-card" && player.id !== localPlayerId;
+        const giveToPlayer = power?.kind === "give-card" && canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
         const canChooseFromHand = power && power.selection.remaining > 0 &&
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
-        const name = player.pseudo;
+        const member = members?.get(player.id);
+        const name = tablePlayerName(player.pseudo, member?.accountId);
         const announce = position === "bottom" ? dutchControl : undefined;
         const emoji = tableEmojis?.get(player.id);
         const layout = getHandLayout(player.cardCount, player.handLayout);
@@ -211,7 +216,8 @@ export default function GameTable({
           <div className={`table-player position-${position}${active ? " is-active-player" : ""}`} key={player.id} data-hand-player={player.id}
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
             <div className="player-name">
-              <span className="player-name-label">
+              <span className="player-name-label" title={player.pseudo !== name ? player.pseudo : undefined}>
+                {member?.accountId && <PlayerAvatar id={member.accountId} name={player.pseudo} style={member.avatarStyle} mini />}
                 <span className="player-name-text">
                   {name}
                   {leaderIds?.includes(player.id) && (
