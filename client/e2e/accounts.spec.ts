@@ -10,8 +10,17 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
   try {
     await page.goto("/");
     await expect(page.getByText("Jouer sans compte")).toBeVisible();
+    const hubPanel = page.locator(".home-entry");
+    const statistics = page.getByRole("navigation", { name: "Statistiques" });
+    for (const [width, height] of [[360, 640], [740, 360], [1280, 800]]) {
+      await page.setViewportSize({ width, height });
+      await expect(statistics).toBeInViewport({ ratio: 1 });
+      const panel = (await hubPanel.boundingBox())!;
+      const buttons = (await statistics.boundingBox())!;
+      expect(buttons.y).toBeGreaterThanOrEqual(panel.y + panel.height);
+      await page.screenshot({ path: testInfo.outputPath(`accueil-invite-${width}.png`) });
+    }
     await page.setViewportSize({ width: 360, height: 640 });
-    await page.screenshot({ path: testInfo.outputPath("accueil-invite.png") });
     await page.getByRole("button", { name: "Mes stats" }).click();
     await expect(page.getByText("Connecte-toi pour retrouver tes statistiques personnelles.")).toBeVisible();
     await page.goBack();

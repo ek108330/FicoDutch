@@ -113,7 +113,14 @@ input {
   text-align: left;
 }
 
+.home-entry-layout {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 490px);
+}
+
 .home-entry {
+  width: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
@@ -488,8 +495,9 @@ input {
 }
 
 @media (min-width: 700px) {
+  .home-entry-layout { width: min(100%, 780px); }
+
   .home-entry {
-    width: min(100%, 780px);
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
     grid-template-rows: minmax(0, 1fr);
     gap: clamp(12px, 3vw, 24px);
@@ -3047,7 +3055,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .guest-entry { display: grid; gap: 4px; text-align: left; font-size: 0.9rem; font-weight: 700; }
 .home-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .home-stats button {
-  min-height: 34px;
+  min-height: 38px;
   border: 1px solid #577963;
   border-radius: 8px;
   background: #e4efe7;

@@ -545,54 +545,56 @@ function App() {
               onAddBot={() => socket.emit("hub:add-bot", { hubId: currentHub.id })}
               onUpdate={(variants, endThreshold) => socket.emit("hub:update-settings", { variants, endThreshold })} />
           ) : (
-            <div className="home-panel home-entry">
-              {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
-                onClose={() => setPreviewHubId(null)} onJoin={() => joinHub(previewHub.id)} />}
-              <form className="home-create" onSubmit={(event) => {
-                event.preventDefault();
-                createHub();
-              }}>
-                {sessionNotice && <p className="home-notice" role="status">{sessionNotice}</p>}
-                {accountSession && !account ? <label className="guest-entry">
-                  Jouer sans compte
-                  <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
-                    value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
-                    onChange={(event) => savePseudo(event.target.value)} />
-                </label> : !accountSession ? <button type="button" onClick={() => {
-                  void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
-                }}>Vérifier la connexion</button> : <strong>{account?.name}</strong>}
-                <button className="primary-button" type="submit" disabled={!accountSession}>
-                  <Plus size={19} aria-hidden="true" /> Créer un Hub
-                </button>
-                {accountSession?.enabled && <nav className="home-stats" aria-label="Statistiques">
-                  <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
-                  <button type="button" onClick={() => navigate("/joueurs")}>Autres joueurs</button>
-                </nav>}
-                {accountSession?.enabled ? <div className="account-links">
-                  <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>{account ? "Mon compte" : "Se connecter ou créer un compte"}</a>
-                </div> : null}
-              </form>
-              <section className="home-join" aria-labelledby="join-title">
-                <h2 id="join-title">Rejoindre une partie</h2>
-                <div className="hub-list">
-                  {hubs.length === 0 ? (
-                    <p className="empty-hubs">Aucun Hub disponible.</p>
-                  ) : hubs.map((hub) => (
-                    <div className="hub-item" key={hub.id}>
-                      <div className="hub-info">
-                        <strong>{hub.name}</strong>
-                        <span>{hub.players.length}/{hub.maxPlayers} joueurs · <span>{hubStatusLabels[hub.status]}</span></span>
+            <div className="home-entry-layout">
+              <div className="home-panel home-entry">
+                {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
+                  onClose={() => setPreviewHubId(null)} onJoin={() => joinHub(previewHub.id)} />}
+                <form className="home-create" onSubmit={(event) => {
+                  event.preventDefault();
+                  createHub();
+                }}>
+                  {sessionNotice && <p className="home-notice" role="status">{sessionNotice}</p>}
+                  {accountSession && !account ? <label className="guest-entry">
+                    Jouer sans compte
+                    <input id="pseudo" type="text" aria-label="Pseudo" placeholder="Pseudo"
+                      value={pseudo} maxLength={GAME_CONFIG.player.pseudoMaxLength}
+                      onChange={(event) => savePseudo(event.target.value)} />
+                  </label> : !accountSession ? <button type="button" onClick={() => {
+                    void readAccount().then(setAccountSession, () => setSessionNotice("La connexion au compte est indisponible."));
+                  }}>Vérifier la connexion</button> : <strong>{account?.name}</strong>}
+                  <button className="primary-button" type="submit" disabled={!accountSession}>
+                    <Plus size={19} aria-hidden="true" /> Créer un Hub
+                  </button>
+                  {accountSession?.enabled ? <div className="account-links">
+                    <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>{account ? "Mon compte" : "Se connecter ou créer un compte"}</a>
+                  </div> : null}
+                </form>
+                <section className="home-join" aria-labelledby="join-title">
+                  <h2 id="join-title">Rejoindre une partie</h2>
+                  <div className="hub-list">
+                    {hubs.length === 0 ? (
+                      <p className="empty-hubs">Aucun Hub disponible.</p>
+                    ) : hubs.map((hub) => (
+                      <div className="hub-item" key={hub.id}>
+                        <div className="hub-info">
+                          <strong>{hub.name}</strong>
+                          <span>{hub.players.length}/{hub.maxPlayers} joueurs · <span>{hubStatusLabels[hub.status]}</span></span>
+                        </div>
+                        <div className="hub-actions">
+                          <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
+                            onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>
+                          <button type="button" className="join-button" disabled={!canJoinHub(hub)}
+                            onClick={() => joinHub(hub.id)}>Rejoindre</button>
+                        </div>
                       </div>
-                      <div className="hub-actions">
-                        <button type="button" className="preview-button" aria-label={`Aperçu du ${hub.name}`}
-                          onClick={() => setPreviewHubId(hub.id)}>Aperçu</button>
-                        <button type="button" className="join-button" disabled={!canJoinHub(hub)}
-                          onClick={() => joinHub(hub.id)}>Rejoindre</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              {accountSession?.enabled && <nav className="home-stats" aria-label="Statistiques">
+                <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
+                <button type="button" onClick={() => navigate("/joueurs")}>Autres joueurs</button>
+              </nav>}
             </div>
           )}
         </div>
