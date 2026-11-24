@@ -89,6 +89,18 @@ test("les actions au milieu d’une manche restent distinctes du résultat et de
   assert.deepEqual(matchStatistics(undefined, "interrupted").awards, {});
 });
 
+test("les prix du Hub cumulent les échanges et réactions de plusieurs parties", () => {
+  const swap: MatchEvent = { kind: "swap", playerId: "bob", cards: [hand("alice", black), hand("bob", red)] };
+  const reaction: MatchEvent = { kind: "reaction", playerId: "alice", card: fit, reference: 1, openedAt: 100 };
+  const first = sample([{ at: 200, event: swap }, { at: 210, event: reaction }]);
+  const second = sample([{ at: 400, event: swap }, { at: 430, event: reaction }]);
+  const summary = matchStatistics(second.journal, "interrupted", false, [first.journal!]);
+  assert.deepEqual(summary.awards.victime, [{ players: ["bob", "alice"], value: 2 }]);
+  assert.deepEqual(summary.awards.rivalite, [{ players: ["alice", "bob"], value: 2 }]);
+  assert.deepEqual(summary.awards.shuriken, [{ players: ["alice"], value: 2, extra: 10 }]);
+  assert.deepEqual(summary.awards.luckyLuke, [{ players: ["alice"], value: 110 }]);
+});
+
 test("le moteur journalise une réaction acceptée, refuse une version périmée et ne projette jamais le journal", () => {
   const round = createRound(players, DEFAULT_VARIANTS, 50);
   const [first, second] = round.players;

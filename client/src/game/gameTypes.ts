@@ -27,7 +27,7 @@ export type GamePlayer = {
 };
 
 export type CardTarget = { playerId: string; position: number };
-export type BotObservation = { playerId: string; slot: number; cardId: string; points: number };
+export type BotObservation = { playerId: string; slot: number; cardId: string; face: CardFace };
 export type PublicCardMove = { kind: "swap"; targets: [CardTarget, CardTarget] } |
   { kind: "gift" | "penalty"; target: CardTarget } |
   { kind: "reaction"; playerId: string; slot: number; face: CardFace } |

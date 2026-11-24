@@ -8,6 +8,7 @@ import type { GameState, PowerKind } from "../src/game/gameTypes.ts";
 import { presentDiscard } from "../src/game/reactions.ts";
 import { startNextRound } from "../src/game/roundCycle.ts";
 import { finishRound } from "../src/game/hands.ts";
+import { observeCard } from "../src/game/memorization.ts";
 import { beginPlay, expireTurn, getTurnView } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 
@@ -17,16 +18,18 @@ const members = [
   { id: "bob", pseudo: "Bob", totalScore: 0, connected: true },
 ];
 const card = (rank: CardRank, id: string = rank): Card => ({ id, rank, suit: "spades" });
+const rememberHand = (player: GameState["players"][number]) =>
+  ({ ...player, botMemory: player.cards.map((_, position) => observeCard(player, position)) });
 
 function table(hand: CardRank[], drawn?: CardRank, power?: PowerKind): GameState {
   const state = beginPlay(createRound(members, DEFAULT_VARIANTS, 100), 0, () => 0);
   const hands: CardRank[][] = [hand, ["2", "9"], ["4", "5", "6"]];
   return {
     ...state,
-    players: state.players.map((player, index) => ({
-      ...player,
-      cards: hands[index].map((rank, pos) => card(rank, `${player.id}-${pos}`)),
-    })),
+    players: state.players.map((player, index) => {
+      const dealt = { ...player, cards: hands[index].map((rank, pos) => card(rank, `${player.id}-${pos}`)) };
+      return dealt.isBot ? rememberHand(dealt) : dealt;
+    }),
     turn: { ...state.turn!, drawnCard: drawn ? card(drawn) : null, power: power ? { kind: power, selected: [] } : null },
   };
 }
@@ -38,6 +41,24 @@ function nextBot(state: GameState, now = state.reaction.presentedAt ?? 0) {
 function step(state: GameState, now = 1_000) {
   return playBotStep(state, nextBot(state, now)!, now);
 }
+
+test("un bot ne mémorise que les cartes autorisées et ignore les valeurs cachées", () => {
+  for (const sixCards of [false, true]) {
+    const round = createRound(members, { ...DEFAULT_VARIANTS, sixCards }, 100);
+    assert.equal(beginPlay(round, 0).players[0].botMemory?.length, sixCards ? 3 : 2);
+  }
+  const round = createRound(members, DEFAULT_VARIANTS, 100);
+  round.players[0].cards = [card("5"), card("6"), card("K"), card("Q")];
+  const started = beginPlay(round, 0, () => 0);
+  const state = { ...started, turn: { ...started.turn!, drawnCard: card("3") } };
+  const hiddenChanged = { ...state, players: state.players.map((player) => player.id !== "bot" ? player :
+    { ...player, cards: [card("5"), card("6"), card("2"), card("A")] }) };
+  assert.deepEqual(nextBot(state), nextBot(hiddenChanged));
+  const reaction = presentDiscard({ ...state, currentPlayerId: "bob" }, [card("Q", "visible")], 0);
+  assert.equal(nextBot(reaction), null);
+  const played = step(state);
+  assert.ok(played.players[0].botMemory?.some(({ face }) => face.rank === "3"));
+});
 
 test("le bot remplace sa pire carte uniquement si la carte tirée est meilleure que toute la main", () => {
   const take = table(["6", "4", "Q"], "3");
@@ -58,7 +79,8 @@ test("un bot cible le joueur le plus proche de la victoire et apprend seulement 
   const look = table(["K", "6", "Q"], undefined, "look-other");
   assert.deepEqual(nextBot(look)?.action, { kind: "power-card", target: { playerId: "alice", position: 0 }, handVersion: 0 });
   const known = step(look);
-  assert.deepEqual(known.players[0].botMemory, [{ playerId: "alice", slot: 0, cardId: "alice-0", points: 2 }]);
+  assert.deepEqual(known.players[0].botMemory?.filter(({ playerId }) => playerId === "alice"),
+    [{ playerId: "alice", slot: 0, cardId: "alice-0", face: { rank: "2", suit: "spades" } }]);
   assert.equal(known.players[1].botMemory, undefined);
   assert.doesNotMatch(JSON.stringify(getTurnView(known, "bob", 1_001)), /botMemory|alice-0|"rank":"2"/);
   const swing = { ...known, turn: { ...known.turn!, power: { kind: "blind-swap" as const, selected: [] } } };
@@ -93,7 +115,7 @@ test("le bot annonce Dutch avec une main faible et une marge sur chaque adversai
   const lessRisky = { ...close, turn: { ...close.turn!, drawnCard: card("Q") } };
   assert.deepEqual(nextBot(lessRisky)?.action, { kind: "dutch-intent", enabled: true });
   const poorLead = { ...lessRisky, players: lessRisky.players.map((player) =>
-    player.id === "bot" ? { ...player, cards: [card("4"), card("A")] } : player) };
+    player.id === "bot" ? rememberHand({ ...player, cards: [card("4"), card("A")] }) : player) };
   assert.equal(nextBot(poorLead)?.action.kind, "discard");
 });
 
@@ -116,7 +138,7 @@ test("deux bots ne peuvent enchaîner leurs réactions qu’avec Pose infinie", 
     ...base,
     currentPlayerId: "bob",
     players: base.players.map((player) => player.id === "alice"
-      ? { ...player, isBot: true as const, cards: [card("6", "second"), ...player.cards] } : player),
+      ? rememberHand({ ...player, isBot: true, cards: [card("6", "second"), ...player.cards] }) : player),
   }, [card("6", "top")], 0);
   const first = step(state);
   assert.equal(first.reaction.notice?.playerId, "bot");
@@ -137,7 +159,7 @@ test("les bots tirent chacun un délai entre 0,5 et 4 secondes à partir de la d
     ...base,
     currentPlayerId: "bob",
     players: base.players.map((player) => player.id === "alice"
-      ? { ...player, isBot: true as const, cards: [card("6", "second"), ...player.cards] } : player),
+      ? rememberHand({ ...player, isBot: true, cards: [card("6", "second"), ...player.cards] }) : player),
   }, [card("6", "top")], 1_000);
 
   const delayFor = (id: string) => id === "alice" ? 2_400 : 4_000;

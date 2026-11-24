@@ -1,6 +1,7 @@
 import { getCardValue } from "./cards.ts";
 import type { BotObservation, GamePlayer, GameState, Power, PowerKind } from "./gameTypes";
 import { getHandLayout } from "./handLayout.ts";
+import { observeCard } from "./memorization.ts";
 import { canTargetCard, getPowerView, isPowerTargetLocked } from "./powers.ts";
 import { canReactToDiscard, matchesDiscard } from "./reactions.ts";
 import { playTurn, type TurnAction } from "./turn.ts";
@@ -14,20 +15,26 @@ export function getBotReactionDelay(random = Math.random) {
   return MIN_REACTION_MS + Math.floor(random() * (MAX_REACTION_MS - MIN_REACTION_MS + 1));
 }
 
-function knownPoints(bot: GamePlayer, player: GamePlayer, position: number) {
+function knownFace(bot: GamePlayer, player: GamePlayer, position: number) {
   if (!bot.botMemory?.length) return undefined;
   const slot = getHandLayout(player.cards.length, player.handLayout).slots[position];
   return bot.botMemory.find((card) => card.playerId === player.id && card.slot === slot &&
-    card.cardId === player.cards[position].id)?.points;
+    card.cardId === player.cards[position].id)?.face;
 }
 
-function opponentScore(bot: GamePlayer, player: GamePlayer) {
+function knownPoints(bot: GamePlayer, player: GamePlayer, position: number) {
+  const face = knownFace(bot, player, position);
+  return face && getCardValue(face);
+}
+
+function estimatedScore(bot: GamePlayer, player: GamePlayer) {
   return player.cards.reduce((score, _, position) => score + (knownPoints(bot, player, position) ?? unknownPoints), 0);
 }
 
 function worstPosition(player: GamePlayer) {
-  return player.cards.reduce((worst, card, position) =>
-    getCardValue(card) > getCardValue(player.cards[worst]) ? position : worst, 0);
+  return player.cards.reduce((worst, _, position) =>
+    (knownPoints(player, player, position) ?? unknownPoints) > (knownPoints(player, player, worst) ?? unknownPoints)
+      ? position : worst, 0);
 }
 
 function chooseCard(player: GamePlayer, position: number): TurnAction {
@@ -51,7 +58,11 @@ function playPower(state: GameState, bot: GamePlayer, opponents: GamePlayer[], w
   if (kind === "give-card") {
     return opponents.length ? { kind: "power-player", playerId: opponents[0].id } : pass;
   }
-  if (kind === "look-own") return selected.length ? { kind: "power-hide" } : bot.cards.length ? chooseCard(bot, worst) : pass;
+  if (kind === "look-own") {
+    if (selected.length) return { kind: "power-hide" };
+    const unknown = bot.cards.findIndex((_, position) => !knownFace(bot, bot, position));
+    return bot.cards.length ? chooseCard(bot, unknown >= 0 ? unknown : worst) : pass;
+  }
   if (kind === "look-other" && selected.length) return { kind: "power-hide" };
   if (kind === "look-and-swap" && selected.length === 2) {
     const view = getPowerView(state, power, true).selection;
@@ -63,8 +74,9 @@ function playPower(state: GameState, bot: GamePlayer, opponents: GamePlayer[], w
   const target = pickOpponentCard(bot, opponents, kind, state.dutch?.announcerId);
   if (!target || ((kind === "blind-swap" || kind === "look-and-swap") && !bot.cards.length)) return pass;
   if (kind === "look-other") return chooseCard(target.player, target.position);
-  const ownCard = selected.length ? bot.cards.find(({ id }) => id === selected[0].cardId) : bot.cards[worst];
-  if (!ownCard || (kind === "blind-swap" && getCardValue(ownCard) <= (target.points ?? unknownPoints))) return pass;
+  const ownPosition = selected.length ? bot.cards.findIndex(({ id }) => id === selected[0].cardId) : worst;
+  if (!bot.cards[ownPosition] || (kind === "blind-swap" &&
+    (knownPoints(bot, bot, ownPosition) ?? unknownPoints) <= (target.points ?? unknownPoints))) return pass;
   return selected.length ? chooseCard(target.player, target.position) : chooseCard(bot, worst);
 }
 
@@ -80,8 +92,11 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
     let nextReactionAt = Infinity;
     for (const bot of bots) {
       if (!canReactToDiscard(state, bot.id)) continue;
-      const position = bot.cards.findIndex((card) => matchesDiscard(card.rank, discard.rank, state.variants.plusMinusOne) &&
-        !isPowerTargetLocked(turn.power, card.id, state.dutch?.announcerId));
+      const position = bot.cards.findIndex((card, index) => {
+        const face = knownFace(bot, bot, index);
+        return face && matchesDiscard(face.rank, discard.rank, state.variants.plusMinusOne) &&
+          !isPowerTargetLocked(turn.power, card.id, state.dutch?.announcerId);
+      });
       if (position < 0) continue;
       const at = presentedAt + reactionDelay(bot.id);
       const delay = Math.max(0, at - now);
@@ -96,7 +111,7 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
   if (!bot) return null;
   const playerId = bot.id;
   const opponents = state.players.filter(({ id, hasLeft }) => id !== playerId && !hasLeft)
-    .sort((a, b) => a.cards.length - b.cards.length || opponentScore(bot, a) - opponentScore(bot, b) || a.totalScore - b.totalScore);
+    .sort((a, b) => a.cards.length - b.cards.length || estimatedScore(bot, a) - estimatedScore(bot, b) || a.totalScore - b.totalScore);
   const worst = worstPosition(bot);
   if (turn.power) return { playerId, action: playPower(state, bot, opponents, worst, turn.power), delay: 1_350 };
   if (!turn.drawnCard) return {
@@ -105,11 +120,11 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
   };
 
   const drawnPoints = getCardValue(turn.drawnCard);
-  const take = bot.cards.length > 0 && bot.cards.every((card) => drawnPoints < getCardValue(card));
-  const handPoints = bot.cards.reduce((sum, card) => sum + getCardValue(card), 0);
-  const expectedScore = take ? handPoints - getCardValue(bot.cards[worst]) + drawnPoints : handPoints;
+  const take = bot.cards.length > 0 && bot.cards.every((_, position) => drawnPoints < (knownPoints(bot, bot, position) ?? unknownPoints));
+  const handPoints = estimatedScore(bot, bot);
+  const expectedScore = take ? handPoints - (knownPoints(bot, bot, worst) ?? unknownPoints) + drawnPoints : handPoints;
   if (!state.dutch && !turn.dutchArmed && opponents.length && expectedScore <= (bot.cards.length <= 2 ? 10 : 6) &&
-      opponents.every((opponent) => opponentScore(bot, opponent) >= expectedScore + 5)) {
+      opponents.every((opponent) => estimatedScore(bot, opponent) >= expectedScore + 5)) {
     return { playerId, action: { kind: "dutch-intent", enabled: true }, delay: 1_150 };
   }
 
@@ -121,18 +136,20 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
 
 export function playBotStep(state: GameState, step: BotStep, now: number) {
   const next = playTurn(state, step.playerId, state.turn?.number, step.action, now);
-  if (next === state || step.action.kind !== "power-card" || !next.turn?.power) return next;
-
-  const seen = getPowerView(next, next.turn.power, true).selection?.revealed;
-  const observed = seen?.flatMap(({ target, face }): BotObservation[] => {
-    const player = next.players.find(({ id }) => id === target.playerId && id !== step.playerId);
-    const card = player?.cards[target.position];
-    return player && card ? [{
-      playerId: player.id, cardId: card.id, points: getCardValue(face),
-      slot: getHandLayout(player.cards.length, player.handLayout).slots[target.position],
-    }] : [];
-  });
-  if (!observed?.length) return next;
+  if (next === state) return next;
+  const observed: BotObservation[] = [];
+  if (step.action.kind === "power-card" && next.turn?.power) {
+    for (const { target, face } of getPowerView(next, next.turn.power, true).selection?.revealed ?? []) {
+      const player = next.players.find(({ id }) => id === target.playerId);
+      if (player?.cards[target.position]) observed.push(observeCard(player, target.position, face));
+    }
+  }
+  if (step.action.kind === "replace" && state.turn?.drawnCard) {
+    const player = next.players.find(({ id }) => id === step.playerId);
+    const position = player?.cards.findIndex(({ id }) => id === state.turn?.drawnCard?.id) ?? -1;
+    if (player && position >= 0) observed.push(observeCard(player, position));
+  }
+  if (!observed.length) return next;
   return {
     ...next,
     players: next.players.map((player) => player.id === step.playerId ? {

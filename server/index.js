@@ -72,7 +72,7 @@ function scheduleHostExpiry(hubId, pauseUntil) {
       await matchStore.finish(matchId(hub), "interrupted");
       const sockets = hub.players.map(({ socketId }) => socketId).filter(Boolean);
       if (expireHostPause(hubId, pauseUntil)) {
-        io.to(sockets).emit("hub:ended", { hubId, reason: "interrupted", matchId: matchId(hub) });
+        io.to(sockets).emit("hub:ended", { hubId, reason: "interrupted", matchId: matchId(hub), tableSummary: true });
         broadcastHubs();
       }
     };
@@ -129,7 +129,7 @@ async function persistEnd(socket, request, status, acknowledge) {
   closing.add(hub.id);
   try {
     const id = matchId(hub);
-    if (!await matchStore.finish(id, status, request.report)) {
+    if (!await matchStore.finish(id, status, request.report, Date.now(), request.table)) {
       if (typeof acknowledge === "function") acknowledge(false);
       return;
     }
@@ -243,7 +243,7 @@ io.on("connection", (socket) => {
     const now = Date.now();
     if (now - (recentCheckpoints.get(hub) ?? 0) < 12_000) return;
     recentCheckpoints.set(hub, now);
-    void matchStore.checkpoint(matchId(hub), request.sequence, request.report).then((accepted) => {
+    void matchStore.checkpoint(matchId(hub), request.sequence, request.report, request.table).then((accepted) => {
       if (typeof acknowledge === "function") acknowledge(accepted);
     }).catch((error) => console.error("Point de reprise non enregistré :", error.code ?? error.name));
   });

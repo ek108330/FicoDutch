@@ -45,12 +45,16 @@ function countPair(store: Map<string, Award>, first: string, second: string) {
   else store.set(key, { players: [first, second], value: 1 });
 }
 
-export function matchStatistics(journal: MatchJournal | undefined, status: MatchStatus, partial = false): MatchStats {
+export function matchStatistics(journal: MatchJournal | undefined, status: MatchStatus, partial = false,
+  previousGames: MatchJournal[] = []): MatchStats {
   const activities = new Map<string, Activity>();
   const botIds = new Set<string>();
   const targets = new Map<string, Award>();
   const pairs = new Map<string, Award>();
-  const lookUp = (id: string) => activities.get(id);
+  const seatsByAccount = new Map<string, string>();
+  const aliases = new Map<string, string>();
+  const canonical = (id: string) => aliases.get(id) ?? id;
+  const lookUp = (id: string) => activities.get(canonical(id));
   let discardOrigin: string | undefined;
   let rounds = 0;
   let unfinished: MatchStats["unfinished"];
@@ -60,19 +64,25 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
   };
   const attack = (from: string, to: string) => {
     const target = lookUp(to);
-    if (from === to || !target) return;
+    if (canonical(from) === canonical(to) || !target) return;
     target.received++;
-    target.haters.add(from);
+    target.haters.add(canonical(from));
   };
 
-  for (const event of matchEntries(journal)) {
+  for (const event of [...previousGames, journal].flatMap(matchEntries)) {
     switch (event.kind) {
       case "deal":
         discardOrigin = undefined;
-        unfinished = { round: event.round, reactions: 0, penalties: 0, exchanges: 0, gifts: 0 };
-        for (const { id, name, cards, isBot } of event.players) {
-          if (isBot) botIds.add(id);
-          if (!activities.has(id)) activities.set(id, newActivity(id, name, event.round));
+        unfinished = { round: rounds + 1, reactions: 0, penalties: 0, exchanges: 0, gifts: 0 };
+        for (const { id, name, accountId, cards, isBot } of event.players) {
+          if (previousGames.length && accountId) {
+            const firstSeat = seatsByAccount.get(accountId) ?? id;
+            seatsByAccount.set(accountId, firstSeat);
+            aliases.set(id, firstSeat);
+          }
+          const seat = canonical(id);
+          if (isBot) botIds.add(seat);
+          if (!activities.has(seat)) activities.set(seat, newActivity(seat, name, event.round));
           for (const card of cards) collect(id, card);
         }
         break;
@@ -114,13 +124,13 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
         if (unfinished) unfinished.exchanges++;
         const [one, two] = event.cards;
         lookUp(event.playerId)!.player.exchanges++;
-        for (const target of new Set([one.playerId, two.playerId])) {
-          if (target === event.playerId) continue;
+        for (const target of new Set([canonical(one.playerId), canonical(two.playerId)])) {
+          if (target === canonical(event.playerId)) continue;
           attack(event.playerId, target);
-          countPair(targets, event.playerId, target);
+          countPair(targets, canonical(event.playerId), target);
         }
         if (one.playerId === two.playerId) break;
-        const [first, second] = [one.playerId, two.playerId].sort();
+        const [first, second] = [canonical(one.playerId), canonical(two.playerId)].sort();
         countPair(pairs, first, second);
         for (const [given, received] of [[one, two], [two, one]]) {
           const player = lookUp(given.playerId)!;

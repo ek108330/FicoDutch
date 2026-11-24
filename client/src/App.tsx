@@ -20,11 +20,11 @@ import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
 import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RecentMatches } from "./ui/MatchArchive";
 import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, tableSummaryPath, type AccountSession } from "./network/accountApi";
-import { logDeal, logMatch } from "./game/matchJournal";
+import { logDeal, logMatch, type MatchJournal } from "./game/matchJournal";
 import { matchStatistics } from "./game/matchStatistics";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number };
-type HostRound = { hubId: string; gameNumber: number; state: GameState };
+type HostRound = { hubId: string; gameNumber: number; state: GameState; previousGames?: MatchJournal[] };
 
 function prepareGame(hub: Hub) {
   const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
@@ -69,7 +69,7 @@ function App() {
 
   const navigate = useCallback((destination: string) => {
     if (destination === pathRef.current) return;
-    window.history.pushState(null, "", destination);
+    window.history.pushState({ ficoDutch: true }, "", destination);
     pathRef.current = destination;
     setPath(destination);
     window.scrollTo(0, 0);
@@ -77,6 +77,11 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
+    if ((pathRef.current === "/compte" || pathRef.current === "/mes-stats") && !window.history.state?.ficoDutch) {
+      const destination = window.location.href;
+      window.history.replaceState({ ficoDutch: true }, "", "/");
+      window.history.pushState({ ficoDutch: true }, "", destination);
+    }
     const onHistory = () => {
       pathRef.current = window.location.pathname;
       setPath(pathRef.current);
@@ -96,6 +101,7 @@ function App() {
 
   function changeAccount(next: AccountSession) {
     setAccountSession(next);
+    if (account?.id === next.account?.id) return;
     setNetworkReady(false);
     socket.disconnect().connect();
   }
@@ -157,7 +163,9 @@ function App() {
       const round = hostRoundRef.current;
       if (round?.hubId === update.id && update.gameStarted) {
         let state = round.state;
+        let previousGames = round.previousGames;
         if (update.gameNumber > round.gameNumber) {
+          if (state.journal) previousGames = [...(previousGames ?? []), state.journal];
           state = { ...prepareGame(update), phase: "dealing", phaseDeadline: receivedAt + GAME_CONFIG.round.dealingMs };
           pausedAt.current = null;
         } else if (state.roundNumber === 1 && state.phase === "memorization" &&
@@ -173,7 +181,7 @@ function App() {
 
         const presentIds = new Set(update.players.map(({ id }) => id));
         state = applyDepartures(state, presentIds, pausedAt.current ?? receivedAt);
-        if (state !== round.state) storeHostRound({ ...round, gameNumber: update.gameNumber, state });
+        if (state !== round.state) storeHostRound({ ...round, gameNumber: update.gameNumber, state, previousGames });
       }
       storeHub({ ...update, memorizationDeadline, pauseDeadline });
     }
@@ -215,7 +223,7 @@ function App() {
             if (saved.matchId) {
               void readMatch(saved.matchId).then((match) => {
                 if (match.status === "interrupted" && !sessionRef.current && pathRef.current === "/") {
-                  navigate(matchPath(match.id));
+                  navigate(tableSummaryPath(match.id));
                 }
               }, () => {});
             }
@@ -324,6 +332,7 @@ function App() {
     const journal = logMatch(state, performance.now(), { kind: "match-end", status }).journal;
     socket.timeout(8_000).emit(status === "finished" ? "hub:finish" : "hub:interrupt", {
       hubId: hub.id, gameNumber: hub.gameNumber, report: matchStatistics(journal, status),
+      ...(round.previousGames?.length && { table: matchStatistics(journal, "interrupted", false, round.previousGames) }),
     }, (error: Error | null, accepted?: boolean) => {
       if (sealed.current === id) sealed.current = null;
       if (status === "interrupted" && (error || !accepted) && hubRef.current?.id === hub.id) {
@@ -357,6 +366,7 @@ function App() {
       const sequence = journal.entry.sequence;
       socket.timeout(6_000).emit("hub:checkpoint", {
         hubId: round.hubId, gameNumber: round.gameNumber, sequence, report: matchStatistics(journal, "interrupted", true),
+        ...(round.previousGames?.length && { table: matchStatistics(journal, "interrupted", true, round.previousGames) }),
       }, (error: Error | null, accepted?: boolean) => {
         if (!error && accepted) sentSequence = Math.max(sentSequence, sequence);
       });
@@ -565,9 +575,9 @@ function App() {
                   <button className="primary-button" type="submit" disabled={!accountSession}>
                     <Plus size={19} aria-hidden="true" /> Créer un Hub
                   </button>
-                  {accountSession?.enabled ? <div className="account-links">
-                    <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>{account ? "Mon compte" : "Se connecter ou créer un compte"}</a>
-                  </div> : null}
+                  {accountSession?.enabled && !account && <div className="account-links">
+                    <a href="/compte" onClick={(event) => { event.preventDefault(); navigate("/compte"); }}>Se connecter ou créer un compte</a>
+                  </div>}
                 </form>
                 <section className="home-join" aria-labelledby="join-title">
                   <h2 id="join-title">Rejoindre une partie</h2>
@@ -605,7 +615,8 @@ function App() {
   return (
     <>
       {renderScreen()}
-      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management} />
+      <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
+        onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined} />
     </>
   );
 }

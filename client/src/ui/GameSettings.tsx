@@ -1,5 +1,5 @@
 import { useId, useState, type RefObject } from "react";
-import { BookOpen, Users, Volume2, VolumeX, X } from "lucide-react";
+import { BookOpen, UserRound, Users, Volume2, VolumeX, X } from "lucide-react";
 import HubManagement, { type HubManagementOptions } from "./HubManagement";
 import Rules from "./Rules";
 
@@ -8,9 +8,10 @@ type Props = {
   sound: boolean;
   toggleSound: () => void;
   management?: HubManagementOptions;
+  onAccount?: () => void;
 };
 
-export default function GameSettings({ dialog, sound, toggleSound, management }: Props) {
+export default function GameSettings({ dialog, sound, toggleSound, management, onAccount }: Props) {
   const title = useId();
   const [panel, setPanel] = useState<"settings" | "rules" | "table">("settings");
   const showRules = panel === "rules";
@@ -36,6 +37,9 @@ export default function GameSettings({ dialog, sound, toggleSound, management }:
             <button type="button" onClick={() => setPanel("rules")}>
               <BookOpen size={19} aria-hidden="true" /> Règles du jeu
             </button>
+            {onAccount && <button type="button" onClick={() => { dialog.current?.close(); onAccount(); }}>
+              <UserRound size={19} aria-hidden="true" /> Mon compte
+            </button>}
             {management && (
               <button type="button" className="settings-management" onClick={() => setPanel("table")}>
                 <Users size={19} aria-hidden="true" /> Gérer la table

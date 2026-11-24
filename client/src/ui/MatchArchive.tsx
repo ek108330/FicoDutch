@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Crosshair, Crown, Flame, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
-import type { Award, AwardId, MatchPlayer, Profile, SavedMatch, TableSummary } from "../../../shared/statistics";
-import { guestMatchToken, matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
-  readTableSummary, rememberGuestMatch } from "../network/accountApi";
+import { ArrowLeft, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert } from "lucide-react";
+import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
+import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readProfile, readRecentMatches,
+  readTableSummary, tableSummaryPath } from "../network/accountApi";
 
 type Navigate = (path: string) => void;
 type RouteProps = { navigate: Navigate; backToTable?: boolean; leaveTable?: () => void };
@@ -11,9 +11,9 @@ const date = new Intl.DateTimeFormat("fr", { dateStyle: "medium", timeStyle: "sh
 const number = new Intl.NumberFormat("fr", { maximumFractionDigits: 1 });
 const seconds = new Intl.NumberFormat("fr", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const individual = [
-  ["shuriken", "Shuriken", Swords], ["luckyLuke", "Lucky Luke", Timer], ["boulet", "Le boulet", TriangleAlert],
-  ["cible", "La cible", Crosshair], ["pyromane", "Le pyromane", Flame], ["roisNoirs", "Le collectionneur de Rois noirs", Crown],
-  ["distributeur", "Le distributeur", Gift],
+  ["shuriken", "Shuriken de la défausse", Swords], ["luckyLuke", "Lucky Lucke", Timer], ["boulet", "Le boulet", TriangleAlert],
+  ["cible", "La cible des échanges et Jokers", Crosshair], ["roisNoirs", "Mr. Roinoir", Crown],
+  ["distributeur", "Le distributeur de cartes", Gift],
 ] as const;
 const interactions: [AwardId, string][] = [
   ["victime", "Victime préférée"], ["rivalite", "Rivalité principale"], ["meilleur", "Meilleur échange"],
@@ -64,7 +64,6 @@ function awardValue(id: AwardId, { value, extra }: Award) {
   switch (id) {
     case "luckyLuke": return `${seconds.format(value / 1_000)} s`;
     case "cible": return `${plural(value, "action")} / ${plural(extra ?? 0, "hater")}`;
-    case "pyromane": return plural(value, "carte provoquée", "cartes provoquées");
     case "roisNoirs": return plural(value, "Roi noir", "Rois noirs");
     default: return extra === undefined ? plural(value, "carte") : `${plural(value, "carte")} / ${plural(extra, "point")}`;
   }
@@ -103,6 +102,7 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
       <span>{duration}</span><span>{plural(match.players.length, "joueur")}</span>
       <span>{plural(match.rounds, "manche terminée", "manches terminées")}</span>
     </div>
+    {match.scopeIncomplete && <p className="archive-note">Seules les statistiques de la dernière partie sont disponibles pour cette ancienne table.</p>}
     {match.status === "interrupted" && <p className="archive-note">{match.partial
       ? "Bilan partiel établi avec les dernières données reçues. Certaines actions et valeurs peuvent manquer."
       : "Les actions validées avant l’interruption sont incluses. Les victoires et les Dutch réussis proviennent des manches terminées."}</p>}
@@ -112,6 +112,7 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
     </section>}
     {sorted.length > 0 && <section className="archive-card archive-ranking">
       <h2>Classement officiel</h2>
+      {match.status === "interrupted" && <p>Dernière partie terminée</p>}
       <table><thead><tr><th>Rang</th><th>Joueur</th><th>Total</th></tr></thead>
         <tbody>{sorted.map((player) => <tr key={player.id}>
           <td>{player.rank}</td><th scope="row"><PlayerName player={player} navigate={navigate} /></th><td>{player.total}</td>
@@ -122,7 +123,6 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
       <h2 id="individual-title">Récompenses individuelles</h2>
       <div className="archive-awards">{individual.map(([id, title, Icon]) => {
         const awards = match.awards[id];
-        if (id === "distributeur" && !awards?.length) return null;
         return <article className="archive-card" key={id}>
           <Icon size={23} aria-hidden="true" />
           <h3>{title}</h3>
@@ -147,76 +147,8 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
   </>;
 }
 
-function CumulativeResults({ summary, navigate }: { summary: TableSummary; navigate: Navigate }) {
-  const totals = new Map<string, { player: MatchPlayer; games: number; gameWins: number; rounds: number; wins: number;
-    dutch: number; dutchWon: number; reactions: number; penalties: number; exchanges: number }>();
-  let rounds = 0;
-  for (const game of summary.games) {
-    rounds += game.rounds;
-    for (const player of game.players) {
-      const id = player.accountId ?? player.id;
-      const total = totals.get(id) ?? { player, games: 0, gameWins: 0, rounds: 0, wins: 0,
-        dutch: 0, dutchWon: 0, reactions: 0, penalties: 0, exchanges: 0 };
-      total.player = player;
-      total.games++;
-      if (player.rank === 1 && player.eligible !== false) total.gameWins++;
-      total.rounds += player.rounds;
-      total.wins += player.wins;
-      total.dutch += player.dutch;
-      total.dutchWon += player.dutchWon;
-      total.reactions += player.reactions;
-      total.penalties += player.penalties;
-      total.exchanges += player.exchanges;
-      totals.set(id, total);
-    }
-  }
-
-  function openMatch(id: string) {
-    const token = guestMatchToken(summary.match.id);
-    if (token) rememberGuestMatch(id, token);
-    navigate(matchPath(id));
-  }
-
-  return <section className="archive-card cumulative-results" aria-labelledby="cumulative-title">
-    <h2 id="cumulative-title">Bilan cumulé de la table</h2>
-    <p>{plural(summary.games.length, "partie")} · {plural(rounds, "manche terminée", "manches terminées")}</p>
-    <div className="cumulative-players">
-      {Array.from(totals.values(), ({ player, games, gameWins, rounds, wins, dutch, dutchWon, reactions, penalties, exchanges }) => (
-        <article className="cumulative-player" key={player.accountId ?? player.id}>
-          <h3><PlayerName player={player} navigate={navigate} /></h3>
-          <dl>
-            <div><dt>Parties gagnées</dt><dd>{gameWins} / {games}</dd></div>
-            <div><dt>Manches gagnées</dt><dd>{wins} / {rounds}</dd></div>
-            <div><dt>Dutch réussis</dt><dd>{dutchWon} / {dutch}</dd></div>
-            <div><dt>Réactions</dt><dd>{reactions}</dd></div>
-            <div><dt>Pénalités</dt><dd>{penalties}</dd></div>
-            <div><dt>Échanges</dt><dd>{exchanges}</dd></div>
-          </dl>
-        </article>
-      ))}
-    </div>
-    {summary.games.length > 1 && <ul className="archive-list">
-      {summary.games.filter(({ id }) => id !== summary.match.id).map((game) => <li key={game.id}>
-        <Link path={matchPath(game.id)} navigate={() => openMatch(game.id)}>{date.format(game.startedAt)}</Link>
-        <span>{plural(game.rounds, "manche terminée", "manches terminées")}</span>
-      </li>)}
-    </ul>}
-  </section>;
-}
-
-function InterruptedTable({ id, ...props }: RouteProps & { id: string }) {
-  const loader = useCallback((signal: AbortSignal) => readTableSummary(id, signal), [id]);
-  return <ArchiveFrame title="Statistiques de la partie" {...props}>
-    <Load loader={loader}>{(summary) => <>
-      <CumulativeResults summary={summary} navigate={props.navigate} />
-      <MatchContent match={summary.match} navigate={props.navigate} />
-    </>}</Load>
-  </ArchiveFrame>;
-}
-
 export function MatchArchive({ id, tableSummary, ...props }: RouteProps & { id: string; tableSummary: boolean }) {
-  const [loader] = useState(() => (signal: AbortSignal) => readMatch(id, signal));
-  if (tableSummary) return <InterruptedTable id={id} {...props} />;
+  const loader = useCallback((signal: AbortSignal) => (tableSummary ? readTableSummary : readMatch)(id, signal), [id, tableSummary]);
   return <ArchiveFrame title="Statistiques de la partie" {...props}>
     <Load loader={loader}>{(match) => <MatchContent match={match} navigate={props.navigate} />}</Load>
   </ArchiveFrame>;
@@ -283,7 +215,8 @@ export function RecentMatches(props: RouteProps) {
   return <ArchiveFrame title="Mes parties" {...props}>
     <Load key={cursor} loader={loader}>{({ matches, next }) =>
       <section className="archive-card">{matches.length ? <ul className="archive-list">{matches.map((entry) =>
-        <li key={entry.id}><Link navigate={props.navigate} path={matchPath(entry.id)}>{date.format(entry.date)}</Link>
+        <li key={entry.id}><Link navigate={props.navigate}
+          path={(entry.status === "interrupted" ? tableSummaryPath : matchPath)(entry.id)}>{date.format(entry.date)}</Link>
           <span>{entry.status === "finished" ? "Terminée" : "Interrompue"}</span></li>,
       )}</ul> : <p>Aucune partie enregistrée.</p>}
         {(pages.length > 1 || next) && <nav className="archive-actions" aria-label="Pages de l’historique">

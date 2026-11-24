@@ -32,9 +32,7 @@ export type MatchStats = {
   unfinished?: { round: number; reactions: number; penalties: number; exchanges: number; gifts: number };
 };
 
-export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number };
-export type TableMatch = Pick<SavedMatch, "id" | "status" | "rounds" | "players" | "startedAt">;
-export type TableSummary = { match: SavedMatch; games: TableMatch[] };
+export type SavedMatch = MatchStats & { id: string; startedAt: number; endedAt: number; scopeIncomplete?: boolean };
 export type DirectoryPlayer = { id: string; name: string; demoBot: boolean; matches: number };
 
 export type Account = { id: string; handle: string; name: string };

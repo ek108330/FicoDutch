@@ -1,6 +1,7 @@
 import { getCardFace, type Card, type CardFace, type CardRank } from "./cards.ts";
 import { takeFromPile } from "./deck.ts";
 import { appendCard, changeHand, recordCardMove } from "./hands.ts";
+import { getHandLayout } from "./handLayout.ts";
 import { journalCard, logMatch } from "./matchJournal.ts";
 import type { CardTarget, GameState, Power, PowerKind, SelectedCard, Turn } from "./gameTypes";
 
@@ -93,7 +94,8 @@ function resolveCard(state: GameState, selected: SelectedCard) {
   const player = state.players.find(({ id }) => id === selected.playerId);
   const position = player?.cards.findIndex(({ id }) => id === selected.cardId) ?? -1;
   return player && position >= 0
-    ? { target: { playerId: player.id, position }, card: player.cards[position] }
+    ? { target: { playerId: player.id, position }, card: player.cards[position],
+      slot: getHandLayout(player.cards.length, player.handLayout).slots[position] }
     : null;
 }
 
@@ -107,11 +109,24 @@ function swapCards(state: GameState, playerId: string, power: "blind-swap" | "lo
     ...state,
     cardMotion: recordCardMove(state, { kind: "swap", targets: [a.target, b.target] }, now),
     players: state.players.map((player) => {
-      if (player.id !== first.playerId && player.id !== second.playerId) return player;
-      const cards = player.cards.slice();
-      if (player.id === first.playerId) cards[a.target.position] = b.card;
-      if (player.id === second.playerId) cards[b.target.position] = a.card;
-      return changeHand(player, cards);
+      let next = player;
+      if (player.id === first.playerId || player.id === second.playerId) {
+        const cards = player.cards.slice();
+        if (player.id === first.playerId) cards[a.target.position] = b.card;
+        if (player.id === second.playerId) cards[b.target.position] = a.card;
+        next = changeHand(player, cards);
+      }
+      if (player.id !== playerId || !player.botMemory) return next;
+      const botMemory = player.botMemory.map((observation) => {
+        if (observation.cardId === a.card.id && observation.playerId === a.target.playerId && observation.slot === a.slot) {
+          return { ...observation, playerId: b.target.playerId, slot: b.slot };
+        }
+        if (observation.cardId === b.card.id && observation.playerId === b.target.playerId && observation.slot === b.slot) {
+          return { ...observation, playerId: a.target.playerId, slot: a.slot };
+        }
+        return observation;
+      });
+      return { ...next, botMemory };
     }),
   }, now, { kind: "swap", playerId, cards: [
     { playerId: first.playerId, card: journalCard(a.card) },

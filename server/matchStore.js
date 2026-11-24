@@ -102,10 +102,22 @@ function createMatchStore(db) {
     return rows;
   }
 
-  async function checkpoint(id, sequence, raw) {
+  async function cleanTable(source, id, raw, partial) {
+    if (!raw) return null;
+    const { rows } = await source.query(`
+      SELECT DISTINCT ON (s.seat_id) s.seat_id, s.account_id, s.name
+      FROM match_seats s JOIN matches m ON m.id = s.match_id
+      WHERE m.id LIKE $1 ORDER BY s.seat_id, m.started_at DESC, m.id DESC
+    `, [id.split(":")[0] + ":%"]);
+    return cleanReport(raw, rows, "interrupted", partial);
+  }
+
+  async function checkpoint(id, sequence, raw, table) {
     if (!integer(sequence) || sequence < 1) return false;
     const report = cleanReport(raw, await getSeats(db, id), "interrupted", true);
     if (!report) return false;
+    const summary = await cleanTable(db, id, table, true);
+    if (summary) report.table = summary;
     await db.query(`
       UPDATE matches SET sequence = $2, checkpoint = $3, checkpoint_at = $4
       WHERE id = $1 AND ended_at IS NULL AND sequence < $2
@@ -151,7 +163,7 @@ function createMatchStore(db) {
     `, [opponents.map(({ accountId }) => accountId), opponents.map(({ rank }) => rank)]);
   }
 
-  async function finish(id, status, raw, now = Date.now()) {
+  async function finish(id, status, raw, now = Date.now(), table) {
     return db.transaction(async (tx) => {
       const { rows } = await tx.query("SELECT ended_at, checkpoint, report FROM matches WHERE id = $1 FOR UPDATE", [id]);
       const match = rows[0];
@@ -161,6 +173,8 @@ function createMatchStore(db) {
       if (raw) {
         report = cleanReport(raw, await getSeats(tx, id), status, false);
         if (!report) return false;
+        const summary = await cleanTable(tx, id, table, false);
+        if (summary) report.table = summary;
       } else if (status === "interrupted") {
         report = match.checkpoint ?? {
           status, partial: true, rounds: 0, awards: {}, players: (await getSeats(tx, id)).filter((seat) => seat.starting).map((seat) => ({
@@ -185,16 +199,26 @@ function createMatchStore(db) {
     return row && { id, ...row.report, startedAt: Number(row.started_at), endedAt: Number(row.ended_at) };
   }
 
-  async function listTableMatches(id, accountId, guestToken) {
+  async function getTableSummary(match) {
     const { rows } = await db.query(`
-      SELECT m.id, m.started_at, m.report->>'status' AS status, m.report->'rounds' AS rounds, m.report->'players' AS players
-      FROM matches m WHERE m.id LIKE $1 AND m.ended_at IS NOT NULL
-        AND EXISTS (SELECT 1 FROM match_seats s WHERE s.match_id = m.id
-          AND (s.account_id = $2 OR s.guest_token_hash = $3))
-      ORDER BY m.started_at, m.id
-    `, [id.split(":")[0] + ":%", accountId ?? null, seatHash(guestToken)]);
-    return rows.map(({ id, started_at, status, rounds, players }) =>
-      ({ id, startedAt: Number(started_at), status, rounds, players }));
+      SELECT m.id, m.started_at, m.report->>'status' AS status, m.report->'players' AS players
+      FROM matches m WHERE m.id LIKE $1 AND m.ended_at IS NOT NULL AND m.started_at <= $2
+      ORDER BY m.started_at DESC, m.id DESC
+    `, [match.id.split(":")[0] + ":%", match.startedAt]);
+    const { table, ...report } = match;
+    const summary = table ? { ...report, ...table, status: report.status } : report;
+    const official = rows.find(({ status }) => status === "finished");
+    const playerKey = ({ accountId, id }) => accountId ?? id;
+    const ranks = new Map(official?.players.filter(({ rank }) => rank !== undefined).map((player) => [playerKey(player), player]));
+    const players = summary.players.map((player) => {
+      const key = playerKey(player);
+      const ranked = ranks.get(key);
+      ranks.delete(key);
+      return ranked ? { ...player, rank: ranked.rank, total: ranked.total } : player;
+    });
+    return { ...summary, players: [...players, ...ranks.values()],
+      startedAt: Number(rows.at(-1)?.started_at ?? report.startedAt),
+      scopeIncomplete: rows.length > 1 && !table };
   }
 
   async function listPlayers(query, after) {
@@ -273,7 +297,7 @@ function createMatchStore(db) {
   }
 
   return { register, addSeat: (id, seat) => addSeat(db, id, seat), hasSeat, nameReserved, checkpoint, finish,
-    getMatch, listTableMatches, getProfile, listPlayers, listMatches, listBots, staleMatches };
+    getMatch, getTableSummary, getProfile, listPlayers, listMatches, listBots, staleMatches };
 }
 
 function mountMatchRoutes(app, store, readAccount) {
@@ -296,10 +320,10 @@ function mountMatchRoutes(app, store, readAccount) {
     const match = matchPattern.test(request.params.id) && await store.getMatch(request.params.id, session?.account.id, guestToken);
     if (!match) return response.status(404).json({ error: "Ce bilan est introuvable ou n’est pas encore disponible." });
     if (request.query.table === "1") {
-      const games = await store.listTableMatches(match.id, session?.account.id, guestToken);
-      return response.json({ match, games });
+      return response.json(await store.getTableSummary(match));
     }
-    response.json(match);
+    const { table: _table, ...report } = match;
+    response.json(report);
   });
   app.get("/api/demo-bots", async (_request, response) => {
     response.set("Cache-Control", "public, max-age=30").json(await store.listBots());

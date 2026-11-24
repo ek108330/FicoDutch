@@ -1,5 +1,6 @@
 import { getCardFace, type CardFace } from "./cards.ts";
-import type { GameState } from "./gameTypes";
+import type { BotObservation, GamePlayer, GameState } from "./gameTypes";
+import { getHandLayout } from "./handLayout.ts";
 import { journalCard, logMatch } from "./matchJournal.ts";
 
 export type MemorizedCard = {
@@ -16,6 +17,18 @@ export type MemorizeRequest = {
 
 export function memorizationLimit(sixCards: boolean) {
   return sixCards ? 3 : 2;
+}
+
+export function observeCard(player: GamePlayer, position: number, face = getCardFace(player.cards[position])): BotObservation {
+  return { playerId: player.id, slot: getHandLayout(player.cards.length, player.handLayout).slots[position],
+    cardId: player.cards[position].id, face };
+}
+
+export function memorizeBotCards(state: GameState) {
+  const limit = memorizationLimit(state.variants.sixCards);
+  return state.players.map((player) => !player.isBot || player.hasLeft ? player : {
+    ...player, botMemory: player.cards.slice(0, limit).map((_, position) => observeCard(player, position)),
+  });
 }
 
 export function memorizeCard(

@@ -7,6 +7,7 @@ import { getHandLayout } from "./handLayout.ts";
 import { applyPowerAction, getPowerView, POWER_DURATION_MS, resolveBlindSwap, startPower, type PowerAction, type PowerView } from "./powers.ts";
 import { canReactToDiscard, presentDiscard, reactToDiscard, type ReactionAction } from "./reactions.ts";
 import { journalCard, logMatch } from "./matchJournal.ts";
+import { memorizeBotCards } from "./memorization.ts";
 
 export const TURN_DURATION_MS = 60_000;
 export const FINAL_REACTION_MS = 3_000;
@@ -74,6 +75,7 @@ export function beginPlay(state: GameState, now: number, random = Math.random) {
     ...state,
     phase: "playing",
     phaseDeadline: null,
+    players: memorizeBotCards(state),
     currentPlayerId: first.id,
     turn: nextTurn(1, now),
   } satisfies GameState;

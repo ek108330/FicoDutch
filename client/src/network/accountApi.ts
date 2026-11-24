@@ -1,4 +1,4 @@
-import type { Account, DirectoryPlayer, MatchStatus, Profile, SavedMatch, TableSummary } from "../../../shared/statistics";
+import type { Account, DirectoryPlayer, MatchStatus, Profile, SavedMatch } from "../../../shared/statistics";
 import { SERVER_URL } from "./socket";
 
 export type AccountSession = { enabled: boolean; account: Account | null; demo?: boolean };
@@ -35,7 +35,7 @@ function matchOptions(id: string, signal?: AbortSignal) {
 export const readMatch = (id: string, signal?: AbortSignal) =>
   request<SavedMatch>(`/matches/${encodeURIComponent(id)}`, matchOptions(id, signal));
 export const readTableSummary = (id: string, signal?: AbortSignal) =>
-  request<TableSummary>(`/matches/${encodeURIComponent(id)}?table=1`, matchOptions(id, signal));
+  request<SavedMatch>(`/matches/${encodeURIComponent(id)}?table=1`, matchOptions(id, signal));
 export const readPlayers = (query: string, after: string, signal?: AbortSignal) =>
   request<{ players: DirectoryPlayer[]; next: string | null }>(
     "/players?" + new URLSearchParams({ q: query, after }), { signal });

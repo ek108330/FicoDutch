@@ -69,14 +69,17 @@ public final class MainActivity extends Activity {
         if (current == null) return;
         current.evaluateJavascript("""
                 (() => {
-                  const dialog = document.querySelector('dialog:modal');
+                  const dialog = document.querySelector('dialog[open]');
                   if (!dialog) return false;
                   if (typeof dialog.requestClose === 'function') dialog.requestClose();
                   else dialog.close();
                   return true;
                 })()
                 """, handled -> {
-            if (current == browser && "false".equals(handled) && current.canGoBack()) current.goBack();
+            if (current != browser || "true".equals(handled)) return;
+            if (current.canGoBack()) current.goBack();
+            else if (isGameUrl(Uri.parse(current.getUrl() == null ? "" : current.getUrl()))
+                    && !GAME_URL.equals(current.getUrl())) current.loadUrl(GAME_URL);
         });
     }
 

@@ -52,7 +52,8 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   store = createMatchStore(db);
   const second = matchId({ ...hub, gameNumber: 2 });
   await store.register({ ...hub, gameNumber: 2 });
-  assert.equal(await store.checkpoint(second, 18, stats), true);
+  const table = { ...stats, rounds: 2, awards: { shuriken: [{ players: [players[0].id], value: 8 }] } };
+  assert.equal(await store.checkpoint(second, 18, stats, table), true);
   assert.equal(await store.checkpoint(second, 15, { ...stats, rounds: 0 }), true);
   await store.finish(second, "interrupted", null);
   const recovered = await store.getMatch(second, players[0].accountId);
@@ -68,10 +69,11 @@ test("les bilans sont durables, réservés aux participants et appliqués une se
   assert.equal(profile.reactions, 8);
   assert.equal(profile.victories, 1);
   assert.equal((await store.listMatches(players[0].accountId)).matches.length, 2);
-  const games = await store.listTableMatches(second, players[0].accountId);
-  assert.deepEqual(games.map(({ id, status, rounds }) => [id, status, rounds]), [
-    [id, "finished", 1], [second, "interrupted", 1],
-  ]);
-  assert.deepEqual(await store.listTableMatches(second, randomUUID()), []);
+  const summary = await store.getTableSummary(recovered);
+  assert.equal(summary.status, "interrupted");
+  assert.equal(summary.rounds, 2);
+  assert.equal(summary.awards.shuriken[0].value, 8);
+  assert.equal(summary.players[0].rank, 1);
+  assert.equal(await store.getMatch(second, randomUUID()), undefined);
   assert.deepEqual((await store.listPlayers("alice", "")).players.map(({ name }) => name), ["Alice22"]);
 });

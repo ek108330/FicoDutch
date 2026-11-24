@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { discard, discardDrawn, drawDeck, expectLocalTurn, fixDeckOrder, openManagement } from "./tableFlow";
+import { discard, discardDrawn, drawDeck, expectLocalTurn, fixDeckOrder, openManagement, openSettings } from "./tableFlow";
 
 const password = "essai";
 const ready = (page: Page) => page.getByRole("heading", { name: "Statistiques de la partie" });
@@ -24,6 +24,12 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.getByRole("button", { name: "Mes stats" }).click();
     await expect(page.getByText("Connecte-toi pour retrouver tes statistiques personnelles.")).toBeVisible();
     await page.goBack();
+    await expect(page.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
+    const settings = await openSettings(page);
+    await settings.getByRole("button", { name: "Mon compte", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Connexion", exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Autres joueurs" }).click();
     await expect(page.getByRole("listitem")).toHaveCount(10);
     await page.screenshot({ path: testInfo.outputPath("dix-bots.png"), fullPage: true });
@@ -71,7 +77,7 @@ async function signIn(page: Page, handle: string, register = false) {
   await page.getByLabel("Identifiant", { exact: true }).fill(handle);
   await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: register ? "Créer mon compte" : "Se connecter", exact: true }).click();
-  await expect(page.getByRole("link", { name: "Mon compte", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Créer un Hub", exact: true })).toBeVisible();
 }
 
 async function join(page: Page, name: string) {
@@ -122,13 +128,14 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await management.getByRole("button", { name: "Interrompre la partie" }).click();
     await host.getByRole("button", { name: "Confirmer l’interruption" }).click();
     await Promise.all([host, guest].map((tab) => expect(ready(tab)).toBeVisible()));
-    const cumulative = (tab: Page) => tab.getByRole("region", { name: "Bilan cumulé de la table" });
-    await expect(cumulative(guest)).toContainText("2 parties · 1 manche terminée");
-    expect(await cumulative(host).innerText()).toEqual(await cumulative(guest).innerText());
+    for (const tab of [host, guest]) {
+      await expect(tab.getByText("1 manche terminée", { exact: true })).toBeVisible();
+      await expect(tab.getByRole("heading", { name: "Bilan cumulé de la table" })).toHaveCount(0);
+      await expect(tab.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
+      await expect(tab.getByRole("region", { name: "Interactions et rivalités" })).toContainText("a fait échouer 1 annonce Dutch");
+    }
+    expect(await host.locator(".archive-screen").innerText()).toEqual(await guest.locator(".archive-screen").innerText());
     await guest.screenshot({ path: testInfo.outputPath("02-bilan-cumule-portrait.png"), fullPage: true });
-    await cumulative(guest).getByRole("link").last().click();
-    await expect(guest.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
-    const url = guest.url();
 
     await otherDevice.goto("/compte");
     await otherDevice.getByLabel("Pseudo", { exact: true }).fill("BobbyMobile");
@@ -148,7 +155,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await otherDevice.getByRole("listitem").filter({ hasText: "Terminée" }).getByRole("link").click();
     await expect(ready(otherDevice)).toBeVisible();
     await expect(otherDevice.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
-    expect(otherDevice.url()).toBe(url);
+    const url = otherDevice.url();
 
     const anonymous = await browser.newPage({ baseURL });
     try {
@@ -196,9 +203,9 @@ test("l’interruption d’une manche conserve une réaction et une pénalité s
       await expect(page.getByText("0 manches terminées", { exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Classement officiel" })).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Activité de la manche 1 interrompue" })).toContainText("1 réaction valide · 1 pénalité");
-      await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Shuriken" }) })).toContainText("BobbyPartie");
+      await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Shuriken de la défausse" }) })).toContainText("BobbyPartie");
       await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Le boulet" }) })).toContainText("AlicePartie");
-      await expect(page.getByRole("heading", { name: "Le distributeur" })).toHaveCount(0);
+      await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Le distributeur de cartes" }) })).toContainText("Non attribuée");
     }
     await guest.screenshot({ path: testInfo.outputPath("01-interruption-portrait.png"), fullPage: true });
     await guest.setViewportSize({ width: 740, height: 360 });
