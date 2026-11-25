@@ -14,7 +14,7 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     const gearBox = (await gear.boundingBox())!;
     const titleBox = (await page.locator(".brand span").boundingBox())!;
     const versionBox = (await page.locator(".top-bar .version").boundingBox())!;
-    expect(logoBox.width).toBeGreaterThan(30);
+    expect(logoBox.width).toBeCloseTo(58.95, 1);
     expect(titleBox.width).toBeGreaterThan(200);
     expect(gearBox.x - (titleBox.x + titleBox.width)).toBeLessThan(12);
     expect(logoBox.y + logoBox.height / 2).toBeCloseTo(gearBox.y + gearBox.height / 2, 0);
@@ -53,6 +53,7 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await guest.locator(".hub-item").filter({ hasText: "Hub de AliceLayout" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
     await expect(start).toBeEnabled();
+    await expect(logo).toHaveCSS("width", "36px");
     await expectScreenFits(page);
     await expect(start).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath("hub-360.png") });

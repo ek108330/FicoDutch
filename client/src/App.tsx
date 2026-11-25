@@ -671,7 +671,7 @@ function App() {
     const previewHub = hubs.find((hub): hub is Hub => hub.id === previewHubId && !hub.isPrivate && "variants" in hub);
     return (
       <main className="home-page">
-        <header className="top-bar">
+        <header className={currentHub ? "top-bar" : "top-bar home-top-bar"}>
           <div className="brand"><img src="/ficodutch-logo.png" alt="" width="30" height="20" /> <span>FicoDutch</span></div>
           {settings}
           <span className="version">Version {GAME_CONFIG.version}</span>
