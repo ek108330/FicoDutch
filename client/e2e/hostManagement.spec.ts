@@ -2,20 +2,32 @@ import { expect, test } from "@playwright/test";
 import { closeSettings, discardDrawn, discard, drawDeck, drawnCard, fixDeckOrder, openLobby, openManagement,
   openSettings, openTwoPlayerHub, expectLocalTurn } from "./tableFlow";
 
-test("l’hôte peut retirer un invité de la salle d’attente", async ({ page: host, browser, baseURL }) => {
+test("l’hôte peut éjecter un invité depuis son pseudo", async ({ page: host, browser, baseURL }, testInfo) => {
+  await host.setViewportSize({ width: 390, height: 780 });
   const guest = await browser.newPage({ baseURL });
   try {
     const start = await openTwoPlayerHub(host, guest, "AliceSalon", "BobSalon");
     await expect(host.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
     await expect((await openSettings(guest)).getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
     await closeSettings(guest);
-    const dialog = await openManagement(host);
-    await expect(dialog.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);
-    await dialog.getByRole("button", { name: "Retirer BobSalon" }).click();
-    await dialog.getByRole("button", { name: "Confirmer le retrait" }).click();
+    const roster = host.getByRole("list", { name: "Joueurs présents" });
+    const pseudo = roster.getByRole("button", { name: "BobSalon", exact: true });
+    const dialog = host.getByRole("dialog", { name: "BobSalon" });
+    await expect(guest.getByRole("list", { name: "Joueurs présents" }).getByRole("button")).toHaveCount(0);
+    await expect(host.getByText(/Salle d[’\x27]attente/)).toHaveCount(0);
+    await expect(host.getByText(/\d+\/\d+ joueurs/)).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
+    await pseudo.click();
+    await expect(dialog).toBeVisible();
+    await host.screenshot({ path: testInfo.outputPath("hub-ejecter-joueur.png") });
+    await host.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(pseudo).toBeFocused();
+    await pseudo.click();
+    await dialog.getByRole("button", { name: "Éjecter du Hub" }).click();
     await expect(guest.getByRole("status").filter({ hasText: "L’hôte t’a retiré de la table." })).toBeVisible();
     await expect(start).toBeDisabled();
-    await expect(host.getByText("1/6 joueurs", { exact: true })).toBeVisible();
+    await expect(roster.getByRole("listitem")).toHaveCount(1);
     await host.getByRole("button", { name: "Quitter le Hub" }).click();
     await expect(guest.getByText("Hub de AliceSalon", { exact: true })).toHaveCount(0);
   } finally {
@@ -36,8 +48,8 @@ test("le retrait conserve les cartes et l’interruption confirmée ferme la tab
     await openLobby(removed, "ChloeGestion");
     await removed.locator(".hub-item").filter({ hasText: "Hub de AliceGestion" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
-    await expect(removed.getByText("Salle d'attente")).toBeVisible();
-    await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
+    await expect(removed.getByRole("list", { name: "Joueurs présents" })).toBeVisible();
+    await expect(host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(3);
     await start.click();
     await expectLocalTurn(removed, 18_000);
     await drawDeck(removed).click();

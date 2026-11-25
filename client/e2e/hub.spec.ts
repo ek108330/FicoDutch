@@ -30,7 +30,7 @@ for (const cardsPerPlayer of [4, 6]) {
       for (const [page, pseudo] of [[host, hostPseudo], [guest, guestPseudo]] as const) {
         const table = page.locator(".game-table");
         await expect(table).toBeVisible();
-        await expect(page.getByText("Salle d'attente")).toHaveCount(0);
+        await expect(page.getByRole("list", { name: "Joueurs présents" })).toHaveCount(0);
         await expect(table.locator(".position-bottom .player-name")).toHaveText(pseudo);
         for (const position of ["top", "bottom"]) {
           await expect(table.locator(`.position-${position} .playing-card.face-down`))

@@ -96,13 +96,13 @@ for (const count of [4, 5, 6]) {
           await openLobby(guest, guestNames[index + 1]);
           await guest.locator(".hub-item").filter({ hasText: `Hub de ${hostName}` })
             .getByRole("button", { name: "Rejoindre" }).click();
-          await expect(guest.getByText("Salle d'attente")).toBeVisible();
+          await expect(guest.getByRole("list", { name: "Joueurs présents" })).toBeVisible();
         }
         if (cards === 6) {
           await host.getByRole("button", { name: "6 cartes", exact: true }).click();
           if (joker) await host.getByRole("button", { name: "Joker +", exact: true }).click();
         }
-        await expect(host.getByText(`${count}/6 joueurs`, { exact: true })).toBeVisible();
+        await expect(host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(count);
         if (joker) {
           for (const [width, height] of [[360, 640], [740, 360]]) {
             await host.setViewportSize({ width, height });

@@ -279,7 +279,7 @@ test("le chrono de consultation commence en haut sur les cartes latérales en pa
     await openLobby(last, "ChloeCadran");
     await last.locator(".hub-item").filter({ hasText: "Hub de AliceCadran" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
-    await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
+    await expect(host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(3);
     await expect(start).toBeEnabled();
     await start.click();
     await expectLocalTurn(last, 18_000);

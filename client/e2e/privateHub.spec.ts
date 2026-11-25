@@ -35,10 +35,10 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await host.screenshot({ path: testInfo.outputPath("hub-prive-admissions.png") });
     await guest.screenshot({ path: testInfo.outputPath("accueil-hub-prive.png") });
     await host.getByRole("button", { name: "Accepter InvitePrive" }).click();
-    await expect(guest.getByText("2/6 joueurs")).toBeVisible();
+    await expect(guest.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(2);
     await expect(guest.getByRole("checkbox", { name: "Hub Privé" })).toBeDisabled();
-    await expect(guest.getByRole("button", { name: /Retirer/ })).toHaveCount(0);
-    await host.getByRole("button", { name: "Retirer InvitePrive" }).click();
+    await host.getByRole("button", { name: "InvitePrive", exact: true }).click();
+    await host.getByRole("button", { name: "Éjecter du Hub" }).click();
     await expect(guest.getByText("L’hôte t’a retiré de la table.")).toBeVisible();
     await requestAdmission(guest);
     await host.getByRole("button", { name: "Accepter InvitePrive" }).click();
@@ -50,11 +50,12 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await requestAdmission(outsider);
     for (let count = 3; count <= 6; count++) {
       await host.getByRole("button", { name: "Ajouter un bot" }).click();
-      await expect(host.getByText(`${count}/6 joueurs`)).toBeVisible();
+      await expect(host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(count);
     }
     await expect(outsider.getByText("La demande d’admission a été clôturée.")).toBeVisible();
     await expect(host.getByRole("button", { name: "Accepter AttentePrive" })).toHaveCount(0);
-    await host.getByRole("button", { name: "Retirer Bot 1", exact: true }).click();
+    await host.getByRole("button", { name: "Bot 1", exact: true }).click();
+    await host.getByRole("button", { name: "Éjecter du Hub" }).click();
     await requestAdmission(outsider);
     await expect(host.getByRole("button", { name: "Accepter AttentePrive" })).toBeVisible();
     await host.getByRole("button", { name: "Lancer la partie" }).click();
@@ -82,7 +83,7 @@ test("une longue file privée défile et se filtre sans déplacer le bouton de l
     await expect(privateSetting).toBeChecked();
     await host.getByRole("button", { name: "Ajouter un bot" }).click();
     const botCard = host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem").filter({ hasText: "Bot 1" });
-    await expect(botCard.locator(":scope > :first-child")).toHaveAccessibleName("Retirer Bot 1");
+    await expect(botCard.getByRole("button", { name: "Bot 1", exact: true })).toHaveAttribute("aria-haspopup", "dialog");
 
     const start = host.getByRole("button", { name: "Lancer la partie" });
     await expect(start).toBeEnabled();

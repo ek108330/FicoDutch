@@ -170,6 +170,14 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await Promise.all([rejected(guest), create(guest).click()]);
     for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Ajouter un bot" }).click();
     await expect(game(page)).toBeEnabled();
+    const hubRatings = page.getByRole("list", { name: "Joueurs présents" }).locator(".lobby-rn");
+    await expect(hubRatings).toHaveCount(5);
+    for (const rating of await hubRatings.all()) {
+      await expect(rating).toHaveText(/^\d+$/);
+      await expect(rating).toHaveCSS("background-color", "rgb(243, 222, 154)");
+    }
+    await expectScreenFits(page);
+    await page.screenshot({ path: testInfo.outputPath("hub-six-joueurs-rn.png") });
     await game(page).click();
     await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible();
     await expect(page.locator(".position-bottom .player-avatar")).toHaveCount(0);

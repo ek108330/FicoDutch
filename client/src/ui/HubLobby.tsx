@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Ban, Check, Crown, Search, X } from "lucide-react";
+import { Check, Crown, Search, X } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
@@ -74,8 +74,27 @@ function AdmissionQueue({ requests, connected, onDecision }: {
 export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, isHost, canStart,
   onStart, onAddBot, onLeave, onUpdate, onRemove, onDecision }: Props) {
   const thresholdId = useId();
+  const playerActionsTitle = useId();
+  const playerActions = useRef<HTMLDialogElement>(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string>();
+  const selectedPlayer = isHost
+    ? hub.players.find((player) => player.id === selectedPlayerId && !player.isHost)
+    : undefined;
   const points = hub.endThreshold === null ? "Sans limite" : `${hub.endThreshold} points`;
   const managesAdmission = isHost && hub.isPrivate;
+
+  useEffect(() => {
+    const dialog = playerActions.current;
+    if (selectedPlayer && dialog && !dialog.open) dialog.showModal();
+    if (!selectedPlayer && dialog?.open) dialog.close();
+  }, [selectedPlayer]);
+
+  useEffect(() => {
+    const closePlayerActions = () => playerActions.current?.close();
+    window.addEventListener("ficodutch:back", closePlayerActions);
+    return () => window.removeEventListener("ficodutch:back", closePlayerActions);
+  }, []);
+
   return (
     <section className={`home-panel lobby-panel${managesAdmission ? " private-lobby" : ""}`} aria-labelledby="lobby-title">
       <header className="lobby-heading">
@@ -86,10 +105,6 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
             Hub Privé
           </label>
           <h1 id="lobby-title"><HubName hub={hub} /></h1>
-        </div>
-        <div className="lobby-meta">
-          <p>Salle d'attente</p>
-          <p>{hub.players.length}/{hub.maxPlayers} joueurs</p>
         </div>
       </header>
       <fieldset className="hub-settings" aria-label="Paramètres de la partie" disabled={!isHost || !connected}>
@@ -116,17 +131,17 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
               const status = player.connected ? "Connecté" : "Déconnecté";
               return (
                 <li key={player.id}>
-                  {isHost && !player.isHost && <button className="lobby-remove" type="button" disabled={!connected}
-                    aria-label={`Retirer ${player.pseudo}`} title={`Retirer ${player.pseudo}`} onClick={() => onRemove(player.id)}>
-                    <Ban size={15} aria-hidden="true" />
-                  </button>}
                   {player.isBot ? <span className="player-bot" role="img" aria-label="Bot">
                     <PlayerAvatar id={player.accountId ?? player.id} name={player.pseudo} style={player.avatarStyle} isBot mini />
                   </span>
                     : <span className="player-connection" data-connected={player.connected} role="img"
                       aria-label={status} title={status} />}
-                  <strong>{player.pseudo}</strong>
-                  {player.rating !== undefined && <small className="lobby-rn">RN {Math.round(player.rating)}</small>}
+                  {isHost && !player.isHost
+                    ? <button className="lobby-player-name" type="button" aria-haspopup="dialog" disabled={!connected}
+                      onClick={() => setSelectedPlayerId(player.id)}>{player.pseudo}</button>
+                    : <strong>{player.pseudo}</strong>}
+                  {player.rating !== undefined && <small className="lobby-rn"
+                    aria-label={`Indice RN ${Math.round(player.rating)}`}>{Math.round(player.rating)}</small>}
                   {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
                 </li>
               );
@@ -152,6 +167,18 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
           <button type="button" className="lobby-leave" onClick={onLeave}>Quitter le Hub</button>
         </div>
       </footer>
+      <dialog className="hub-management lobby-player-actions" ref={playerActions} aria-labelledby={playerActionsTitle}
+        onClose={() => setSelectedPlayerId(undefined)}>
+        <h2 id={playerActionsTitle}>{selectedPlayer?.pseudo}</h2>
+        <div className="hub-management-actions">
+          <button type="button" autoFocus onClick={() => playerActions.current?.close()}>Annuler</button>
+          <button type="button" className="hub-danger" disabled={!connected || !selectedPlayer} onClick={() => {
+            if (!selectedPlayer) return;
+            playerActions.current?.close();
+            onRemove(selectedPlayer.id);
+          }}>Éjecter du Hub</button>
+        </div>
+      </dialog>
     </section>
   );
 }

@@ -42,7 +42,7 @@ export async function openTwoPlayerHub(host: Page, guest: Page, hostPseudo: stri
 
   await guest.locator(".hub-item").filter({ hasText: `Hub de ${hostPseudo}` })
     .getByRole("button", { name: "Rejoindre", exact: true }).click();
-  await expect(guest.getByText("Salle d'attente")).toBeVisible();
+  await expect(guest.getByRole("list", { name: "Joueurs présents" })).toBeVisible();
   await expect(guest.getByRole("button", { name: "Lancer la partie" })).toHaveCount(0);
   await expect(start).toBeEnabled({ timeout: 12_000 });
   return start;

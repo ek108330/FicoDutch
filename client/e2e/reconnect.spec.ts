@@ -98,7 +98,7 @@ test("le bouton quitter donne l’administration au premier humain connecté apr
     for (const [page, name] of [[successor, "BobDepart"], [last, "ChloeDepart"]] as const) {
       await openLobby(page, name);
       await page.locator(".hub-item").filter({ hasText: "Hub de AliceDepart" }).getByRole("button", { name: "Rejoindre" }).click();
-      await expect(page.getByText("Salle d'attente")).toBeVisible();
+      await expect(page.getByRole("list", { name: "Joueurs présents" })).toBeVisible();
     }
     await host.getByRole("button", { name: "Lancer la partie" }).click();
     await expectLocalTurn(last, 22_000);

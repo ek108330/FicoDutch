@@ -53,7 +53,7 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
     await expect(messages(newcomer)).toHaveText("Aucun message pour le moment.");
     await expect(messages(host)).toContainText(content);
-    await expect(host.getByText("3/6 joueurs", { exact: true })).toBeVisible();
+    await expect(host.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(3);
 
     await start.click();
     await expectLocalTurn(newcomer, 19_000);
