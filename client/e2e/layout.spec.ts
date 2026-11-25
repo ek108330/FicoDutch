@@ -10,6 +10,8 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await expect(page.locator(".home-page")).toHaveCSS("background-color", "rgb(16, 47, 41)");
     const logo = page.locator(".brand img");
     await expect(logo).toHaveJSProperty("naturalWidth", 144);
+    await expect(logo).toHaveCSS("object-position", "50% 0%");
+    const signature = page.getByText("by Kevin", { exact: true });
     const logoBox = (await logo.boundingBox())!;
     const gearBox = (await gear.boundingBox())!;
     const titleBox = (await page.locator(".brand span").boundingBox())!;
@@ -32,6 +34,9 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
       await page.setViewportSize({ width, height });
       await expectScreenFits(page);
       await expect(gear).toBeInViewport();
+      await expect(signature).toBeInViewport({ ratio: 1 });
+      const signatureBox = (await signature.boundingBox())!;
+      expect(signatureBox.x + signatureBox.width).toBeLessThan((await gear.boundingBox())!.x);
       await expect(page.getByRole("heading", { name: "Rejoindre une partie" })).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath(`accueil-${width}.png`) });
     }

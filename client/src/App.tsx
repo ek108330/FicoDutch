@@ -672,7 +672,10 @@ function App() {
     return (
       <main className="home-page">
         <header className={currentHub ? "top-bar" : "top-bar home-top-bar"}>
-          <div className="brand"><img src="/ficodutch-logo.png" alt="" width="30" height="20" /> <span>FicoDutch</span></div>
+          <div className="brand">
+            <img src="/ficodutch-logo.png" alt="" width="30" height="20" />
+            <span>FicoDutch{!currentHub && <sup className="brand-signature">by Kevin</sup>}</span>
+          </div>
           {settings}
           <span className="version">Version {GAME_CONFIG.version}</span>
         </header>
