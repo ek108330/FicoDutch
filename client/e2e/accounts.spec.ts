@@ -170,14 +170,27 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await Promise.all([rejected(guest), create(guest).click()]);
     for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Ajouter un bot" }).click();
     await expect(game(page)).toBeEnabled();
-    const hubRatings = page.getByRole("list", { name: "Joueurs présents" }).locator(".lobby-rn");
+    const hubRoster = page.getByRole("list", { name: "Joueurs présents" });
+    const hubRatings = hubRoster.locator(".lobby-rn");
     await expect(hubRatings).toHaveCount(5);
     for (const rating of await hubRatings.all()) {
       await expect(rating).toHaveText(/^\d+$/);
       await expect(rating).toHaveCSS("background-color", "rgb(243, 222, 154)");
+      const rightInset = await rating.evaluate((badge) =>
+        badge.parentElement!.getBoundingClientRect().right - badge.getBoundingClientRect().right);
+      expect(rightInset).toBeCloseTo(6);
+    }
+    for (const name of await hubRoster.locator(".lobby-player-name").all()) {
+      await expect(name).toHaveCSS("white-space", "nowrap");
+      await expect(name).toHaveCSS("text-overflow", "ellipsis");
     }
     await expectScreenFits(page);
     await page.screenshot({ path: testInfo.outputPath("hub-six-joueurs-rn.png") });
+    await page.setViewportSize({ width: 320, height: 568 });
+    await expectScreenFits(page);
+    await expect(page.getByRole("button", { name: "Quitter le Hub" })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: testInfo.outputPath("hub-six-joueurs-rn-320.png") });
+    await page.setViewportSize({ width: 360, height: 640 });
     await game(page).click();
     await expect(page.getByRole("region", { name: "Mémorisation" })).toBeVisible();
     await expect(page.locator(".position-bottom .player-avatar")).toHaveCount(0);

@@ -137,12 +137,13 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
                     : <span className="player-connection" data-connected={player.connected} role="img"
                       aria-label={status} title={status} />}
                   {isHost && !player.isHost
-                    ? <button className="lobby-player-name" type="button" aria-haspopup="dialog" disabled={!connected}
+                    ? <button className="lobby-player-name" type="button" title={player.pseudo}
+                      aria-haspopup="dialog" disabled={!connected}
                       onClick={() => setSelectedPlayerId(player.id)}>{player.pseudo}</button>
-                    : <strong>{player.pseudo}</strong>}
+                    : <strong title={player.pseudo}>{player.pseudo}</strong>}
+                  {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
                   {player.rating !== undefined && <small className="lobby-rn"
                     aria-label={`Indice RN ${Math.round(player.rating)}`}>{Math.round(player.rating)}</small>}
-                  {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
                 </li>
               );
             })}

@@ -516,7 +516,9 @@ input {
 .lobby-players strong,
 .lobby-player-name {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .lobby-player-name {
@@ -686,6 +688,10 @@ input {
   .top-bar { padding-inline: 8px; }
   .brand { gap: 6px; }
   .lobby-players li { font-size: 0.78rem; }
+}
+
+@media (orientation: portrait) and (max-height: 600px) {
+  .lobby-panel:not(.private-lobby) .chat-log { height: clamp(38px, 9dvh, 60px); }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
@@ -3564,7 +3570,10 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
   color: #24190c;
   font-size: 0.66em;
 }
-.lobby-rn { font-size: 0.72rem; }
+.lobby-rn {
+  margin-inline-start: auto;
+  font-size: 0.72rem;
+}
 
 @media (orientation: landscape) and (max-height: 450px) {
   .home-content:has(.home-podium) { padding-block: 5px; }
