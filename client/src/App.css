@@ -2635,6 +2635,12 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   color: #243428;
 }
 
+.result-screen[data-final] .round-results .result-primary {
+  border-color: #93b8ff;
+  background: #1d4ed8;
+  color: #fff;
+}
+
 .round-results button:disabled {
   opacity: 0.7;
   cursor: default;

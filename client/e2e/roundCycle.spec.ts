@@ -73,6 +73,7 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     }
     await guest.screenshot({ path: testInfo.outputPath("01-resultats-manche-1.png") });
     await expect(next(host)).toBeEnabled();
+    await expect(next(host)).toHaveCSS("background-color", "rgb(243, 222, 154)");
     await expect(next(guest)).toHaveCount(0);
     const interruptRound = host.getByRole("button", { name: "Interrompre la partie", exact: true });
     await expect(guest.getByRole("button", { name: "Interrompre la partie", exact: true })).toHaveCount(0);
@@ -124,11 +125,12 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
     }
     await guest.setViewportSize({ width: 390, height: 844 });
     await guest.screenshot({ path: testInfo.outputPath("05-classement-final-portrait.png"), fullPage: true });
-    const startOver = host.getByRole("button", { name: "Lancer la prochaine partie" });
+    const startOver = host.getByRole("button", { name: "Lancer une nouvelle partie" });
     const interrupt = host.getByRole("button", { name: "Interrompre la partie", exact: true });
-    await expect(guest.getByRole("button", { name: "Lancer la prochaine partie" })).toHaveCount(0);
+    await expect(guest.getByRole("button", { name: "Lancer une nouvelle partie" })).toHaveCount(0);
     await expect(guest.getByRole("button", { name: "Interrompre la partie", exact: true })).toHaveCount(0);
     await expect(startOver).toBeEnabled();
+    await expect(startOver).toHaveCSS("background-color", "rgb(29, 78, 216)");
     const infinite = (page: Page) => page.getByRole("button", { name: "Pose infinie", exact: true });
     await expect(infinite(guest)).toBeDisabled();
     await expect(infinite(host)).toHaveAttribute("aria-pressed", "false");

@@ -162,7 +162,7 @@ export default function RoundResults({
               </button>}
               <button type="button" className="result-primary" disabled={isFinal ? !canRestart : !canStartNext}
                 onClick={isFinal ? onRestart : startNext}>
-                {isFinal ? "Lancer la prochaine partie" : "Lancer la manche suivante"}
+                {isFinal ? "Lancer une nouvelle partie" : "Lancer la manche suivante"}
               </button>
             </div>
           ) : null}

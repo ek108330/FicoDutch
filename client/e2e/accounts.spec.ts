@@ -367,10 +367,10 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       await expect(ready(tab)).toHaveCount(0);
     }
     await expect(guest.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);
-    await expect(host.getByRole("button", { name: "Lancer la prochaine partie" })).toBeEnabled();
+    await expect(host.getByRole("button", { name: "Lancer une nouvelle partie" })).toBeEnabled();
     await expect(host.getByRole("button", { name: "Interrompre la partie" })).toBeVisible();
     await host.screenshot({ path: testInfo.outputPath("01-fin-de-partie.png"), fullPage: true });
-    await host.getByRole("button", { name: "Lancer la prochaine partie" }).click();
+    await host.getByRole("button", { name: "Lancer une nouvelle partie" }).click();
     await expect(guest.getByRole("region", { name: "Mémorisation" })).toBeVisible();
     const management = await openManagement(host);
     await management.getByRole("button", { name: "Interrompre la partie" }).click();
