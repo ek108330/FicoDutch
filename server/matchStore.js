@@ -344,7 +344,7 @@ function createMatchStore(db) {
   }
 
   const recordDeparture = (id, seatId, reason) => db.query(
-    "UPDATE match_seats SET departure = $3 WHERE match_id = $1 AND seat_id = $2 AND departure IS NULL", [id, seatId, reason]);
+    "UPDATE match_seats SET departure = $3 WHERE match_id = $1 AND seat_id = $2 AND (departure IS NULL OR $3 = 'removed')", [id, seatId, reason]);
   const getRating = async (id) => (await db.query("SELECT rn FROM player_stats WHERE account_id = $1", [id])).rows[0]?.rn;
   const reportHistory = (reporter, target, now) => db.query(`
     INSERT INTO rating_reports (reporter_id, account_id, reported_at)

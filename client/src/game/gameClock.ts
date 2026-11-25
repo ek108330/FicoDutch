@@ -8,5 +8,7 @@ export function resumeGameClock(state: GameState, pausedFor: number): GameState 
     turn: state.turn && { ...state.turn, deadline: state.turn.deadline + pausedFor },
     reaction: state.reaction.presentedAt === null ? state.reaction
       : { ...state.reaction, presentedAt: state.reaction.presentedAt + pausedFor },
+    dutch: state.dutch?.announcedAt === undefined ? state.dutch
+      : { ...state.dutch, announcedAt: state.dutch.announcedAt + pausedFor },
   };
 }

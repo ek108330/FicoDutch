@@ -45,8 +45,16 @@ export function startNextRound(
     .map((player) => ({ ...player, previousRank: previousRanks.get(player.id) }));
   const previousIds = new Set(state.players.map(({ id }) => id));
   const startingScore = Math.max(...state.players.map(({ totalScore }) => totalScore));
+  const departedScores = { ...state.departedScores };
+  for (const { id, hasLeft, totalScore, scoreHistory } of state.players) {
+    if (hasLeft) departedScores[id] = { totalScore, scoreHistory };
+  }
   const arrivals = members.filter(({ id, connected }) => connected && !previousIds.has(id))
-    .map(({ id, pseudo, accountId }) => ({ id, pseudo, accountId, totalScore: startingScore, scoreHistory: [startingScore] }));
+    .map(({ id, pseudo, accountId }) => {
+      const score = departedScores[id] ?? { totalScore: startingScore, scoreHistory: [startingScore] };
+      delete departedScores[id];
+      return { id, pseudo, accountId, ...score };
+    });
   const participants = [...players, ...arrivals];
   const onlineIds = new Set(members.filter(({ connected }) => connected).map(({ id }) => id));
   if (participants.filter(({ id }) => onlineIds.has(id)).length < GAME_CONFIG.players.min) return state;
@@ -55,6 +63,7 @@ export function startNextRound(
     ...(state.journal ? logDeal({ ...next, matchId: state.matchId, journal: state.journal }, now) : next),
     phase: "dealing",
     phaseDeadline: now + GAME_CONFIG.round.dealingMs,
+    departedScores,
     openingPlayerId: chooseOpeningPlayer(players, result.winnerIds, random),
   };
 }

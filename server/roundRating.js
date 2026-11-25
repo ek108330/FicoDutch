@@ -41,7 +41,7 @@ function cleanRound(round, seats, previous) {
     const seat = seats.get(id);
     if (!seat || ids.has(id) || !Number.isInteger(base) || base < 0 || base > 702 || !Number.isInteger(score) ||
         typeof left !== "boolean" || (left && !seat.departure)) return null;
-    if (previous ? previous.some((entry) => entry.id === id && entry.left) : !seat.starting) return null;
+    if (!previous && !seat.starting) return null;
     ids.add(id);
   }
   if (ids.size !== scores.length) return null;

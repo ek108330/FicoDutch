@@ -1,6 +1,12 @@
 import type { HubSession } from "../../../shared/hubTypes";
 
 const sessionKey = "ficodutch-hub-session";
+const returnKey = (hubId: string) => `${sessionKey}:return:${hubId}`;
+
+export function readHubReturnToken(hubId: string) {
+  try { return sessionStorage.getItem(returnKey(hubId)); }
+  catch { return null; }
+}
 
 export function readHubSession(): HubSession | null {
   try {
@@ -18,8 +24,10 @@ export function readHubSession(): HubSession | null {
 
 export function saveHubSession(session: HubSession | null) {
   try {
-    if (session) sessionStorage.setItem(sessionKey, JSON.stringify(session));
-    else sessionStorage.removeItem(sessionKey);
+    if (session) {
+      sessionStorage.setItem(sessionKey, JSON.stringify(session));
+      sessionStorage.setItem(returnKey(session.hubId), session.token);
+    } else sessionStorage.removeItem(sessionKey);
   } catch {
     // La reprise dans le même onglet conserve le jeton en mémoire.
   }

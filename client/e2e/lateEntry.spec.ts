@@ -33,7 +33,11 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await expectLocalTurn(guest, 18_000);
 
     await expect(hub(newcomer).getByText("En cours", { exact: true })).toBeVisible();
-    await join(newcomer).click();
+    await hub(newcomer).getByRole("button", { name: "Aperçu du Hub de AliceEntree" }).click();
+    const preview = newcomer.getByRole("dialog", { name: "Hub de AliceEntree" });
+    await expect(preview.getByRole("group", { name: "Variantes" }).locator("[data-active]")).toHaveCount(4);
+    await newcomer.screenshot({ path: testInfo.outputPath("apercu-variantes-en-cours.png") });
+    await preview.getByRole("button", { name: "Rejoindre" }).click();
     await expect(waiting(newcomer)).toBeVisible();
     await expect(newcomer.getByText("Tu entreras en jeu après la manche 1.")).toBeVisible();
     await expect(ranking(newcomer)).toHaveCount(0);
@@ -63,10 +67,19 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await (await openSettings(late)).getByRole("button", { name: "Quitter la table" }).click();
     await expect(host.getByText("En attente de la prochaine manche · ChloeEntree", { exact: true })).toBeVisible();
 
+    await host.getByRole("button", { name: "Pose infinie", exact: true }).click();
     await host.getByRole("button", { name: "Lancer la manche suivante" }).click();
     await expect(newcomer.getByRole("region", { name: "Distribution des cartes" })).toBeVisible();
-    await join(late).click();
+    await hub(late).getByRole("button", { name: "Aperçu du Hub de AliceEntree" }).click();
+    const latePreview = late.getByRole("dialog", { name: "Hub de AliceEntree" });
+    await expect(latePreview.getByRole("group", { name: "Variantes" }).locator("[data-active=true]"))
+      .toHaveText("Pose infinie, activée");
+    await latePreview.getByRole("button", { name: "Rejoindre" }).click();
     await expect(late.getByText("Tu entreras en jeu après la manche 2.")).toBeVisible();
+    await late.getByRole("button", { name: "Annuler et quitter" }).click();
+    await expect(join(late)).toBeEnabled();
+    await join(late).click();
+    await expect(late.getByRole("button", { name: "Annuler et quitter" })).toBeVisible();
     await expect(newcomer.getByRole("region", { name: "Mémorisation" })).toHaveText("Mémorisation", { timeout: 9_000 });
     await expect(newcomer.locator(".playing-card.face-down")).toHaveCount(12);
     await expect(newcomer.locator(".position-bottom .playing-card.face-down")).toHaveCount(4);

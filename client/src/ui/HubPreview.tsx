@@ -9,9 +9,6 @@ type Props = { hub: Hub; canJoin: boolean; onClose: () => void; onJoin: () => vo
 export default function HubPreview({ hub, canJoin, onClose, onJoin }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
-  const activeVariants = Object.entries(VARIANT_LABELS)
-    .filter(([key]) => hub.variants[key as keyof Hub["variants"]])
-    .map(([, label]) => label);
 
   useEffect(() => {
     if (dialog.current && !dialog.current.open) dialog.current.showModal();
@@ -22,7 +19,14 @@ export default function HubPreview({ hub, canJoin, onClose, onJoin }: Props) {
       <h2 id={title}><HubName hub={hub} /></h2>
       <p>{hubStatusLabels[hub.status]} · {hub.players.length}/{hub.maxPlayers} joueurs</p>
       <p>{hub.endThreshold === null ? "Partie sans limite de points" : `Fin de partie à ${hub.endThreshold} points`}</p>
-      {activeVariants.length > 0 && <p>Variantes · {activeVariants.join(", ")}</p>}
+      <div className="variant-grid preview-variants" role="group" aria-label="Variantes">
+        {Object.entries(VARIANT_LABELS).map(([key, label]) => {
+          const active = hub.variants[key as keyof Hub["variants"]];
+          return <span key={key} data-active={active}>
+            {label}<span className="sr-only">{active ? ", activée" : ", désactivée"}</span>
+          </span>;
+        })}
+      </div>
       <ul className="hub-management-list" aria-label="Joueurs du Hub">
         {hub.players.map((player) => (
           <li key={player.id}>

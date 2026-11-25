@@ -14,6 +14,11 @@ export const FINAL_REACTION_MS = 3_000;
 const DUTCH_ANNOUNCEMENT_MS = 2_800;
 const CARD_MOTION_WINDOW_MS = 1_350;
 
+export function dutchAnnouncementRemaining(state: GameState, now: number) {
+  const announcedAt = state.dutch?.announcedAt;
+  return announcedAt === undefined ? 0 : Math.max(0, Math.min(DUTCH_ANNOUNCEMENT_MS, announcedAt + DUTCH_ANNOUNCEMENT_MS - now));
+}
+
 export type TurnAction =
   | { kind: "draw"; source: "deck" }
   | { kind: "replace"; position: number; handVersion: number }
@@ -93,17 +98,22 @@ function moveToNextPlayer(state: GameState, turn: Turn, now: number, discarded: 
   if (dutch) {
     const remainingPlayerIds = dutch.remainingPlayerIds.filter((id) => id !== currentId && activeOrder.includes(id));
     const next = { ...state, dutch: { ...dutch, remainingPlayerIds } };
-    const nextState = state.dutch ? next : logMatch(next, now, { kind: "dutch", playerId: dutch.announcerId });
+    const pause = dutchAnnouncementRemaining(next, now);
+    const reaction = next.reaction;
+    const nextState = state.dutch ? next : logMatch({
+      ...next,
+      reaction: reaction.presentedAt === null ? reaction : { ...reaction, presentedAt: reaction.presentedAt + pause },
+    }, now, { kind: "dutch", playerId: dutch.announcerId });
     if (!remainingPlayerIds.length) {
       return discarded ? {
         ...nextState,
-        turn: { ...turn, drawnCard: null, power: null, deadline: now + FINAL_REACTION_MS, finalReaction: true },
+        turn: { ...turn, drawnCard: null, power: null, deadline: now + pause + FINAL_REACTION_MS, finalReaction: true },
       } : finishRound(nextState, now);
     }
     return {
       ...nextState,
       currentPlayerId: remainingPlayerIds[0],
-      turn: nextTurn(turn.number + 1, now),
+      turn: nextTurn(turn.number + 1, now + pause),
     };
   }
   const nextId = activeOrder[0];
@@ -167,7 +177,7 @@ export function playTurn(
   action: unknown,
   now: number
 ): GameState {
-  if (!action || typeof action !== "object" || !("kind" in action)) return state;
+  if (!action || typeof action !== "object" || !("kind" in action) || dutchAnnouncementRemaining(state, now) > 0) return state;
   if (action.kind === "reaction") {
     return "reference" in action && "position" in action && "handVersion" in action
       ? reactToDiscard(state, actorId, action.reference, action.position, action.handVersion, now)
@@ -231,19 +241,15 @@ function skipTurn(state: GameState, turn: Turn, now: number): GameState {
 }
 
 export function applyDepartures(state: GameState, presentIds: ReadonlySet<string>, now: number): GameState {
-  const departed = new Set(state.players.filter(({ id, hasLeft }) => !hasLeft && !presentIds.has(id)).map(({ id }) => id));
-  if (!departed.size) return state;
+  const players = state.players.map((player) => {
+    const hasLeft = !presentIds.has(player.id);
+    return hasLeft === player.hasLeft ? player : { ...player, hasLeft };
+  });
+  if (players.every((player, index) => player === state.players[index])) return state;
 
-  const next = {
-    ...state,
-    players: state.players.map((player) => departed.has(player.id) ? { ...player, hasLeft: true } : player),
-    dutch: state.dutch && {
-      ...state.dutch,
-      remainingPlayerIds: state.dutch.remainingPlayerIds.filter((id) => !departed.has(id)),
-    },
-  };
+  const next = { ...state, players };
   if (state.phase === "playing" && state.turn && !state.turn.finalReaction && state.currentPlayerId &&
-      departed.has(state.currentPlayerId)) {
+      !presentIds.has(state.currentPlayerId)) {
     return skipTurn(next, { ...state.turn, dutchArmed: false }, now);
   }
   return next;
@@ -270,7 +276,7 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     topDiscard: topDiscard ? getCardFace(topDiscard) : null,
     previousDiscard: previousDiscard ? getCardFace(previousDiscard) : null,
     power: turn.power ? getPowerView(state, turn.power, canSeePrivateCards) : null,
-    cardMotion: getCardMotionView(state, now),
+    cardMotion: dutchAnnouncementRemaining(state, now) > 0 ? null : getCardMotionView(state, now),
     players: state.players.map(({ id, pseudo, isBot, cards, handVersion, handLayout }) => ({
       id, pseudo, cardCount: cards.length, handVersion, ...(isBot && { isBot }), ...(handLayout && { handLayout }),
     })),
@@ -281,9 +287,8 @@ export function getTurnView(state: GameState, viewerId: string, now: number): Tu
     },
     dutch: state.dutch ? {
       announcerId: state.dutch.announcerId,
-      lastTurns: state.dutch.remainingPlayerIds.length,
-      announcementMs: state.dutch.announcedAt === undefined ? 0
-        : Math.max(0, Math.min(DUTCH_ANNOUNCEMENT_MS, DUTCH_ANNOUNCEMENT_MS + state.dutch.announcedAt - now)),
+      lastTurns: state.dutch.remainingPlayerIds.filter((id) => state.players.some((entry) => entry.id === id && !entry.hasLeft)).length,
+      announcementMs: dutchAnnouncementRemaining(state, now),
     } : null,
     canAnnounceDutch: !state.dutch && canSeePrivateCards && !turn.power?.pendingSwap,
     dutchArmed: canSeePrivateCards && turn.dutchArmed,

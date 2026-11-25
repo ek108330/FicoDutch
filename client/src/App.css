@@ -879,7 +879,7 @@ input {
   gap: 4px;
 }
 
-.variant-grid button {
+.variant-grid button, .variant-grid > span {
   min-height: 34px;
   padding: 3px 2px;
   border: 1px solid #bac8bc;
@@ -890,10 +890,13 @@ input {
   cursor: pointer;
 }
 
-.variant-grid button[aria-pressed="true"] {
+.variant-grid button[aria-pressed="true"], .variant-grid > span[data-active="true"] {
   border-color: #ba9234;
   background: #f6dda1;
 }
+
+.preview-variants { margin-bottom: 16px; }
+.preview-variants > span { display: grid; place-items: center; text-align: center; cursor: default; }
 
 .hub-settings :disabled {
   cursor: default;
@@ -2351,13 +2354,14 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 .dutch-banner {
   position: absolute;
   z-index: 12;
-  inset: 50% auto auto 50%;
-  translate: -50% -50%;
+  inset: auto auto calc(100% + 5px) 50%;
+  translate: -50% 0;
   display: grid;
   justify-items: center;
   gap: 3px;
-  width: min(66%, 230px);
-  padding: clamp(10px, 3vmin, 18px);
+  grid-template-columns: auto 1fr;
+  width: min(100%, 230px);
+  padding: 7px 10px;
   border: 2px solid #ffe18a;
   border-radius: 20px;
   background: #123b2a;
@@ -2370,12 +2374,14 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 }
 
 .dutch-banner svg {
-  width: clamp(46px, 15vmin, 88px);
+  grid-row: span 2;
+  align-self: center;
+  width: clamp(32px, 11vmin, 64px);
   height: auto;
   transform: rotate(-12deg);
 }
 
-.dutch-banner strong { font-size: clamp(1.8rem, 8vmin, 3rem); }
+.dutch-banner strong { font-size: clamp(1.25rem, 5vmin, 2rem); }
 .dutch-banner span { font-weight: 750; color: #fff8dd; }
 
 @media (prefers-reduced-motion: no-preference) {

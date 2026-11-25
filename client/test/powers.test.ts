@@ -150,7 +150,7 @@ test("le Joker+ donne une carte cachée à un adversaire dont la main est encore
 
 test("Dutch bloque le Joker+ contre l’annonceur et laisse les autres cibles disponibles", () => {
   const state = startWithCard("JOKER", true);
-  const dutch = { announcerId: "bob", remainingPlayerIds: ["alice", "charlie"], announcedAt: 0 };
+  const dutch = { announcerId: "bob", remainingPlayerIds: ["alice", "charlie"], announcedAt: -3_000 };
   const power = activate({ ...state, dutch });
   assert.equal(power.turn?.power?.kind, "give-card");
   assert.equal(playTurn(power, "alice", 1, { kind: "power-player", playerId: "bob" }, 1_200), power);

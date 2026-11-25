@@ -65,6 +65,7 @@ export type GameState = {
   phaseDeadline: number | null;
   openingPlayerId: string | null;
   players: GamePlayer[];
+  departedScores?: Record<string, Pick<GamePlayer, "totalScore" | "scoreHistory">>;
   drawPile: Card[];
   discardPile: Card[];
   currentPlayerId: string | null;

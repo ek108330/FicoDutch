@@ -110,6 +110,13 @@ test("le bouton quitter donne l’administration au premier humain connecté apr
     const management = await openManagement(successor);
     await expect(management.getByRole("button", { name: "Retirer ChloeDepart" })).toBeVisible();
     await successor.screenshot({ path: testInfo.outputPath("admin-transmise-au-joueur.png") });
+    await host.locator(".hub-item").filter({ hasText: "Hub de AliceDepart" }).getByRole("button", { name: "Rejoindre" }).click();
+    await expect(host.locator(".position-bottom .player-name-text")).toHaveText("AliceDepart");
+    await expect(host.locator(".position-bottom .playing-card.face-down")).toHaveCount(4);
+    const returningSettings = await openSettings(host);
+    await expect(returningSettings.getByRole("button", { name: "Gérer la table" })).toHaveCount(0);
+    await returningSettings.getByRole("button", { name: "Fermer les paramètres" }).click();
+    await host.screenshot({ path: testInfo.outputPath("retour-ancien-hote.png") });
     await expect(drawnCard(last)).toHaveAccessibleName(card!);
     await discardDrawn(last);
     await last.getByRole("button", { name: "Passer le pouvoir" }).click();

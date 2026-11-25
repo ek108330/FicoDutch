@@ -6,6 +6,7 @@ const announce = (page: Page) => page.getByRole("button", { name: "Annoncer Dutc
 
 test("annonce Dutch, protection du Valet et scores", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(50_000);
+  await host.setViewportSize({ width: 390, height: 844 });
   await fixDeckOrder(host);
   const guest = await browser.newPage({ baseURL });
   try {
@@ -21,6 +22,12 @@ test("annonce Dutch, protection du Valet et scores", async ({ page: host, browse
     await guest.screenshot({ path: testInfo.outputPath("01-annonce-preparee.png") });
     await discardDrawn(guest);
 
+    const banner = host.getByRole("alert").filter({ hasText: "Dutch !" });
+    await expect(drawDeck(host)).toBeDisabled();
+    await expect(discard(host)).toHaveAccessibleName("Défausse, 5 de pique");
+    const [notice, pile] = await Promise.all([banner.boundingBox(), discard(host).boundingBox()]);
+    expect(notice!.y + notice!.height).toBeLessThan(pile!.y);
+    await host.screenshot({ path: testInfo.outputPath("annonce-dutch-defausse-visible.png"), animations: "disabled" });
     for (const page of [host, guest]) {
       await expect(page.getByRole("alert").filter({ hasText: "Dutch !" })).toHaveText("Dutch !BobDutch");
       await expect(page.locator(".player-name").getByRole("img", { name: "BobDutch a annoncé Dutch" })).toBeVisible();

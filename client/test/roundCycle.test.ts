@@ -112,6 +112,11 @@ test("la manche suivante conserve la place d’un joueur déconnecté et retire 
   };
   const afterDeparture = startNextRound(afterLeave, 1, onlineMembers("alice", "bob"), 1_200);
   assert.deepEqual(afterDeparture.players.map(({ id }) => id), ["alice", "bob"]);
+  const finishedSecond = finishRound({ ...afterDeparture, phase: "playing" }, 10_000);
+  const rejoined = startNextRound(finishedSecond, 2, members, 10_100);
+  const charlie = rejoined.players.find(({ id }) => id === "charlie")!;
+  assert.equal(charlie.totalScore, result.players[2].totalScore);
+  assert.deepEqual(charlie.scoreHistory, result.players[2].scoreHistory);
 });
 
 test("la manche suivante admet les nouveaux joueurs en ligne au plus haut total de la manche écoulée", () => {

@@ -28,6 +28,7 @@ type RoundScreenProps = {
   peers: ReturnType<typeof useHubPeers>;
   updateHostRound: UpdateHostRound;
   onRestart: () => void;
+  onLeave: () => void;
   onInterrupt?: () => void;
   restarting: boolean;
   settings: ReactNode;
@@ -43,7 +44,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
-  peers, updateHostRound, onRestart, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause,
+  peers, updateHostRound, onRestart, onLeave, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
@@ -186,7 +187,7 @@ export default function RoundScreen({
           {!gameFinished && (
             <>
               <p role="status">Tu entreras en jeu après la manche {roundNumber}.</p>
-              <p>Ton score de départ sera le total le plus élevé à la fin de cette manche.</p>
+              <button type="button" onClick={onLeave}>Annuler et quitter</button>
             </>
           )}
         </section>

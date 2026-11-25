@@ -67,6 +67,7 @@ export type LobbyChatStatus = "ok" | "unavailable" | "invalid" | "slow";
 export type JoinHubRequest = {
   hubId: string;
   pseudo: string;
+  returnToken?: string;
 };
 
 export type StartHubRequest = Pick<Hub, "variants" | "endThreshold"> & {

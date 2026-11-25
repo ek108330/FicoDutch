@@ -4,7 +4,7 @@ const { dealingMs, memorizationMs } = require("../shared/roundTiming.json");
 const {
   addHubBot, completeHostResume, createHub, disconnectPlayer, expireHostPause, finishHubGame, getAllHubs, interruptHub, joinHub,
   relayLobbyMessage, removeHubGuest, removePlayer, resolveEncryptedRelay, resolvePeerRelay, restartHubGame, resumeHub, startHubGame, updateHubSettings,
-  changeManualPause, finishManualResume,
+  changeManualPause, finishManualResume, publishRoundVariants,
 } = require("./hubManager");
 
 function openTable(t, hostSocket, guestSocket) {
@@ -26,6 +26,27 @@ function signal(hubId, recipient, type, senderVersion = 1, recipientVersion = 1)
     negotiationId: "test", description: { type, sdp: "v=0" },
   };
 }
+
+test("le Hub privé rend sa place au joueur qui est parti et publie les variantes actives", (t) => {
+  const host = "return-host";
+  const { hub, session } = createHub(host, "Alice");
+  t.after(() => removePlayer(host));
+  const { session: guest } = joinHub(hub.id, "return-guest", "Bob");
+  updateHubSettings(host, { variants: hub.variants, endThreshold: 100, isPrivate: true });
+  assert.ok(startHubGame(host, { hubId: hub.id, endThreshold: 100, variants: hub.variants,
+    cardCounts: { [session.playerId]: 4, [guest.playerId]: 4 } }).hub);
+  assert.ok(removePlayer("return-guest", true));
+  assert.equal(joinHub(hub.id, "return-wrong", "Bob"), null);
+  const returned = joinHub(hub.id, "return-guest", "Bob", undefined, undefined, undefined, undefined, false, guest.token);
+  assert.deepEqual(returned.session, guest);
+  assert.equal(returned.hub.players.find(({ id }) => id === guest.playerId).connectionVersion, 2);
+  const request = { hubId: hub.id, gameNumber: 1, roundNumber: 2, variants: { ...hub.variants, sixCards: true } };
+  assert.equal(publishRoundVariants("return-guest", request), false);
+  assert.equal(publishRoundVariants(host, request), true);
+  assert.equal(publishRoundVariants(host, { ...request, variants: hub.variants }), false);
+  assert.equal(removeHubGuest(host, hub.id, guest.playerId).socketId, "return-guest");
+  assert.equal(joinHub(hub.id, "return-guest", "Bob", undefined, undefined, undefined, undefined, false, guest.token), null);
+});
 
 test("seul l’hôte déclenche la pause et la reprise après trois secondes", (t) => {
   const hostSocket = "manual-host";

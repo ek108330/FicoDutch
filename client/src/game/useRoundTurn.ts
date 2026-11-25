@@ -8,7 +8,7 @@ import { getBotReactionDelay, getBotStep, playBotStep } from "./bot";
 import { allPlayersMemorized, getMemorizedCards, memorizeCard, setMemorizationReady, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
-  beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn, TURN_DURATION_MS,
+  beginPlay, dutchAnnouncementRemaining, expireTurn, getCardMotionView, getTurnView, playTurn, TURN_DURATION_MS,
   type CardMotionView, type TurnAction, type TurnRequest, type TurnView,
 } from "./turn";
 import type { GameVariants } from "./variants";
@@ -65,7 +65,8 @@ function projectRound(
   const base = {
     roundNumber: state.roundNumber,
     clockVersion,
-    remainingMs: deadline === null ? null : Math.max(0, Math.min(phaseLength[state.phase], deadline - now)),
+    remainingMs: deadline === null ? null
+      : Math.max(0, Math.min(phaseLength[state.phase] + dutchAnnouncementRemaining(state, now), deadline - now)),
     leaderIds: getRoundLeaders(state),
   };
   if (state.phase === "playing") {
@@ -106,7 +107,8 @@ function acceptRoundView(current: ReceivedView | null, view: RoundView, received
   if (current && view.clockVersion < current.view.clockVersion) return current;
   const deadline = view.remainingMs === null
     ? null
-    : receivedAt + Math.max(0, Math.min(phaseLength[view.phase], view.remainingMs));
+    : receivedAt + Math.max(0, Math.min(phaseLength[view.phase] +
+      (view.phase === "playing" ? view.turn.dutch?.announcementMs ?? 0 : 0), view.remainingMs));
   if (current?.view.roundNumber === view.roundNumber) {
     const previous = current.view;
     if (phaseRank[previous.phase] > phaseRank[view.phase]) return current;
@@ -157,7 +159,8 @@ export function useRoundTurn({
       reactions.delays.clear();
     }
     const time = performance.now();
-    const step = getBotStep(hostRound, time, (id) => {
+    const announcementPause = dutchAnnouncementRemaining(hostRound, time);
+    const step = getBotStep(hostRound, time + announcementPause, (id) => {
       const existing = reactions.delays.get(id);
       if (existing !== undefined) return existing;
       const delay = getBotReactionDelay();
@@ -167,7 +170,7 @@ export function useRoundTurn({
     if (!step) return;
     const motionEnd = step.action.kind !== "reaction" && hostRound.cardMotion?.move.kind === "swap"
       ? hostRound.cardMotion.at + 1_100 : 0;
-    const delay = Math.ceil(Math.max(step.delay, motionEnd - time));
+    const delay = Math.ceil(Math.max(announcementPause + step.delay, motionEnd - time));
     const timer = window.setTimeout(() => updateHostRound(hubId, (state) =>
       state === hostRound ? playBotStep(state, step, performance.now()) : state
     ), delay);
@@ -239,14 +242,14 @@ export function useRoundTurn({
     ? hostRound && projectRound(hostRound, playerId, now, firstDeadline, clockVersion)
     : received?.view ?? null;
   const deadline = isHost ? hostDeadline : received?.deadline ?? null;
-  const remaining = scene ? Math.max(0, Math.min(phaseLength[scene.phase], (deadline ?? now) - now)) : 0;
   const view = scene?.phase === "playing" ? scene.turn : null;
   const dutch = view?.dutch;
-  const announcementMs = (dutch?.announcementMs ?? 0) - (isHost ? 0 : Math.max(0, now - (received?.receivedAt ?? now)));
+  const announcementMs = Math.max(0, (dutch?.announcementMs ?? 0) - (isHost ? 0 : Math.max(0, now - (received?.receivedAt ?? now))));
+  const remaining = scene ? Math.max(0, Math.min(phaseLength[scene.phase], (deadline ?? now) - now - announcementMs)) : 0;
   const announcement = announcementMs > 0 ? view?.players.find(({ id }) => id === dutch?.announcerId) : undefined;
   const waitingForClock = !isHost && (!received || clockVersion > received.view.clockVersion);
-  const canPlay = !paused && !waitingForClock && view?.playerId === playerId && !view.finalReaction && remaining > 0 && (isHost || hostConnected);
-  const canReact = !paused && !waitingForClock && !!view?.reaction.canAttempt &&
+  const canPlay = !paused && announcementMs === 0 && !waitingForClock && view?.playerId === playerId && !view.finalReaction && remaining > 0 && (isHost || hostConnected);
+  const canReact = !paused && announcementMs === 0 && !waitingForClock && !!view?.reaction.canAttempt &&
     (!view.finalReaction || remaining > 0) && (isHost || hostConnected);
   const canStartNext = !paused && isHost && members.filter(({ connected }) => connected).length >= GAME_CONFIG.players.min &&
     scene?.phase === "results" && !scene.result.gameWinnerIds.length;

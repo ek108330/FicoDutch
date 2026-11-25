@@ -6,7 +6,7 @@ import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
 import { useHostTransfer } from "./network/useHostTransfer";
-import { readHubSession, saveHubSession } from "./network/hubSession";
+import { readHubReturnToken, readHubSession, saveHubSession } from "./network/hubSession";
 import type { Hub, HubAdmission, HubEnd, HubListing, HubMembership, HubSession, RestartHubRequest, StartHubRequest } from "../../shared/hubTypes";
 import { createRound } from "./game/createRound";
 import { resumeGameClock } from "./game/gameClock";
@@ -411,6 +411,14 @@ function App() {
 
   const roundNumber = hostRound?.state.roundNumber;
   const roundPhase = hostRound?.state.phase;
+  const roundVariants = hostRound?.state.variants;
+  const roundHubId = hostRound?.hubId;
+  const roundGameNumber = hostRound?.gameNumber;
+  useEffect(() => {
+    if (networkReady && roundNumber && roundNumber > 1 && roundVariants) {
+      socket.emit("hub:round-variants", { hubId: roundHubId, gameNumber: roundGameNumber, roundNumber, variants: roundVariants });
+    }
+  }, [networkReady, roundNumber, roundVariants, roundHubId, roundGameNumber]);
   const pendingRatingMatch = hostRound?.state.matchId;
   useEffect(() => {
     if (!networkReady || !pendingRatingMatch) return;
@@ -508,6 +516,7 @@ function App() {
     socket.emit("hub:join", {
       hubId,
       pseudo: cleanPseudo,
+      returnToken: readHubReturnToken(hubId) ?? undefined,
     });
   }
 
@@ -588,7 +597,7 @@ function App() {
 
   function canJoinHub(hub: HubListing) {
     return networkReady && !pendingAdmission && (!!account || !!pseudo.trim()) &&
-      (hub.status === "waiting" || (!hub.isPrivate && hub.status === "in-progress"));
+      (hub.status === "waiting" || (hub.status === "in-progress" && (!hub.isPrivate || !!readHubReturnToken(hub.id))));
   }
 
   const settings = (
@@ -639,6 +648,7 @@ function App() {
           peers={peers}
           updateHostRound={updateHostRound}
           onRestart={restartGame}
+          onLeave={leaveHub}
           onInterrupt={interrupt}
           restarting={restarting}
           settings={settings}

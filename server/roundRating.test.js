@@ -69,10 +69,13 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   await store.recordDeparture(first, azure.id, "left");
   const { results: [result] } = await store.recordRounds(first, [next], now + 100_000);
   assert.ok(result.changes.find(({ id }) => id === azure.id).after < 48);
+  const returned = round(3, [score(azure, 2), score(betty, 1), score(celine, 2)]);
+  assert.ok((await store.recordRounds(first, [returned], now + 100_000)).results[0].changes
+    .some(({ id }) => id === azure.id));
   assert.equal(await store.finish(first, "interrupted"), true);
-  assert.equal(await store.recordRounds(first, [round(3, [score(betty, 1), score(celine, 2)])], now + 200_000), null);
+  assert.equal(await store.recordRounds(first, [round(4, [score(azure, 2), score(betty, 1), score(celine, 2)])], now + 200_000), null);
   const profile = await store.getProfile(azure.accountId);
-  assert.equal(profile.ratings.length, 2);
+  assert.equal(profile.ratings.length, 3);
   assert.equal(profile.rating, profile.ratings.at(-1).rating);
   const week = 7 * 24 * 60 * 60 * 1_000;
   const readAzure = async (at) => (await store.listPlayers("azure", null, 1, at)).players[0];

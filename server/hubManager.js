@@ -2,6 +2,36 @@ const { randomBytes, randomUUID } = require("crypto");
 const { emojis, maxMessageLength } = require("../shared/hubSocial.json");
 
 const hubs = new Map();
+const departedPlayers = new WeakMap();
+const publishedVariantRounds = new WeakMap();
+
+function publishRoundVariants(socketId, request) {
+  const current = findPlayerHub(socketId);
+  const hub = current?.hub;
+  if (!current?.player.isHost || hub.id !== request?.hubId || !hub.gameStarted || hub.gameFinished ||
+      request.gameNumber !== hub.gameNumber || !Number.isSafeInteger(request.roundNumber) ||
+      request.roundNumber <= (publishedVariantRounds.get(hub) ?? 1)) return false;
+  const keys = Object.keys(hub.variants);
+  if (!keys.every((key) => typeof request.variants?.[key] === "boolean")) return false;
+  publishedVariantRounds.set(hub, request.roundNumber);
+  if (keys.every((key) => hub.variants[key] === request.variants[key])) return false;
+  hub.variants = Object.fromEntries(keys.map((key) => [key, request.variants[key]]));
+  return true;
+}
+
+function reserveReturn(hub, player) {
+  let reservations = departedPlayers.get(hub);
+  if (!reservations) departedPlayers.set(hub, reservations = new Map());
+  reservations.set(player.token, player);
+}
+
+function returningPlayer(hub, { id, pseudo }, token) {
+  const reservations = departedPlayers.get(hub);
+  if (!reservations) return undefined;
+  if (id) return [...reservations.values()].find(({ accountId }) => accountId === id);
+  const player = reservations.get(token);
+  return player && !player.accountId && player.pseudo.toLowerCase() === pseudo.toLowerCase() ? player : undefined;
+}
 function applyRoundRating(hub, number, changes) {
   hub.roundRating = { number };
   const ratings = new Map(changes.map(({ accountId, after }) => [accountId, after]));
@@ -137,17 +167,22 @@ function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, av
   return membership(hub, host);
 }
 
-function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating, approved = false) {
+function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating, approved = false, token) {
   const existing = findPlayerHub(socketId);
   if (existing) return existing.hub.id === hubId ? membership(existing.hub, existing.player) : null;
 
   const hub = hubs.get(hubId);
+  const returning = hub && returningPlayer(hub, { id: accountId, pseudo }, token);
   if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers ||
-      (hub.isPrivate && (!approved || hub.gameStarted)) ||
+      (hub.isPrivate && !returning && (!approved || hub.gameStarted)) ||
       (accountId && hub.players.some((player) => player.accountId === accountId))) return null;
-  const player = newPlayer(socketId, pseudo, false, accountId, avatarStyle, avatarPhotoId);
+  const player = returning
+    ? { ...returning, socketId, pseudo, connected: true, isHost: false,
+      connectionVersion: returning.connectionVersion + 1, avatarStyle, avatarPhotoId }
+    : newPlayer(socketId, pseudo, false, accountId, avatarStyle, avatarPhotoId);
   player.rating = rating;
   hub.players.push(player);
+  if (returning) departedPlayers.get(hub).delete(returning.token);
   return membership(hub, player);
 }
 
@@ -187,7 +222,7 @@ function addHubBot(socketId, hubId, profiles = []) {
   return true;
 }
 
-function removePlayer(socketId) {
+function removePlayer(socketId, allowReturn = false) {
   const current = findPlayerHub(socketId);
   if (!current) return null;
   const { hub, player } = current;
@@ -195,6 +230,7 @@ function removePlayer(socketId) {
     hubs.delete(hub.id);
     return { hubId: hub.id, deleted: true };
   }
+  if (allowReturn && hub.gameStarted && !hub.gameFinished) reserveReturn(hub, player);
   hub.players.splice(hub.players.indexOf(player), 1);
   return { hubId: hub.id, deleted: false };
 }
@@ -228,6 +264,7 @@ function promoteHost(current, successor, now = Date.now()) {
   if (!player.isHost || successor !== nextHumanHost(hub) || !successor) return false;
   hub.players.splice(hub.players.indexOf(player), 1);
   successor.isHost = true;
+  reserveReturn(hub, player);
   hub.hostId = successor.id;
   hub.hostPseudo = successor.pseudo;
   hub.clockVersion++;
@@ -348,6 +385,7 @@ function restartHubGame(socketId, request) {
   hub.gameFinished = false;
   delete hub.manualPause;
   delete hub.roundRating;
+  publishedVariantRounds.delete(hub);
   hub.gameNumber++;
   hub.clockVersion++;
   return true;
@@ -402,7 +440,7 @@ function resolveEncryptedRelay(socketId, request) {
 }
 
 module.exports = {
-  guestNameInUse, withPlayerName,
+  guestNameInUse, withPlayerName, returningPlayer, publishRoundVariants,
   findPlayerHub, getHub: (id) => hubs.get(id),
   getActiveMatchIds: () => [...hubs.values()].filter((hub) => hub.gameStarted).map((hub) => `${hub.id}:${hub.gameNumber}`),
   getAllHubs, privateHubMembers, createHub, joinHub, updateHubSettings, startHubGame, removePlayer,

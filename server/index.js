@@ -12,7 +12,7 @@ const {
   disconnectPlayer, resumeHub, completeHostResume, expireHostPause, finishHubGame, restartHubGame,
   changeManualPause, finishManualResume,
   addHubBot, removeHubGuest, interruptHub, relayLobbyMessage, resolveEncryptedRelay, findPlayerHub, getHub, getActiveMatchIds,
-  guestNameInUse, withPlayerName, applyRoundRating, nextHumanHost, promoteHost, privateHubMembers,
+  guestNameInUse, withPlayerName, applyRoundRating, nextHumanHost, promoteHost, privateHubMembers, returningPlayer, publishRoundVariants,
 } = require("./hubManager");
 
 const app = express();
@@ -316,12 +316,14 @@ io.on("connection", (socket) => {
       const rating = identity.id ? await matchStore?.getRating(identity.id) : undefined;
       const hub = getHub(hubId);
       const id = matchStore && hub?.gameStarted ? matchId(hub) : null;
-      if (closing.has(hubId) || (id && identity.id && await matchStore.hasSeat(id, identity.id))) {
+      const returnToken = typeof data.returnToken === "string" && data.returnToken.length === 43 ? data.returnToken : undefined;
+      const returning = hub && returningPlayer(hub, identity, returnToken);
+      if (closing.has(hubId) || (id && identity.id && !returning && await matchStore.hasSeat(id, identity.id))) {
         socket.emit("hub:error", "Ce compte a déjà une place dans cette partie, ou la table est en cours de fermeture.");
         return;
       }
       if (!socket.connected || closing.has(hubId)) return;
-      if (hub?.isPrivate) {
+      if (hub?.isPrivate && !returning) {
         if (!canRequestAdmission(hub) || findPlayerHub(socket.id) ||
             (identity.id && hub.players.some(({ accountId }) => accountId === identity.id)) ||
             [...privateRequests].some(([otherSocketId, entry]) => otherSocketId !== socket.id && entry.hubId === hubId &&
@@ -334,7 +336,8 @@ io.on("connection", (socket) => {
         broadcastHubs();
         return;
       }
-      const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId, rating);
+      const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId,
+        rating, false, returnToken);
       if (!membership) {
         socket.emit("hub:error", "Impossible de rejoindre ce Hub. Vérifie qu’il est disponible et que ce compte n’y occupe pas déjà une place.");
         return;
@@ -343,7 +346,7 @@ io.on("connection", (socket) => {
         try {
           await matchStore.addSeat(matchId(membership.hub), findPlayerHub(socket.id).player);
         } catch (error) {
-          removePlayer(socket.id);
+          removePlayer(socket.id, !!returning);
           broadcastHubs();
           throw error;
         }
@@ -355,6 +358,10 @@ io.on("connection", (socket) => {
     } catch (error) {
       socketError(socket, error);
     }
+  });
+
+  socket.on("hub:round-variants", (request) => {
+    if (publishRoundVariants(socket.id, request)) broadcastHubs();
   });
 
   socket.on("hub:cancel-admission", (request) => {
@@ -589,7 +596,7 @@ io.on("connection", (socket) => {
       }
       return;
     }
-    const result = removePlayer(socket.id);
+    const result = removePlayer(socket.id, true);
     if (result) {
       if (current) backupHolders.get(current.hub)?.delete(current.player.id);
       if (matchStore && current?.hub.gameStarted && !current.player.isHost) {

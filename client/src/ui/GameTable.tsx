@@ -186,13 +186,12 @@ export default function GameTable({
             <div className="discard-placeholder">Défausse</div>
           </div>
         ) : piles}
+        {dutchAnnouncement && <div className="dutch-banner" role="alert">
+          <Megaphone aria-hidden="true" />
+          <strong>Dutch !</strong>
+          <span>{dutchAnnouncement}</span>
+        </div>}
       </div>
-
-      {dutchAnnouncement && <div className="dutch-banner" role="alert">
-        <Megaphone aria-hidden="true" />
-        <strong>Dutch !</strong>
-        <span>{dutchAnnouncement}</span>
-      </div>}
 
       {positionedPlayers.map(({ player, position }) => {
         const dealSeat = dealing ? players.indexOf(player) : undefined;
