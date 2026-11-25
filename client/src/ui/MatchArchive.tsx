@@ -5,6 +5,7 @@ import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches,
   readTableSummary, tableSummaryPath, type DirectorySort } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
+import FriendProfileActions from "./FriendProfileActions";
 import RatingBadge from "./RatingBadge";
 import RatingChange from "./RatingChange";
 import { describeCardFace, suits } from "./cardLabels";
@@ -294,7 +295,7 @@ function RivalResults({ wins, losses }: Pick<Profile["rivals"][number], "wins" |
   </div>;
 }
 
-function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Navigate }) {
+function ProfileContent({ profile, navigate, viewerId }: { profile: Profile; navigate: Navigate; viewerId?: string }) {
   const rating = Math.round(profile.rating);
   const roundWinRate = outcomeRate(profile.roundWins, profile.rounds);
   const totals = [
@@ -325,6 +326,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
         <div><dt>Manches gagnées</dt><dd>{roundWinRate}</dd></div>
       </dl>
     </div>
+    {viewerId && viewerId !== profile.id && !profile.demoBot && <FriendProfileActions key={viewerId} id={profile.id} />}
     {profile.demoBot && <p className="archive-muted">Bot de démonstration · historique initial simulé</p>}
     <div className="profile-stat-groups">
       {totals.map(({ title, played, wins, rate, rateTitle }) => <section key={title} className="archive-card profile-stat-group"
@@ -359,11 +361,11 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   </>;
 }
 
-export function PublicProfile({ id, personal, ...props }: RouteProps & { id: string; personal?: boolean }) {
+export function PublicProfile({ id, personal, viewerId, ...props }: RouteProps & { id: string; personal?: boolean; viewerId?: string }) {
   const [loader] = useState(() => (signal: AbortSignal) => readProfile(id, signal));
   return <ArchiveFrame title={personal ? "Mes stats" : "Profil public"} {...props}>
     {personal && <div className="archive-actions"><Link path="/mes-parties" navigate={props.navigate}>Mes parties</Link></div>}
-    <Load loader={loader}>{(profile) => <ProfileContent profile={profile} navigate={props.navigate} />}</Load>
+    <Load loader={loader}>{(profile) => <ProfileContent profile={profile} navigate={props.navigate} viewerId={viewerId} />}</Load>
   </ArchiveFrame>;
 }
 

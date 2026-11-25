@@ -20,6 +20,7 @@ import PlayerAvatar from "./ui/PlayerAvatar";
 import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
+import FriendsPanel from "./ui/FriendsPanel";
 import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RatingPodium, RecentMatches } from "./ui/MatchArchive";
 import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, tableSummaryPath, type AccountSession } from "./network/accountApi";
 import { completedRoundsAfter, logDeal, logMatch } from "./game/matchJournal";
@@ -615,7 +616,7 @@ function App() {
       navigate, backToTable: !!currentHub,
       ...(currentHub?.gameFinished && { leaveTable: () => { leaveHub(); navigate("/"); } }),
     };
-    if (profile) return <PublicProfile key={profile} id={profile} {...archiveProps} />;
+    if (profile) return <PublicProfile key={profile} id={profile} viewerId={account?.id} {...archiveProps} />;
     if (path === "/joueurs") return <PlayersDirectory {...archiveProps} />;
     if (path === "/bots") return <DemoBots {...archiveProps} />;
     if (path === "/mes-stats" && account) return <PublicProfile key={account.id} id={account.id} personal {...archiveProps} />;
@@ -752,6 +753,7 @@ function App() {
                   <button type="button" onClick={() => navigate("/mes-stats")}>Mes stats</button>
                   <button type="button" onClick={() => navigate("/joueurs")}>Classement</button>
                 </nav>
+                {account && <FriendsPanel key={account.id} navigate={navigate} />}
                 <RatingPodium navigate={navigate} />
               </>}
             </div>

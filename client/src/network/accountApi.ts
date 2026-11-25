@@ -1,4 +1,5 @@
 import type { Account, DirectoryPlayer, MatchStatus, Profile, SavedMatch } from "../../../shared/statistics";
+import type { Friendship, FriendsList } from "../../../shared/friends";
 import { SERVER_URL } from "./socket";
 
 export type AccountSession = { enabled: boolean; account: Account | null; demo?: boolean };
@@ -16,6 +17,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const readAccount = (signal?: AbortSignal) => request<AccountSession>("/session", { signal });
+export const readFriends = (signal?: AbortSignal) => request<FriendsList>("/friends", { signal });
+const friendPath = (id: string) => `/friends/${encodeURIComponent(id)}`;
+export const readFriendship = (id: string, signal?: AbortSignal) =>
+  request<{ relationship: Friendship }>(friendPath(id), { signal });
+export const updateFriendship = (id: string, action: "request" | "accept" | "remove") =>
+  request<{ relationship: Friendship }>(friendPath(id), action === "remove" ? { method: "DELETE" } :
+    { method: "POST", body: JSON.stringify({ action }) });
 export const signIn = (handle: string, password: string, create: boolean) =>
   request<AccountSession>(create ? "/accounts" : "/session", { method: "POST", body: JSON.stringify({ handle, password }) });
 export const signOut = () => request<AccountSession>("/session", { method: "DELETE" });

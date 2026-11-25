@@ -6,6 +6,7 @@ const { randomUUID } = require("node:crypto");
 const { Server } = require("socket.io");
 const { openDatabase } = require("./database");
 const { mountAccounts } = require("./accounts");
+const { mountFriends } = require("./friends");
 const { createMatchStore, mountMatchRoutes, matchId } = require("./matchStore");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
@@ -645,6 +646,7 @@ async function start() {
       console.log(`Population de test disponible : ${demoBots.length} bots et leur historique simulé.`);
     }
     const readAccount = mountAccounts(app, io, db, acceptsOrigin, broadcastHubs);
+    mountFriends(app, io, db, readAccount, acceptsOrigin);
     mountMatchRoutes(app, matchStore, readAccount, acceptsOrigin);
     setInterval(async () => {
       try {

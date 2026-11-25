@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS account_sessions (
 );
 CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions (expires_at);
 
+CREATE TABLE IF NOT EXISTS friendships (
+  first_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  second_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  requester_id uuid NOT NULL,
+  accepted boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (first_id, second_id),
+  CHECK (first_id < second_id),
+  CHECK (requester_id IN (first_id, second_id))
+);
+CREATE INDEX IF NOT EXISTS friendships_second ON friendships (second_id, first_id);
+
 CREATE TABLE IF NOT EXISTS matches (
   id text PRIMARY KEY,
   started_at bigint NOT NULL,

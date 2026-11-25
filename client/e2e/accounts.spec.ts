@@ -286,6 +286,94 @@ async function join(page: Page, name: string) {
   await page.locator(".hub-item").filter({ hasText: `Hub de ${name}` }).getByRole("button", { name: "Rejoindre", exact: true }).click();
 }
 
+test("les amis se valident sur demande, voient leur présence et peuvent se retirer", async ({ page: alice, browser, baseURL }, testInfo) => {
+  test.setTimeout(45_000);
+  const bobContext = await browser.newContext({ baseURL });
+  const [bob, claire, david] = await Promise.all([bobContext.newPage(), browser.newPage({ baseURL }), browser.newPage({ baseURL })]);
+  const friends = (tab: Page) => tab.getByRole("region", { name: "Amis", exact: true });
+  const friend = (tab: Page, name: string) => friends(tab).getByRole("listitem").filter({ has: tab.getByRole("link", { name: new RegExp(name) }) });
+  const openProfile = async (tab: Page, name: string) => {
+    await tab.goto("/joueurs");
+    await tab.getByRole("link", { name, exact: true }).click();
+    await expect(tab.getByRole("heading", { name, exact: true })).toBeVisible();
+  };
+  const send = async (tab: Page, name: string) => {
+    await openProfile(tab, name);
+    await tab.getByRole("button", { name: "Ajouter en ami" }).click();
+    await expect(tab.getByText("Demande envoyée", { exact: true })).toBeVisible();
+  };
+  const requests = async (tab: Page) => {
+    await friends(tab).getByRole("button", { name: "1 demande d’amitié", exact: true }).click();
+    return tab.getByRole("dialog", { name: "Demandes d’amitié" });
+  };
+  try {
+    await alice.setViewportSize({ width: 390, height: 844 });
+    await signIn(alice, "AliceAmis", true);
+    await signIn(bob, "BobbyAmis", true);
+    await signIn(claire, "ClaireAmis", true);
+    await signIn(david, "DavidAmis", true);
+    await send(bob, "AliceAmis");
+    await expect(friends(bob)).toHaveCount(0);
+    await expect(friends(alice)).toContainText("Aucun ami");
+    const dialog = await requests(alice);
+    await alice.screenshot({ path: testInfo.outputPath("demandes-amis-portrait.png") });
+    await dialog.getByRole("button", { name: "Accepter la demande de BobbyAmis" }).click();
+    await expect(bob.getByRole("button", { name: "Retirer des amis" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Fermer les demandes d’amitié" }).click();
+    await expect(friend(alice, "BobbyAmis").getByRole("img", { name: "En ligne" })).toBeVisible();
+    const secondBob = await bob.context().newPage();
+    await secondBob.goto("/");
+    await expect(friend(secondBob, "AliceAmis").getByRole("img", { name: "En ligne" })).toBeVisible();
+    await secondBob.close();
+    await expect(friend(alice, "BobbyAmis").getByRole("img", { name: "En ligne" })).toBeVisible();
+
+    await send(claire, "AliceAmis");
+    const refusal = await requests(alice);
+    await refusal.getByRole("button", { name: "Refuser la demande de ClaireAmis" }).click();
+    await expect(refusal.getByText("Aucune demande en attente.")).toBeVisible();
+    await refusal.getByRole("button", { name: "Fermer les demandes d’amitié" }).click();
+    await expect(claire.getByRole("button", { name: "Ajouter en ami" })).toBeVisible();
+    await send(claire, "AliceAmis");
+    const acceptance = await requests(alice);
+    await acceptance.getByRole("button", { name: "Accepter la demande de ClaireAmis" }).click();
+    await acceptance.getByRole("button", { name: "Fermer les demandes d’amitié" }).click();
+    await expect(friend(alice, "ClaireAmis").getByRole("img", { name: "En ligne" })).toBeVisible();
+    await claire.close();
+    await expect(friend(alice, "ClaireAmis").getByRole("img", { name: "Hors ligne" })).toBeVisible();
+
+    await send(david, "AliceAmis");
+    const last = await requests(alice);
+    await last.getByRole("button", { name: "Accepter la demande de DavidAmis" }).click();
+    await last.getByRole("button", { name: "Fermer les demandes d’amitié" }).click();
+    const list = friends(alice).getByRole("list", { name: "Liste d’amis" });
+    const cards = list.getByRole("listitem");
+    await expect(cards).toHaveCount(3);
+    await expect(list.locator(".rn-badge")).toHaveText(["50", "50", "50"]);
+    const [first, second, third] = await Promise.all((await cards.all()).map((card) => card.boundingBox()));
+    expect(first!.y).toBe(second!.y);
+    expect(third!.y).toBeGreaterThan(first!.y);
+    await alice.screenshot({ path: testInfo.outputPath("amis-en-ligne-et-hors-ligne.png") });
+    await david.goto("/");
+    await david.getByRole("button", { name: "Créer un Hub", exact: true }).click();
+    await expect(alice.getByRole("button", { name: "Aperçu du Hub de DavidAmis" })).toBeVisible();
+    await alice.setViewportSize({ width: 320, height: 568 });
+    const podium = alice.getByRole("region", { name: "Podium RN" });
+    await expect(podium).toBeInViewport({ ratio: 1 });
+    expect((await friends(alice).boundingBox())!.y).toBeLessThan((await podium.boundingBox())!.y);
+    expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    await alice.screenshot({ path: testInfo.outputPath("amis-accueil-320.png") });
+
+    await friend(alice, "BobbyAmis").getByRole("link").click();
+    await alice.getByRole("button", { name: "Retirer des amis" }).click();
+    await expect(alice.getByRole("button", { name: "Ajouter en ami" })).toBeVisible();
+    await expect(bob.getByRole("button", { name: "Ajouter en ami" })).toBeVisible();
+    await alice.getByRole("link", { name: "Accueil" }).click();
+    await expect(friend(alice, "BobbyAmis")).toHaveCount(0);
+  } finally {
+    await Promise.all([bobContext.close(), ...[claire, david].map((tab) => tab.isClosed() ? undefined : tab.close())]);
+  }
+});
+
 test("les comptes voient le même classement, et le bilan survit au Hub, au renommage et au changement d’appareil", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(85_000);
   await fixDeckOrder(host);
