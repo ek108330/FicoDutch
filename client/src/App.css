@@ -3330,7 +3330,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
   border-radius: 8px;
 }
 .archive-awards h3 { display: flex; align-items: center; gap: 5px; font-size: 0.87rem; line-height: 1.2; }
-.archive-awards h3 svg { flex: none; color: #f4cf75; }
+.archive-awards h3 svg, .archive-interactions dt svg { flex: none; color: #f4cf75; }
 .archive-awards p { margin-top: 4px; font-size: 0.84rem; line-height: 1.3; }
 .archive-screen .archive-home-button {
   display: flex;
@@ -3353,6 +3353,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-list + .archive-actions { margin-top: 10px; }
 .archive-interactions { display: grid; gap: 8px; }
 .archive-interactions dt, .profile-numbers dt { font-weight: 700; }
+.archive-interactions dt { display: flex; align-items: center; gap: 5px; }
 .archive-interactions dd { margin: 3px 0 0; font-size: 0.9rem; }
 .profile-numbers {
   display: grid;

@@ -27,7 +27,7 @@ function sample(events: { at: number; event: MatchEvent }[], twoRounds = false) 
   return state;
 }
 
-test("les actions validées établissent les treize statistiques et les égalités", () => {
+test("les actions validées établissent les statistiques et les égalités", () => {
   const completed = sample([
     { at: 100, event: { kind: "discard", playerId: "alice", card: fit, reference: 1 } },
     { at: 420, event: { kind: "reaction", playerId: "bob", card: fit, reference: 1, openedAt: 100 } },
@@ -49,7 +49,7 @@ test("les actions validées établissent les treize statistiques et les égalit�
   ], true);
   const report = matchStatistics(completed.journal, "finished");
   const { awards } = report;
-  assert.equal(Object.keys(awards).length, 13);
+  assert.equal(Object.keys(awards).length, 12);
   assert.deepEqual(awards.shuriken, [{ players: ["bob"], value: 1, extra: 5 }, { players: ["chloe"], value: 1, extra: 5 }]);
   assert.deepEqual(awards.luckyLuke, [{ players: ["bob"], value: 320 }]);
   assert.deepEqual(awards.boulet, [{ players: ["chloe"], value: 1, extra: 13 }]);
@@ -62,7 +62,6 @@ test("les actions validées établissent les treize statistiques et les égalit�
   assert.equal(awards.meilleur?.[0].value, 13);
   assert.deepEqual(awards.pire?.[0], { players: ["alice"], value: 13,
     exchange: { opponentId: "bob", given: "clubs-K", received: "hearts-K" } });
-  assert.deepEqual(awards.voleur, [{ players: ["bob"], value: 1 }]);
   assert.equal(awards.bourreau?.length, 2);
   assert.equal(report.players.find(({ id }) => id === "bob")?.rank, 1);
 });
@@ -71,6 +70,7 @@ test("les actions au milieu d’une manche restent distinctes du résultat et de
   const state = sample([
     { at: 121, event: { kind: "dutch", playerId: "alice" } },
     { at: 211, event: { kind: "power", playerId: "alice", power: "blind-swap", stage: "start" } },
+    { at: 230, event: { kind: "incorrect", playerId: "bob", card: fit, reference: 1 } },
     { at: 230, event: { kind: "penalty", playerId: "bob", card: red } },
     { at: 240, event: { kind: "gift", playerId: "alice", recipient: "bob", card: red } },
   ]);
@@ -90,16 +90,27 @@ test("les actions au milieu d’une manche restent distinctes du résultat et de
   assert.deepEqual(matchStatistics(undefined, "interrupted").awards, {});
 });
 
-test("les prix du Hub cumulent les échanges et réactions de plusieurs parties", () => {
+test("les prix du Hub cumulent les échanges, réactions et erreurs de plusieurs parties", () => {
   const swap: MatchEvent = { kind: "swap", playerId: "bob", cards: [hand("alice", black), hand("bob", red)] };
   const reaction: MatchEvent = { kind: "reaction", playerId: "alice", card: fit, reference: 1, openedAt: 100 };
-  const first = sample([{ at: 200, event: swap }, { at: 210, event: reaction }]);
-  const second = sample([{ at: 400, event: swap }, { at: 430, event: reaction }]);
+  const error: MatchEvent = { kind: "incorrect", playerId: "bob", card: fit, reference: 1 };
+  const first = sample([
+    { at: 200, event: swap }, { at: 210, event: reaction },
+    { at: 230, event: error }, { at: 230, event: { kind: "penalty", playerId: "bob", card: red } },
+  ]);
+  const second = sample([
+    { at: 400, event: swap }, { at: 430, event: reaction },
+    { at: 450, event: error }, { at: 450, event: { kind: "penalty", playerId: "bob", card: fit } },
+    { at: 460, event: error },
+    { at: 470, event: { kind: "gift", playerId: "alice", recipient: "bob", card: red } },
+  ]);
   const summary = matchStatistics(second.journal, "interrupted", false, [first.journal!]);
   assert.deepEqual(summary.awards.victime, [{ players: ["bob", "alice"], value: 2 }]);
   assert.deepEqual(summary.awards.rivalite, [{ players: ["alice", "bob"], value: 2 }]);
   assert.deepEqual(summary.awards.shuriken, [{ players: ["alice"], value: 2, extra: 10 }]);
   assert.deepEqual(summary.awards.luckyLuke, [{ players: ["alice"], value: 110 }]);
+  assert.deepEqual(summary.awards.boulet, [{ players: ["bob"], value: 3, extra: 18 }]);
+  assert.equal(summary.players.find(({ id }) => id === "bob")?.penalties, 2);
 });
 
 test("le moteur journalise une réaction acceptée, refuse une version périmée et ne projette jamais le journal", () => {

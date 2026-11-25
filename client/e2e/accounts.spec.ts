@@ -478,13 +478,44 @@ test("l’interruption d’une manche conserve une réaction et une pénalité s
       await expect(page.getByRole("heading", { name: "Classement officiel" })).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Activité de la manche 1 interrompue" })).toContainText("1 réaction valide · 1 pénalité");
       await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Le défausseur" }) })).toContainText("BobbyPartie");
-      await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Le boulet" }) })).toContainText("AlicePartie");
+      await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Le boulet" }) }))
+        .toContainText(/AlicePartie avec 1 erreur pour \d+ points?\./);
       await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Le distributeur" }) })).toContainText("Non attribuée");
     }
     await guest.screenshot({ path: testInfo.outputPath("01-interruption-portrait.png"), fullPage: true });
     await guest.setViewportSize({ width: 740, height: 360 });
     await guest.screenshot({ path: testInfo.outputPath("02-interruption-paysage.png"), fullPage: true });
   } finally { await guest.close(); }
+});
+
+test("le bilan affiche les interactions en phrases avec leurs icônes", async ({ page }, testInfo) => {
+  await signIn(page, "LecteurBilan", true);
+  await page.setViewportSize({ width: 360, height: 640 });
+  const awards = {
+    boulet: [{ players: ["alice"], value: 3, extra: 18 }],
+    rivalite: [{ players: ["alice", "bob"], value: 5 }],
+    pire: [{ players: ["bob"], value: 13, exchange: { opponentId: "alice", given: "spades-A", received: "joker-1" } }],
+    bourreau: [{ players: ["alice"], value: 1 }, { players: ["bob"], value: 1 }],
+    voleur: [{ players: ["alice"], value: 1 }],
+  };
+  const report: SavedMatch = {
+    id: "00000000-0000-4000-8000-000000000001:1", startedAt: 0, endedAt: 60_000,
+    status: "interrupted", partial: false, rounds: 1, awards,
+    players: ["Alice", "Bob"].map((name) => ({
+      id: name.toLowerCase(), name, rounds: 1, wins: 0, scoreSum: 0, bestScore: 0,
+      dutch: 0, dutchWon: 0, reactions: 0, penalties: 0, exchanges: 0,
+    })),
+  };
+  await page.route("**/api/matches/*", (route) => route.fulfill({ json: report }));
+  await page.goto(`/parties/${encodeURIComponent(report.id)}`);
+  await expect(page.getByText("Alice avec 3 erreurs pour 18 points.")).toBeVisible();
+  const interactions = page.getByRole("region", { name: "Interactions et rivalités" });
+  await expect(interactions.getByText("Alice et Bob ont échangé 5 fois.", { exact: true })).toBeVisible();
+  await expect(interactions.getByText("Alice a donné un joker à Bob contre un as.", { exact: true })).toBeVisible();
+  await expect(interactions.getByText("Alice & Bob ont fait échouer 1 Dutch.", { exact: true })).toBeVisible();
+  await expect(interactions.getByText("Voleur de victoires")).toHaveCount(0);
+  await expect(interactions.locator("dt > svg")).toHaveCount(4);
+  await page.screenshot({ path: testInfo.outputPath("bilan-interactions-portrait.png"), fullPage: true });
 });
 
 test("la disparition du dernier humain ferme la table des bots avec un bilan partiel", async ({ page: host, browser, baseURL }, testInfo) => {

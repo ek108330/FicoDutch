@@ -8,6 +8,7 @@ type Activity = {
   rois: Set<string>;
   reactionPoints: number;
   quickest: number;
+  reactionErrors: number;
   penaltyPoints: number;
   sent: Totals;
   received: number;
@@ -15,7 +16,6 @@ type Activity = {
   caused: number;
   bestSwap: number;
   worstSwap?: Award;
-  stolen: number;
   blocked: number;
 };
 
@@ -25,9 +25,9 @@ function newActivity(id: string, name: string, firstRound: number): Activity {
       id, name, rounds: 0, wins: 0, scoreSum: 0, bestScore: null,
       dutch: 0, dutchWon: 0, reactions: 0, penalties: 0, exchanges: 0,
     },
-    firstRound, rois: new Set(), reactionPoints: 0, quickest: Infinity, penaltyPoints: 0,
+    firstRound, rois: new Set(), reactionPoints: 0, quickest: Infinity, reactionErrors: 0, penaltyPoints: 0,
     sent: { count: 0, points: 0 }, received: 0, haters: new Set(), caused: 0,
-    bestSwap: 0, stolen: 0, blocked: 0,
+    bestSwap: 0, blocked: 0,
   };
 }
 
@@ -103,6 +103,9 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
         if (discardOrigin) lookUp(discardOrigin)!.caused++;
         break;
       }
+      case "incorrect":
+        lookUp(event.playerId)!.reactionErrors++;
+        break;
       case "penalty": {
         if (unfinished) unfinished.penalties++;
         const player = lookUp(event.playerId)!;
@@ -160,10 +163,7 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
           player.rounds++;
           player.scoreSum += score;
           player.bestScore = Math.min(player.bestScore ?? score, score);
-          if (event.winners.includes(id)) {
-            player.wins++;
-            if (announcer && id !== event.announcer) entry.stolen++;
-          }
+          if (event.winners.includes(id)) player.wins++;
           if (event.dutchPenalty && announcedScore && id !== event.announcer && base <= announcedScore.base) entry.blocked++;
         }
         break;
@@ -196,7 +196,7 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
   }
   add("shuriken", individual((entry) => entry.player.reactions, (entry) => entry.reactionPoints));
   add("luckyLuke", individual((entry) => entry.quickest, undefined, true), true);
-  add("boulet", individual((entry) => entry.player.penalties, partial ? undefined : (entry) => entry.penaltyPoints));
+  add("boulet", individual((entry) => entry.reactionErrors, partial ? undefined : (entry) => entry.penaltyPoints));
   add("cible", individual((entry) => entry.received, (entry) => entry.haters.size));
   add("pyromane", individual((entry) => entry.caused));
   if (!partial) add("roisNoirs", individual((entry) => entry.rois.size));
@@ -207,7 +207,6 @@ export function matchStatistics(journal: MatchJournal | undefined, status: Match
     add("meilleur", individual((entry) => entry.bestSwap));
     add("pire", players.flatMap(({ worstSwap }) => worstSwap ? [worstSwap] : []));
   }
-  add("voleur", individual((entry) => entry.stolen));
   add("bourreau", individual((entry) => entry.blocked));
   return { status, partial, rounds, players: players.map(({ player }) => player), awards,
     ...(status === "interrupted" && unfinished && { unfinished }) };

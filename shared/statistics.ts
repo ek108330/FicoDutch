@@ -19,7 +19,7 @@ export type MatchPlayer = {
 };
 
 export type AwardId = "shuriken" | "luckyLuke" | "boulet" | "cible" | "pyromane" | "roisNoirs" |
-  "distributeur" | "victime" | "rivalite" | "meilleur" | "pire" | "voleur" | "bourreau";
+  "distributeur" | "victime" | "rivalite" | "meilleur" | "pire" | "bourreau";
 
 export type Award = { players: string[]; value: number; extra?: number;
   exchange?: { opponentId: string; given: string; received: string } };

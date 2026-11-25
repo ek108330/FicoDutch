@@ -24,7 +24,7 @@ const matchId = (hub) => `${hub.id}:${hub.gameNumber}`;
 const matchPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}:[1-9][0-9]{0,8}$/;
 const awardIds = [
   "shuriken", "luckyLuke", "boulet", "cible", "pyromane", "roisNoirs", "distributeur",
-  "victime", "rivalite", "meilleur", "pire", "voleur", "bourreau",
+  "victime", "rivalite", "meilleur", "pire", "bourreau",
 ];
 const privateAwards = new Set(["roisNoirs", "meilleur", "pire"]);
 const integer = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000;

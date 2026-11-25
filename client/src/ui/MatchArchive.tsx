@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowDownRight, ArrowLeft, ArrowUpRight, Crosshair, Crown, Gift, Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowLeftRight, ArrowUpRight, Crosshair, Crown, Gift, ShieldX,
+  Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
   readTableSummary, tableSummaryPath, type DirectorySort } from "../network/accountApi";
@@ -20,10 +21,10 @@ const individual = [
   ["cible", "Cible dans le dos", Crosshair], ["roisNoirs", "Mr. Roinoir", Crown],
   ["distributeur", "Le distributeur", Gift],
 ] as const;
-const interactions: [AwardId, string][] = [
-  ["victime", "Victime préférée"], ["rivalite", "Rivalité principale"],
-  ["pire", "Pire échange"], ["voleur", "Voleur de victoires"], ["bourreau", "Bourreau des Dutch"],
-];
+const interactions = [
+  ["victime", "Victime préférée", Crosshair], ["rivalite", "Rivalité principale", Swords],
+  ["pire", "Pire échange", ArrowLeftRight], ["bourreau", "Bourreau des Dutch", ShieldX],
+] as const;
 
 function Link({ path, navigate, children }: { path: string; navigate: Navigate; children: ReactNode }) {
   return <a href={path} onClick={(event) => {
@@ -74,6 +75,7 @@ function plural(value: number, one: string, many = one + "s") { return `${number
 function awardValue(id: AwardId, { value, extra }: Award, shared = false) {
   switch (id) {
     case "luckyLuke": return `en ${seconds.format(value / 1_000)} s`;
+    case "boulet": return `avec ${plural(value, "erreur")}${extra === undefined ? "" : ` pour ${plural(extra, "point")}`}`;
     case "cible": return `${shared ? "ont chacun subi" : "avec"} ${plural(value, "action")} de ${plural(extra ?? 0, "adversaire")}`;
     case "roisNoirs": return `avec ${plural(value, "roi noir", "rois noirs")}`;
     default: return `avec ${plural(value, "carte")}${extra === undefined ? "" : ` pour ${plural(extra, "point")}`}`;
@@ -96,17 +98,19 @@ function PlayerName({ player, navigate }: { player: MatchPlayer | undefined; nav
 function Interaction({ id, award, roster, navigate }: {
   id: AwardId; award: Award; roster: Map<string, MatchPlayer>; navigate: Navigate;
 }) {
-  const [a, b] = award.players.map((key) => <PlayerName key={key} player={roster.get(key)} navigate={navigate} />);
-  const value = award.value;
+  const { value, exchange, players } = award;
+  const names = players.map((key) => <PlayerName key={key} player={roster.get(key)} navigate={navigate} />);
+  const [a, b] = names;
   switch (id) {
     case "victime": return <>{a} a ciblé {b} dans {plural(value, "échange")}.</>;
-    case "rivalite": return <>{a} et {b} ont effectué {plural(value, "échange")}.</>;
-    case "pire": return award.exchange
-      ? <>{a} a donné {exchangeCard(award.exchange.given)} à <PlayerName player={roster.get(award.exchange.opponentId)}
-        navigate={navigate} /> contre {exchangeCard(award.exchange.received)}.</>
+    case "rivalite": return <>{a} et {b} ont échangé {plural(value, "fois", "fois")}.</>;
+    case "pire": return exchange
+      ? <><PlayerName player={roster.get(exchange.opponentId)} navigate={navigate} />
+        {" a donné "}{exchangeCard(exchange.received)} à {a} contre {exchangeCard(exchange.given)}.</>
       : <>{a} a pris {plural(value, "point")} de plus en un échange.</>;
-    case "voleur": return <>{a} a remporté {plural(value, "manche")} après un Dutch adverse.</>;
-    case "bourreau": return <>{a} a fait échouer {plural(value, "annonce Dutch", "annonces Dutch")}.</>;
+    case "bourreau": return <>{names.map((name, index) =>
+      <Fragment key={players[index]}>{index > 0 && " & "}{name}</Fragment>)}
+      {names.length === 1 ? " a" : " ont"} fait échouer {plural(value, "Dutch", "Dutch")}.</>;
     default: return null;
   }
 }
@@ -187,12 +191,18 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
     <section aria-labelledby="interaction-title">
       <h2 id="interaction-title">Interactions et rivalités</h2>
       <dl className="archive-interactions">
-        {interactions.map(([id, title]) => <div className="archive-card" key={id}>
-          <dt>{title}</dt>
-          {(match.awards[id]?.length ? match.awards[id] : undefined)?.map((award) => <dd key={award.players.join(":")}>
-            <Interaction id={id} award={award} roster={roster} navigate={navigate} />
-          </dd>) ?? <dd className="archive-muted">Non attribuée</dd>}
-        </div>)}
+        {interactions.map(([id, title, Icon]) => {
+          const awards = match.awards[id] ?? [];
+          const entries = id === "bourreau" && awards.length > 1
+            ? [{ ...awards[0], players: awards.flatMap(({ players }) => players) }]
+            : awards;
+          return <div className="archive-card" key={id}>
+            <dt><Icon size={16} aria-hidden="true" />{title}</dt>
+            {entries.length ? entries.map((award) => <dd key={award.players.join(":")}>
+              <Interaction id={id} award={award} roster={roster} navigate={navigate} />
+            </dd>) : <dd className="archive-muted">Non attribuée</dd>}
+          </div>;
+        })}
       </dl>
     </section>
     {match.status === "interrupted" && <button type="button" className="archive-home-button" onClick={() => navigate("/")}>
