@@ -113,6 +113,14 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   assert.deepEqual(nextRanked.map(({ name, position }) => [name, position]), [["Celine", 2]]);
   const { players: searched } = await store.listSortedPlayers("cel", "name", "asc", 0);
   assert.deepEqual(searched.map(({ name, position }) => [name, position]), [["Celine", 2]]);
+  await db.query("UPDATE player_stats SET rounds = 0, rn = 99 WHERE account_id = $1", [betty.accountId]);
+  const { players: ascending } = await store.listSortedPlayers("", "position", "asc", 0);
+  assert.deepEqual(ascending.map(({ position }) => position), [1, 2, 3, null]);
+  assert.equal(ascending.at(-1).id, betty.accountId);
+  const { players: descending } = await store.listSortedPlayers("", "rating", "desc", 0);
+  assert.equal(descending.at(-1).id, betty.accountId);
+  const { players: olderPage } = await store.listPlayers("", ascending.at(-2), 1);
+  assert.equal(olderPage[0].id, betty.accountId);
   await store.reportHistory(denis.accountId, azure.accountId, now);
   await store.reportHistory(denis.accountId, azure.accountId, now + 100);
   const { rows: reports } = await db.query("SELECT reported_at FROM rating_reports");

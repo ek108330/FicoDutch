@@ -28,6 +28,8 @@ export const signIn = (handle: string, password: string, create: boolean) =>
   request<AccountSession>(create ? "/accounts" : "/session", { method: "POST", body: JSON.stringify({ handle, password }) });
 export const signOut = () => request<AccountSession>("/session", { method: "DELETE" });
 export const rename = (name: string) => request<AccountSession>("/account", { method: "PATCH", body: JSON.stringify({ name }) });
+export const checkNameAvailability = (name: string, signal: AbortSignal) =>
+  request<{ available: boolean }>("/account/name-availability?" + new URLSearchParams({ name }), { signal });
 export const saveAvatar = (style: number | null) =>
   request<AccountSession>("/account/avatar", { method: "PATCH", body: JSON.stringify({ style }) });
 export const saveAvatarPhoto = (image: string | null) =>
@@ -51,7 +53,7 @@ export const readTableSummary = (id: string, signal?: AbortSignal) =>
   request<SavedMatch>(`/matches/${encodeURIComponent(id)}?table=1`, matchOptions(id, signal));
 export type DirectorySort = { column: "position" | "name" | "rounds" | "wins" | "rating" | "week"; direction: "asc" | "desc" };
 export const readPlayers = (query: string, after: string, sort: DirectorySort, signal?: AbortSignal) =>
-  request<{ players: (DirectoryPlayer & { position: number })[]; next: string | null }>(
+  request<{ players: (DirectoryPlayer & { position: number | null })[]; next: string | null }>(
     "/players?" + new URLSearchParams({ q: query, after, sort: sort.column, direction: sort.direction }), { signal });
 export const readProfile = (id: string, signal?: AbortSignal) => request<Profile>(`/players/${encodeURIComponent(id)}`, { signal });
 export const readPodium = (signal?: AbortSignal) => request<DirectoryPlayer[]>("/podium", { signal });

@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, UserRound } from "lucide-react";
 import type { Account } from "../../../shared/statistics";
-import { profilePath, rename, saveAvatar, saveAvatarPhoto, signIn, signOut, type AccountSession } from "../network/accountApi";
+import { checkNameAvailability, profilePath, rename, saveAvatar, saveAvatarPhoto, signIn, signOut, type AccountSession } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
 import { generateAvatarStyle, prepareAvatarPhoto } from "./playerAvatarConfig";
 
@@ -12,13 +12,35 @@ type Props = {
   forStats?: boolean;
 };
 
-const namePattern = "[A-Z][A-Za-z0-9]{4,14}";
+const namePattern = "[A-Za-z][A-Za-z0-9]{4,14}";
+const validName = new RegExp(`^${namePattern}$`);
 
 export default function AccountScreen({ account, onChange, navigate, forStats }: Props) {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [pseudo, setPseudo] = useState<string>();
+  const [availability, setAvailability] = useState<{ name: string; available: boolean }>();
+  const [photo, setPhoto] = useState<File>();
+  const name = pseudo ?? account?.name ?? "";
+  const normalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+  const candidate = account && normalizedName !== account.name && validName.test(name) ? normalizedName : "";
+  const canRename = !!candidate && availability?.name === candidate && availability.available;
+
+  useEffect(() => {
+    if (!candidate) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void checkNameAvailability(candidate, controller.signal).then(({ available }) => {
+        if (!controller.signal.aborted) setAvailability({ name: candidate, available });
+      }, () => {});
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [candidate, name]);
 
   async function run(work: () => Promise<AccountSession>, changed?: () => void) {
     setBusy(true);
@@ -37,7 +59,12 @@ export default function AccountScreen({ account, onChange, navigate, forStats }:
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    if (account) void run(() => rename(String(data.get("name"))), () => setNotice("Pseudo enregistré."));
+    if (account) {
+      if (canRename) void run(() => rename(normalizedName), () => {
+        setPseudo(undefined);
+        setNotice("Pseudo enregistré.");
+      });
+    }
     else void run(() => signIn(String(data.get("handle")), String(data.get("password")), creating),
       () => { if (!forStats && !/^\/(parties|bilans|mes-parties)(\/|$)/.test(location.pathname)) navigate("/"); });
   }
@@ -51,55 +78,70 @@ export default function AccountScreen({ account, onChange, navigate, forStats }:
         <h1><UserRound aria-hidden="true" /> {account ? "Mon compte" : creating ? "Créer un compte" : "Connexion"}</h1>
         {forStats && <p>Connecte-toi pour retrouver tes statistiques personnelles.</p>}
         {account && <section className="account-avatar-form" aria-label="Icône du profil">
-          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} />
+          <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} photoId={account.avatarPhotoId} />
           <button type="button" disabled={busy} onClick={() =>
-            void run(() => saveAvatar(generateAvatarStyle(account.id, account.avatarStyle)), () => setNotice("Icône enregistrée."))}>
+            void run(() => saveAvatar(generateAvatarStyle(account.id, account.avatarStyle)), () => {
+              setPhoto(undefined);
+              setNotice("Icône enregistrée.");
+            })}>
             Générer une icône
           </button>
         </section>}
-        {account && <form className="account-photo-form" onSubmit={(event) => {
-          event.preventDefault();
-          const form = event.currentTarget;
-          const file = new FormData(form).get("photo");
-          if (file instanceof File) {
-            void run(async () => saveAvatarPhoto(await prepareAvatarPhoto(file)), () => {
-              form.reset();
-              setNotice("Photo enregistrée.");
-            });
-          }
-        }}>
-          {account.avatarPhotoId && <PlayerAvatar id={account.id} name={account.name} style={account.avatarStyle} photoId={account.avatarPhotoId} />}
-          <label>Photo de profil <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required
-            aria-describedby="photo-format" /></label>
+        {account && <section className="account-photo-form">
           <p id="photo-format">La photo publique est recadrée en cercle et réduite à 128 × 128 px.</p>
           <div className="archive-actions">
-            <button type="submit" disabled={busy}>Enregistrer la photo</button>
+            <label className="account-photo-picker">
+              <span>Choisir une photo</span>
+              <input name="photo" type="file" accept="image/*" disabled={busy} aria-label="Photo de profil"
+                aria-describedby="photo-format" onChange={(event) => {
+                  if (event.currentTarget.files?.[0]) setPhoto(event.currentTarget.files[0]);
+                  event.currentTarget.value = "";
+                }} />
+            </label>
+            {photo && <button type="button" disabled={busy} onClick={() =>
+              void run(async () => saveAvatarPhoto(await prepareAvatarPhoto(photo)), () => {
+                setPhoto(undefined);
+                setNotice("Photo enregistrée.");
+              })}>Enregistrer la photo</button>}
             {account.avatarPhotoId && <button type="button" disabled={busy}
               onClick={() => void run(() => saveAvatarPhoto(null), () => setNotice("Photo retirée."))}>Retirer la photo</button>}
           </div>
-        </form>}
+          {photo && <p className="account-photo-name">{photo.name}</p>}
+        </section>}
         <form onSubmit={submit} key={account?.id ?? String(creating)}>
           {account ? <>
             <p>Identifiant de connexion <strong>{account.handle}</strong></p>
-            <label>Pseudo <input name="name" required pattern={namePattern} minLength={5} maxLength={15}
-              defaultValue={account.name} autoCapitalize="off" aria-describedby="pseudo-format" /></label>
+            <label htmlFor="account-pseudo">Pseudo</label>
+            <div className="account-pseudo-row">
+              <input id="account-pseudo" name="name" required pattern={namePattern} value={name} autoCapitalize="off"
+                aria-describedby="pseudo-format" onChange={(event) => {
+                  setPseudo(event.target.value);
+                  setAvailability(undefined);
+                  setNotice("");
+                }} />
+              <button className="archive-primary" type="submit" disabled={busy || !canRename}>Changer</button>
+            </div>
           </> : <>
-            <label>Identifiant <input name="handle" required pattern={creating ? namePattern : "[A-Za-z][A-Za-z0-9]{4,14}"}
+            <label>Identifiant <input name="handle" required pattern={namePattern}
               minLength={5} maxLength={15} autoComplete="username" autoCapitalize="off"
               aria-describedby={creating ? "pseudo-format" : undefined} /></label>
             <label>Mot de passe <input name="password" type="password" required minLength={5} maxLength={128}
               autoComplete={creating ? "new-password" : "current-password"} /></label>
           </>}
-          {(account || creating) && <p id="pseudo-format">5 à 15 lettres ou chiffres, avec une majuscule au début.</p>}
+          {(account || creating) && <p id="pseudo-format">
+            {candidate && availability?.name === candidate && !availability.available
+              ? "Ce pseudo est déjà utilisé." : "5 à 15 lettres ou chiffres, avec une lettre au début."}
+          </p>}
           {notice && <p role="status">{notice}</p>}
           {error && <p className="archive-error" role="alert">{error}</p>}
-          <button className="archive-primary" type="submit" disabled={busy}>
-            {account ? "Enregistrer le pseudo" : creating ? "Créer mon compte" : "Se connecter"}
-          </button>
+          {!account && <button className="archive-primary" type="submit" disabled={busy}>
+            {creating ? "Créer mon compte" : "Se connecter"}
+          </button>}
         </form>
         {account ? <div className="archive-actions">
           <a href={profilePath(account.id)} onClick={(event) => { event.preventDefault(); navigate(profilePath(account.id)); }}>Mon profil public</a>
-          <button type="button" disabled={busy} onClick={() => void run(signOut, () => navigate("/"))}>Se déconnecter</button>
+          <button className="account-danger" type="button" disabled={busy}
+            onClick={() => void run(signOut, () => navigate("/"))}>Se déconnecter</button>
         </div> : <button type="button" disabled={busy} onClick={() => { setCreating(!creating); setError(""); }}>
           {creating ? "J’ai déjà un compte" : "Créer un compte"}
         </button>}

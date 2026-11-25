@@ -57,23 +57,35 @@ export async function prepareAvatarPhoto(file: File) {
   if (!file.size || file.size > 12 * 1024 * 1024) {
     throw new Error("Choisis une image de 12 Mo maximum.");
   }
-  let image: ImageBitmap;
-  try { image = await createImageBitmap(file); }
-  catch { throw new Error("Cette image ne peut pas être ouverte. Essaie un fichier JPEG, PNG ou WebP."); }
+  let image: ImageBitmap | HTMLImageElement | undefined;
+  let objectUrl: string | undefined;
   try {
+    try {
+      image = await createImageBitmap(file);
+    } catch {
+      const photo = new Image();
+      objectUrl = URL.createObjectURL(file);
+      photo.src = objectUrl;
+      try { await photo.decode(); }
+      catch { throw new Error("Cette image ne peut pas être ouverte. Essaie un fichier JPEG, PNG ou WebP."); }
+      image = photo;
+    }
     const size = 128;
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("La réduction de l’image est indisponible.");
-    const crop = Math.min(image.width, image.height);
+    const width = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
+    const height = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
+    const crop = Math.min(width, height);
     context.beginPath();
     context.arc(size / 2, size / 2, size / 2, 0, 2 * Math.PI);
     context.clip();
     context.imageSmoothingQuality = "high";
-    context.drawImage(image, (image.width - crop) / 2, (image.height - crop) / 2, crop, crop, 0, 0, size, size);
+    context.drawImage(image, (width - crop) / 2, (height - crop) / 2, crop, crop, 0, 0, size, size);
     return canvas.toDataURL("image/png").split(",")[1];
   } finally {
-    image.close();
+    if (image && "close" in image) image.close();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
 }

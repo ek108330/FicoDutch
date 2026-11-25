@@ -7,4 +7,6 @@
     <string name="server_error">Le serveur du jeu ne répond pas. Réessaie dans un instant.</string>
     <string name="display_error">Mets à jour Android System WebView ou Chrome, puis réessaie.</string>
     <string name="retry">Réessayer</string>
+    <string name="photo_picker_unavailable">Aucun sélecteur de photos disponible.</string>
+    <string name="photo_picker_unreadable">Cette photo n’est pas accessible.</string>
 </resources>

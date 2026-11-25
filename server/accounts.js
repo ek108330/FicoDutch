@@ -7,7 +7,8 @@ const avatarStyleCount = legacyStyleCount + 4 * colors.length * (colors.length -
 const derive = promisify(scrypt);
 const cookie = "ficodutch_account";
 const sessionLength = 30 * 24 * 60 * 60 * 1_000;
-const namePattern = /^[A-Z][A-Za-z0-9]{4,14}$/;
+const namePattern = /^[A-Za-z][A-Za-z0-9]{4,14}$/;
+const capitalizeName = (name) => name[0].toUpperCase() + name.slice(1);
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const hashOptions = { N: 131_072, r: 8, p: 1, maxmem: 144 * 1024 * 1024 };
 const dummySalt = randomBytes(16);
@@ -94,11 +95,12 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
   }
 
   async function authenticate(request, response, register) {
-    const { handle, password } = request.body ?? {};
-    if (typeof handle !== "string" || !(register ? namePattern : /^[A-Za-z][A-Za-z0-9]{4,14}$/).test(handle) ||
+    const { handle: input, password } = request.body ?? {};
+    if (typeof input !== "string" || !namePattern.test(input) ||
         typeof password !== "string" || password.length < 5 || password.length > 128) {
       return response.status(400).json({ error: "Identifiant de 5 à 15 caractères et mot de passe de 5 à 128 caractères requis." });
     }
+    const handle = register ? capitalizeName(input) : input;
 
     hashing = true;
     let row;
@@ -153,13 +155,29 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
     }
     response.clearCookie(cookie, cookieOptions).json({ enabled: true, account: null });
   });
+  app.get("/api/account/name-availability", async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    const session = await readAccount(request.headers);
+    if (!session) return response.status(401).json({ error: "Connecte-toi pour modifier ton pseudo." });
+    const { name } = request.query;
+    if (typeof name !== "string" || !namePattern.test(name) || guestNameInUse(name)) {
+      return response.json({ available: false });
+    }
+    const { rows } = await db.query(`
+      SELECT 1 FROM accounts WHERE id <> $2 AND (lower(handle) = lower($1) OR lower(display_name) = lower($1))
+      LIMIT 1
+    `, [name, session.account.id]);
+    response.json({ available: rows.length === 0 });
+  });
+
   app.patch("/api/account", requireOrigin, async (request, response) => {
     const session = await readAccount(request.headers);
     if (!session) return response.status(401).json({ error: "Connecte-toi pour modifier ton pseudo." });
-    const name = request.body?.name;
-    if (typeof name !== "string" || !namePattern.test(name)) {
-      return response.status(400).json({ error: "Saisis 5 à 15 lettres ou chiffres, avec une majuscule au début." });
+    const input = request.body?.name;
+    if (typeof input !== "string" || !namePattern.test(input)) {
+      return response.status(400).json({ error: "Saisis 5 à 15 lettres ou chiffres, en commençant par une lettre." });
     }
+    const name = capitalizeName(input);
     try {
       const { rows } = await withPlayerName(name, () => guestNameInUse(name) ? { rows: [] } : db.query(`
         UPDATE accounts SET display_name = $1 WHERE id = $2
@@ -197,7 +215,7 @@ function mountAccounts(app, io, db, acceptsOrigin, broadcastHubs) {
       return response.status(400).json({ error: "Cette icône est invalide." });
     }
     const { rows } = await db.query(`
-      UPDATE accounts SET avatar_style = $1 WHERE id = $2
+      UPDATE accounts SET avatar_style = $1, avatar_photo = NULL, avatar_photo_id = NULL WHERE id = $2
       RETURNING id, handle, display_name, avatar_style, avatar_photo_id
     `, [style, session.account.id]);
     await publishAvatar(response, publicAccount(rows[0]));

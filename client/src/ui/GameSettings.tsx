@@ -9,18 +9,35 @@ type Props = {
   toggleSound: () => void;
   management?: HubManagementOptions;
   onAccount?: () => void;
+  onSignOut?: () => Promise<void>;
   onLeave?: () => void;
 };
 
-export default function GameSettings({ dialog, sound, toggleSound, management, onAccount, onLeave }: Props) {
+export default function GameSettings({ dialog, sound, toggleSound, management, onAccount, onSignOut, onLeave }: Props) {
   const title = useId();
   const [panel, setPanel] = useState<"settings" | "rules" | "table">("settings");
   const showRules = panel === "rules";
   const SoundIcon = sound ? Volume2 : VolumeX;
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+
+  async function disconnect() {
+    if (!onSignOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      await onSignOut();
+      dialog.current?.close();
+    } catch {
+      setSignOutError("Impossible de se déconnecter. Réessaie dans un instant.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <dialog className={showRules ? "rules-dialog" : "hub-management game-settings"} ref={dialog}
-      aria-labelledby={title} onClose={() => setPanel("settings")}>
+      aria-labelledby={title} onClose={() => { setPanel("settings"); setSignOutError(""); }}>
       {showRules ? <Rules titleId={title} onBack={() => setPanel("settings")} />
         : panel === "table" && management ? (
           <HubManagement {...management} titleId={title} onBack={() => setPanel("settings")} onClose={() => dialog.current?.close()} />
@@ -38,8 +55,11 @@ export default function GameSettings({ dialog, sound, toggleSound, management, o
             <button type="button" onClick={() => setPanel("rules")}>
               <BookOpen size={19} aria-hidden="true" /> Règles du jeu
             </button>
-            {onAccount && <button type="button" onClick={() => { dialog.current?.close(); onAccount(); }}>
+            {onAccount && <button className="account-danger" type="button" onClick={() => { dialog.current?.close(); onAccount(); }}>
               <UserRound size={19} aria-hidden="true" /> Mon compte
+            </button>}
+            {onSignOut && <button className="account-danger" type="button" disabled={signingOut} onClick={() => void disconnect()}>
+              <LogOut size={19} aria-hidden="true" /> Se déconnecter
             </button>}
             {management && (
               <button type="button" className="settings-management" onClick={() => setPanel("table")}>
@@ -50,6 +70,7 @@ export default function GameSettings({ dialog, sound, toggleSound, management, o
               <LogOut size={19} aria-hidden="true" /> Quitter la table
             </button>}
           </div>
+          {signOutError && <p role="alert">{signOutError}</p>}
         </>
       )}
     </dialog>

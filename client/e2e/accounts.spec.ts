@@ -286,6 +286,83 @@ async function join(page: Page, name: string) {
   await page.locator(".hub-item").filter({ hasText: `Hub de ${name}` }).getByRole("button", { name: "Rejoindre", exact: true }).click();
 }
 
+test("le compte sur mobile valide le pseudo, remplace l’avatar et se déconnecte depuis les paramètres", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await signIn(page, "profilMobile", true);
+  await expect(page.locator(".home-identity")).toHaveText("ProfilMobile");
+  const settings = await openSettings(page);
+  const settingsAccount = settings.getByRole("button", { name: "Mon compte" });
+  const settingsSignOut = settings.getByRole("button", { name: "Se déconnecter" });
+  for (const button of [settingsAccount, settingsSignOut]) {
+    await expect(button).toHaveCSS("background-color", "rgb(145, 59, 54)");
+    await expect(button).toHaveCSS("color", "rgb(255, 255, 255)");
+  }
+  await settingsAccount.click();
+  const pseudo = page.getByLabel("Pseudo", { exact: true });
+  const change = page.getByRole("button", { name: "Changer", exact: true });
+  await expect(change).toBeDisabled();
+  await pseudo.fill("Trop");
+  await expect(change).toBeDisabled();
+  await pseudo.fill("TropDeCaracteres123");
+  await expect(change).toBeDisabled();
+  await pseudo.fill("bottin");
+  await expect(page.getByText("Ce pseudo est déjà utilisé.")).toBeVisible();
+  await expect(change).toBeDisabled();
+  await pseudo.fill("nouveauMobile");
+  await expect(change).toBeEnabled();
+  await expect(change).toHaveCSS("background-color", "rgb(243, 222, 154)");
+  const fieldBox = (await pseudo.boundingBox())!;
+  const buttonBox = (await change.boundingBox())!;
+  expect(buttonBox.x).toBeGreaterThan(fieldBox.x + fieldBox.width);
+  expect(buttonBox.y).toBeCloseTo(fieldBox.y);
+  await page.screenshot({ path: testInfo.outputPath("pseudo-mobile-disponible.png") });
+  await change.click();
+  await expect(pseudo).toHaveValue("NouveauMobile");
+  await expect(change).toBeDisabled();
+
+  const contents = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#f5d783";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  const pendingFile = page.waitForEvent("filechooser");
+  await page.getByLabel("Photo de profil").click();
+  await (await pendingFile).setFiles({
+    name: "portrait.png", mimeType: "image/png", buffer: Buffer.from(contents, "base64"),
+  });
+  await page.getByRole("button", { name: "Enregistrer la photo" }).click();
+  const avatar = page.getByRole("region", { name: "Icône du profil" });
+  const photo = avatar.locator(".player-avatar img");
+  await expect(photo).toHaveJSProperty("naturalWidth", 128);
+  await expect(page.locator(".account-card .player-avatar")).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("photo-mon-compte-mobile.png") });
+  await avatar.getByRole("button", { name: "Générer une icône" }).click();
+  await expect(photo).toHaveCount(0);
+  await expect(avatar.locator(".avatar-symbol")).toBeVisible();
+  await page.reload();
+  await expect(avatar.locator(".avatar-symbol")).toBeVisible();
+  await expect(photo).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Accueil" }).click();
+  await page.getByRole("button", { name: "Classement", exact: true }).click();
+  const directory = page.getByRole("table", { name: "Classement des joueurs" });
+  const lastRow = directory.locator("tbody tr").last();
+  for (const sort of ["Nom", "RN", "Manches", "Rang"]) {
+    await directory.getByRole("button", { name: sort, exact: true }).click();
+    await expect(lastRow.getByRole("link", { name: "NouveauMobile" })).toBeVisible();
+    await expect(lastRow.locator(".directory-position")).toHaveText("-");
+  }
+  await page.screenshot({ path: testInfo.outputPath("classement-sans-rang.png"), fullPage: true });
+  await page.getByRole("link", { name: "Accueil" }).click();
+  await openSettings(page);
+  await settingsSignOut.click();
+  await expect(page.getByText("Jouer sans compte")).toBeVisible();
+  await openSettings(page);
+  await expect(settingsSignOut).toHaveCount(0);
+});
+
 test("les amis se valident sur demande, voient leur présence et peuvent se retirer", async ({ page: alice, browser, baseURL }, testInfo) => {
   test.setTimeout(45_000);
   const bobContext = await browser.newContext({ baseURL });
@@ -364,6 +441,8 @@ test("les amis se valident sur demande, voient leur présence et peuvent se reti
     await alice.screenshot({ path: testInfo.outputPath("amis-accueil-320.png") });
 
     await friend(alice, "BobbyAmis").getByRole("link").click();
+    await expect(alice.locator(".archive-screen > :last-child").getByRole("button", { name: "Retirer des amis" })).toBeVisible();
+    await alice.screenshot({ path: testInfo.outputPath("profil-retrait-ami.png"), fullPage: true });
     await alice.getByRole("button", { name: "Retirer des amis" }).click();
     await expect(alice.getByRole("button", { name: "Ajouter en ami" })).toBeVisible();
     await expect(bob.getByRole("button", { name: "Ajouter en ami" })).toBeVisible();
@@ -419,7 +498,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await host.getByRole("button", { name: "Enregistrer la photo" }).click();
     await expect(host.getByRole("status")).toHaveText("Photo enregistrée.");
     await host.reload();
-    const photo = host.locator(".account-photo-form .player-avatar img");
+    const photo = profileIcon.locator(".player-avatar img");
     await expect(photo).toHaveJSProperty("naturalWidth", 128);
     await expect(photo).toHaveJSProperty("naturalHeight", 128);
     const alpha = await photo.evaluate(async (image: HTMLImageElement) => {
@@ -518,7 +597,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
 
     await otherDevice.goto("/compte");
     await otherDevice.getByLabel("Pseudo", { exact: true }).fill("BobbyMobile");
-    await otherDevice.getByRole("button", { name: "Enregistrer le pseudo" }).click();
+    await otherDevice.getByRole("button", { name: "Changer", exact: true }).click();
     await expect(otherDevice.getByRole("status")).toHaveText("Pseudo enregistré.");
     const link = otherDevice.getByRole("link", { name: "Mon profil public" });
     const profileUrl = (await link.getAttribute("href"))!;

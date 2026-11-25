@@ -74,7 +74,7 @@ try {
   adb("shell", "input", "text", "TestFicoAndroid");
   await tap("Créer un Hub");
   await tap("Ajouter un bot");
-  const botName = /^(?:Bot \d+|ChaBotté|BotEnTrain|HarryBotter|Botus|RobinDesBots|Botman|Botzilla|JamesBot|SherlockBot|ValteriBotAs)$/;
+  const botName = /^(?:Bot \d+|ChaBotté|BotEnTrain|HarryBotter|Botus|RobinDesBots|Botman|Botzilla|James Bot|SherlockBot|ValteriBotAs|Bottin|BotRoyal|Bipbipbot|Bottine|Bot27Lieues)$/;
   await find(botName);
   capture("02-hub-android");
   await tap("Lancer la partie");

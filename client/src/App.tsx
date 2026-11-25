@@ -22,7 +22,7 @@ import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
 import FriendsPanel from "./ui/FriendsPanel";
 import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RatingPodium, RecentMatches } from "./ui/MatchArchive";
-import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, tableSummaryPath, type AccountSession } from "./network/accountApi";
+import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, signOut, tableSummaryPath, type AccountSession } from "./network/accountApi";
 import { completedRoundsAfter, logDeal, logMatch } from "./game/matchJournal";
 import type { HostRound } from "./game/roundBackup";
 import { matchStatistics } from "./game/matchStatistics";
@@ -128,6 +128,7 @@ function App() {
   function changeAccount(next: AccountSession) {
     setAccountSession(next);
     if (account?.id === next.account?.id) return;
+    if (account && !next.account) clearTable();
     setNetworkReady(false);
     socket.disconnect().connect();
   }
@@ -768,7 +769,11 @@ function App() {
       {renderScreen()}
       <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
         onLeave={currentHub?.gameStarted && networkReady ? leaveHub : undefined}
-        onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined} />
+        onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined}
+        onSignOut={account ? async () => {
+          changeAccount(await signOut());
+          navigate("/");
+        } : undefined} />
     </>
   );
 }

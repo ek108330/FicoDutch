@@ -9,6 +9,7 @@ const playerRanking = `
   FROM accounts a JOIN player_stats s ON a.id = s.account_id
 `;
 const playerOrder = 'rating DESC, matches DESC, "roundWinRate" DESC, id';
+const rankedFirst = '(rounds = 0)';
 const sortColumns = { position: "position", name: "lower(name)", rounds: "rounds", wins: '"roundWinRate"', rating: "rating",
   week: 'rating - "ratingWeekStart"' };
 
@@ -241,13 +242,15 @@ function createMatchStore(db) {
   async function listPlayers(query, after = null, limit = 30, weekAt = Date.now()) {
     const { rows } = await db.query(`
       WITH ranking AS (${playerRanking}), page AS (
-        SELECT * FROM ranking WHERE replace(lower(name), ' ', '') LIKE $1 AND
-          ($2::float8 IS NULL OR (rating, matches, "roundWinRate") < ($2, $3, $4)
-            OR ((rating, matches, "roundWinRate") = ($2, $3, $4) AND id > $5))
-        ORDER BY ${playerOrder} LIMIT $6
+        SELECT ranking.* FROM ranking
+        CROSS JOIN (SELECT COALESCE((SELECT rounds > 0 FROM player_stats WHERE account_id = $5::uuid), true) AS ranked) cursor
+        WHERE replace(lower(name), ' ', '') LIKE $1 AND
+          ($2::float8 IS NULL OR (rounds > 0, rating, matches, "roundWinRate") < (cursor.ranked, $2, $3, $4)
+            OR ((rounds > 0, rating, matches, "roundWinRate") = (cursor.ranked, $2, $3, $4) AND id > $5))
+        ORDER BY ${rankedFirst}, ${playerOrder} LIMIT $6
       )
       SELECT page.*, ${weekStart("page", "$7", "$8")} AS "ratingWeekStart"
-      FROM page ORDER BY ${playerOrder}
+      FROM page ORDER BY ${rankedFirst}, ${playerOrder}
     `, [query + "%", after?.rating ?? null, after?.matches ?? null, after?.roundWinRate ?? null, after?.id ?? null,
       limit + 1, weekAt === null ? null : weekAt - WEEK_MS, weekAt]);
     const players = rows.slice(0, limit);
@@ -256,11 +259,11 @@ function createMatchStore(db) {
   }
 
   async function listSortedPlayers(query, sort, direction, offset, limit = 30, now = Date.now()) {
-    const order = `${sortColumns[sort]} ${direction === "asc" ? "ASC" : "DESC"} NULLS LAST, ${playerOrder}`;
+    const order = `${rankedFirst}, ${sortColumns[sort]} ${direction === "asc" ? "ASC" : "DESC"} NULLS LAST, ${playerOrder}`;
     const weekly = sort === "week";
     const { rows } = await db.query(`
       WITH ranking AS (
-        SELECT players.*, row_number() OVER (ORDER BY ${playerOrder})::int AS position
+        SELECT players.*, CASE WHEN rounds > 0 THEN row_number() OVER (ORDER BY ${rankedFirst}, ${playerOrder})::int END AS position
         FROM (${playerRanking}) players
       ),
       filtered AS (
@@ -398,7 +401,7 @@ function mountMatchRoutes(app, store, readAccount, acceptsOrigin) {
   });
   app.get("/api/podium", async (_request, response) => {
     const { players } = await store.listPlayers("", null, 3, null);
-    response.set("Cache-Control", "public, max-age=15").json(players);
+    response.set("Cache-Control", "public, max-age=15").json(players.filter(({ rounds }) => rounds > 0));
   });
   app.post("/api/players/:id/report", async (request, response) => {
     if (!request.headers.origin || !acceptsOrigin(request.headers.origin))

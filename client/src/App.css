@@ -888,6 +888,12 @@ input {
   flex: none;
   color: #f3de9a;
 }
+.settings-links .account-danger, .account-card .account-danger {
+  border-color: #db9d96;
+  background: #913b36;
+  color: #fff;
+}
+.settings-links .account-danger svg { color: inherit; }
 
 .settings-management { grid-column: 1 / -1; }
 
@@ -2351,7 +2357,6 @@ button.pile-slot:not(:disabled) .pile-card,
 .game-table .player-avatar-mini .avatar-symbol { width: 1em; height: 1em; }
 .profile-identity, .directory-player { display: flex; align-items: center; gap: 9px; }
 .account-avatar-form .player-avatar { justify-self: center; }
-.account-photo-form .player-avatar { justify-self: center; }
 
 .leader-crown {
   position: absolute;
@@ -3444,7 +3449,12 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
   gap: 8px;
 }
 .profile-overview .profile-identity { min-width: 0; }
-.profile-overview .profile-identity h2 { margin: 0; overflow-wrap: anywhere; }
+.profile-overview .profile-identity h2 {
+  margin: 0;
+  font-size: clamp(1.22rem, 5.6vw, 1.7rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
 .profile-overview .player-avatar {
   flex: none;
   width: clamp(44px, 14vw, 76px);
@@ -3524,6 +3534,35 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .account-card form label { display: grid; gap: 6px; }
 .account-card :is(form, .account-avatar-form) { display: grid; gap: 13px; }
 .account-card input { width: 100%; min-height: 40px; padding: 7px 10px; border-radius: 7px; border: 1px solid #aacbb5; }
+.account-pseudo-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 6px; }
+.account-card .account-pseudo-row button:disabled {
+  border-color: #88978f;
+  background: #c1cac4;
+  color: #31443a;
+  cursor: default;
+}
+.account-photo-form { display: grid; gap: 7px; }
+.account-photo-name { overflow-wrap: anywhere; }
+.account-photo-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px 11px;
+  border: 1px solid #78aa93;
+  border-radius: 8px;
+  background: #1b4b37;
+  color: #f8fff9;
+}
+.account-photo-picker:focus-within { outline: 2px solid #ffdf91; outline-offset: 3px; }
+.account-photo-picker input {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
 .archive-screen .archive-primary { background: #f3de9a; color: #24190c; font-weight: 750; }
 .archive-error { color: #ffd4c6; }
 .account-links { display: flex; flex-wrap: wrap; gap: 4px 9px; justify-content: center; align-items: center; font-size: 0.84rem; }
@@ -3643,6 +3682,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .friend-requests .friend-refuse { color: #ffb3a8; }
 .profile-friend-actions { margin-block: 7px; }
 .profile-friend-actions button { display: inline-flex; align-items: center; gap: 5px; }
+.profile-friend-footer { margin-top: 14px; }
 
 .home-entry-layout:has(.home-podium) .hub-list { max-height: min(240px, 28dvh); }
 @media (orientation: portrait) and (max-height: 650px) {

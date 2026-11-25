@@ -11,7 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
-import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -26,6 +26,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
@@ -140,21 +141,15 @@ public final class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
-            @SuppressWarnings("deprecation")
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams options) {
                 String page = view.getUrl();
                 if (page == null || !isGameUrl(Uri.parse(page)) || !"/compte".equals(Uri.parse(page).getPath())
                         || options.getMode() != FileChooserParams.MODE_OPEN || options.isCaptureEnabled()) return false;
-                if (photoSelection != null) return false;
-                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                        .addCategory(Intent.CATEGORY_OPENABLE)
-                        .setType("image/*")
-                        .putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/jpeg", "image/png", "image/webp"});
+                finishPhotoSelection(null);
                 photoSelection = callback;
-                try {
-                    startActivityForResult(picker, PICK_AVATAR);
-                } catch (ActivityNotFoundException unavailable) {
+                if (!showPhotoPicker()) {
                     finishPhotoSelection(null);
+                    Toast.makeText(MainActivity.this, R.string.photo_picker_unavailable, Toast.LENGTH_SHORT).show();
                 }
                 return true;
             }
@@ -163,17 +158,49 @@ public final class MainActivity extends Activity {
         return webView;
     }
 
+    @SuppressWarnings("deprecation")
+    private boolean showPhotoPicker() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                startActivityForResult(new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*"), PICK_AVATAR);
+                return true;
+            } catch (ActivityNotFoundException unavailable) {
+                // Fall back to the system document picker.
+            }
+        }
+        try {
+            startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), PICK_AVATAR);
+            return true;
+        } catch (ActivityNotFoundException unavailable) {
+            return false;
+        }
+    }
+
     @Override
     @SuppressWarnings("deprecation")
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != PICK_AVATAR) return;
-        Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
-        boolean readableDocument = uri != null && "content".equals(uri.getScheme())
-                && DocumentsContract.isDocumentUri(this, uri)
-                && checkUriPermission(uri, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    == PackageManager.PERMISSION_GRANTED;
-        finishPhotoSelection(readableDocument ? new Uri[]{uri} : null);
+        Uri[] photos = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+        Uri uri = photos != null && photos.length == 1 ? photos[0] : null;
+        boolean valid = uri != null && isReadablePhoto(uri);
+        finishPhotoSelection(valid ? photos : null);
+        if (resultCode == RESULT_OK && !valid) {
+            Toast.makeText(this, R.string.photo_picker_unreadable, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean isReadablePhoto(Uri uri) {
+        if (!"content".equals(uri.getScheme()) ||
+                checkUriPermission(uri, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    != PackageManager.PERMISSION_GRANTED) return false;
+        try {
+            String type = getContentResolver().getType(uri);
+            return type != null && type.startsWith("image/");
+        } catch (SecurityException unavailable) {
+            return false;
+        }
     }
 
     private void finishPhotoSelection(Uri[] result) {

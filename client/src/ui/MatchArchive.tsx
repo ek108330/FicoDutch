@@ -326,7 +326,7 @@ function ProfileContent({ profile, navigate, viewerId }: { profile: Profile; nav
         <div><dt>Manches gagnées</dt><dd>{roundWinRate}</dd></div>
       </dl>
     </div>
-    {viewerId && viewerId !== profile.id && !profile.demoBot && <FriendProfileActions key={viewerId} id={profile.id} />}
+    <FriendProfileActions key={viewerId} id={viewerId && viewerId !== profile.id && !profile.demoBot ? profile.id : undefined}>
     {profile.demoBot && <p className="archive-muted">Bot de démonstration · historique initial simulé</p>}
     <div className="profile-stat-groups">
       {totals.map(({ title, played, wins, rate, rateTitle }) => <section key={title} className="archive-card profile-stat-group"
@@ -358,6 +358,7 @@ function ProfileContent({ profile, navigate, viewerId }: { profile: Profile; nav
         </div>
       </li>)}</ul> : <p className="archive-muted">Aucun résultat à afficher.</p>}
     </section>)}
+    </FriendProfileActions>
   </>;
 }
 
@@ -430,9 +431,9 @@ export function PlayersDirectory(props: RouteProps) {
         <tbody>{players.map((player) => {
           const weekStart = player.ratingWeekStart;
           const change = weekStart == null ? null : player.rating - weekStart;
-          const place = player.position <= 3 ? player.position : undefined;
+          const place = player.position != null && player.position <= 3 ? player.position : undefined;
           return <tr key={player.id} data-place={place}>
-            <td><span className="directory-position">{player.position ?? "—"}</span></td>
+            <td><span className="directory-position">{player.position ?? "-"}</span></td>
             <th scope="row"><span className="directory-player">
               <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} isBot={player.demoBot} mini />
               <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
