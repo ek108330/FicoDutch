@@ -2750,9 +2750,13 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
 
 .score-ranking thead th { color: #f3de9a; font-size: 0.72rem; }
 .score-ranking .ranking-rank { width: 3.3em; }
-.score-ranking .ranking-round-score { padding-inline-end: 8px; text-align: right; }
-.score-ranking thead .ranking-round-score { width: 6rem; font-size: 0.67rem; font-weight: 700; white-space: nowrap; }
+.score-ranking :is(.ranking-rn, .ranking-round-score) { text-align: right; white-space: nowrap; }
+.score-ranking thead .ranking-rn { width: 3.5rem; }
+.score-ranking thead .ranking-round-score { width: 3.6rem; font-size: 0.67rem; }
 .score-ranking .result-total { width: 3.2em; text-align: right; white-space: nowrap; }
+.rn-change { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rn-change[data-direction="up"] { color: #abe3b8; }
+.rn-change[data-direction="down"] { color: #ffb3a8; }
 
 .ranking-player {
   display: flex;
@@ -3389,10 +3393,18 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-meta span:first-child { color: #ffdf91; font-weight: 750; }
 .archive-screen .archive-note { margin-top: 10px; font-size: 0.9rem; }
 .archive-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 136px), 1fr)); gap: 8px; }
-.archive-rating-movements { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 8px; }
-.archive-rn-delta { display: block; margin-top: 2px; }
-.archive-rating-movements article:first-child h3 svg { color: #abe3b8; }
-.archive-rating-movements article:last-child h3 svg { color: #ffb3a8; }
+.archive-rating-movements { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.archive-rating-movements .archive-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+.archive-rating-movements a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-rating-movements .rn-change { font-weight: 750; }
 .archive-card, .account-card { padding: 12px; border: 1px solid #6d9580; border-radius: 11px; background: #153e30; }
 .archive-card h2 { margin-top: 0; }
 .archive-card > svg { color: #f4cf75; }

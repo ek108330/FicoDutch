@@ -1,11 +1,12 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowDownRight, ArrowLeft, ArrowLeftRight, ArrowUpRight, Crosshair, Crown, Gift, ShieldX,
+import { ArrowLeft, ArrowLeftRight, Crosshair, Crown, Gift, ShieldX,
   Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches,
   readTableSummary, tableSummaryPath, type DirectorySort } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
 import RatingBadge from "./RatingBadge";
+import RatingChange from "./RatingChange";
 import { describeCardFace, suits } from "./cardLabels";
 import type { CardRank } from "../game/cards";
 
@@ -116,28 +117,16 @@ function Interaction({ id, award, roster, navigate }: {
   }
 }
 
-const ratingDelta = new Intl.NumberFormat("fr", { maximumFractionDigits: 2, signDisplay: "always" });
-function formatRatingChange(delta: number) {
-  if (delta === 0) return "0";
-  return Math.abs(delta) < 0.005 ? `${delta > 0 ? "+" : "−"}<0,01` : ratingDelta.format(delta);
-}
-
 function MatchRatingMovements({ movements, navigate }: { movements: RatingMovement[]; navigate: Navigate }) {
-  const changes = movements.map(({ delta }) => delta);
-  const extremes = [
-    { title: "Gain de RN", delta: Math.max(0, ...changes), empty: "Aucun gain net", Icon: ArrowUpRight },
-    { title: "Perte de RN", delta: Math.min(0, ...changes), empty: "Aucune perte nette", Icon: ArrowDownRight },
-  ];
-  return <section className="archive-awards archive-rating-movements" aria-label="Variations de l’indice RN">
-    {extremes.map(({ title, delta, empty, Icon }) => <article className="archive-card" key={title}>
-      <h3><Icon size={16} aria-hidden="true" />{title}</h3>
-      {delta ? <p>
-        <strong>{movements.filter((entry) => entry.delta === delta).map(({ accountId, name }, index) =>
-          <Fragment key={accountId}>{index > 0 && " & "}<Link path={profilePath(accountId)} navigate={navigate}>{name}</Link></Fragment>,
-        )}</strong>
-        <span className="archive-rn-delta">{formatRatingChange(delta)} RN</span>
-      </p> : <p className="archive-muted">{movements.length ? empty : "Aucune manche classée"}</p>}
-    </article>)}
+  const sorted = [...movements].sort((a, b) => b.delta - a.delta);
+  return <section aria-labelledby="archive-rn-title">
+    <h2 id="archive-rn-title">Variations de l’indice RN</h2>
+    {sorted.length ? <ul className="archive-rating-movements">
+      {sorted.map(({ accountId, name, delta }) => <li className="archive-card" key={accountId}>
+        <Link path={profilePath(accountId)} navigate={navigate}>{name}</Link>
+        <RatingChange delta={delta} unit />
+      </li>)}
+    </ul> : <p className="archive-muted">Aucune manche classée</p>}
   </section>;
 }
 

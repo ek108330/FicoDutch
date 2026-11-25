@@ -643,6 +643,7 @@ function App() {
           playerId={playerId ?? ""}
           deadline={memorizationDeadline}
           members={currentHub.players}
+          roundRating={currentHub.roundRating}
           gameFinished={currentHub.gameFinished}
           hostRound={hostRound?.hubId === currentHub.id && hostRound.gameNumber === currentHub.gameNumber ? hostRound.state : null}
           peers={peers}

@@ -33,7 +33,7 @@ function returningPlayer(hub, { id, pseudo }, token) {
   return player && !player.accountId && player.pseudo.toLowerCase() === pseudo.toLowerCase() ? player : undefined;
 }
 function applyRoundRating(hub, number, changes) {
-  hub.roundRating = { number };
+  hub.roundRating = { number, deltas: Object.fromEntries(changes.map(({ id, before, after }) => [id, after - before])) };
   const ratings = new Map(changes.map(({ accountId, after }) => [accountId, after]));
   for (const current of hubs.values()) {
     for (const player of current.players) {

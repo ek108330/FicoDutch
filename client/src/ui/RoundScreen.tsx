@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pause, Play } from "lucide-react";
 import { GAME_CONFIG } from "../config/gameConfig";
-import type { HubPlayer } from "../../../shared/hubTypes";
+import type { Hub, HubPlayer } from "../../../shared/hubTypes";
 import { pauseResumeMs } from "../../../shared/roundTiming.json";
 import { memorizationLimit } from "../game/memorization";
 import type { CardTarget, GameState } from "../game/gameTypes";
@@ -23,6 +23,7 @@ type RoundScreenProps = {
   playerId: string;
   deadline: number;
   members: HubPlayer[];
+  roundRating: Hub["roundRating"];
   gameFinished: boolean;
   hostRound: GameState | null;
   peers: ReturnType<typeof useHubPeers>;
@@ -43,7 +44,7 @@ type Memorization = { roundNumber: number; chosen: number[]; visible: number[] }
 const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] };
 
 export default function RoundScreen({
-  hubId, hostId, playerId, deadline: firstDeadline, members, gameFinished, hostRound,
+  hubId, hostId, playerId, deadline: firstDeadline, members, roundRating, gameFinished, hostRound,
   peers, updateHostRound, onRestart, onLeave, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
@@ -212,6 +213,7 @@ export default function RoundScreen({
         result={scene.result}
         settings={settings}
         roundNumber={roundNumber}
+        ratingDeltas={roundRating?.number === roundNumber ? roundRating.deltas : undefined}
         remaining={turn.remaining}
         waitingForNextRound={scene.waitingForNextRound}
         isHost={playerId === hostId}

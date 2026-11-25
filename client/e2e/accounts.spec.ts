@@ -397,7 +397,10 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await discardDrawn(host);
     for (const tab of [host, guest]) {
       await expect(tab.getByRole("heading", { name: "Fin de la partie" })).toBeVisible({ timeout: 15_000 });
-      await expect(tab.getByRole("table", { name: "Classement cumulé" })).not.toContainText("→");
+      const ranking = tab.getByRole("table", { name: "Classement cumulé" });
+      await expect(ranking).not.toContainText("→");
+      await expect(ranking.getByRole("row", { name: /AliceCompte/ }).locator(".ranking-rn")).toHaveText("+2,00");
+      await expect(ranking.getByRole("row", { name: /BobbyCompte/ }).locator(".ranking-rn")).toHaveText("-2,00");
       await expect(ready(tab)).toHaveCount(0);
     }
     await expect(guest.getByRole("button", { name: "Interrompre la partie" })).toHaveCount(0);
@@ -417,14 +420,9 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       await expect(tab.getByRole("heading", { name: "Bilan cumulé de la table" })).toHaveCount(0);
       await expect(tab.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
       const rating = tab.getByRole("region", { name: "Variations de l’indice RN" });
-      await expect(rating.getByRole("article")).toHaveCount(2);
-      await expect(rating.getByRole("heading")).toHaveText(["Gain de RN", "Perte de RN"]);
-      await expect(rating.getByRole("article").first()).toContainText("AliceCompte");
-      await expect(rating.getByRole("article").first()).toContainText("+2 RN");
-      await expect(rating.getByRole("article").last()).toContainText("BobbyCompte");
-      await expect(rating.getByRole("article").last()).toContainText(/[-−]2 RN/);
-      const [gain, loss] = await Promise.all([rating.getByRole("article").first().boundingBox(), rating.getByRole("article").last().boundingBox()]);
-      expect(gain!.y).toBeCloseTo(loss!.y);
+      await expect(rating.getByRole("listitem")).toHaveCount(2);
+      await expect(rating.getByRole("link")).toHaveText(["AliceCompte", "BobbyCompte"]);
+      await expect(rating.locator(".rn-change")).toHaveText(["+2,00 RN", "-2,00 RN"]);
       await expect(tab.getByRole("region", { name: "Interactions et rivalités" })).toContainText("a fait échouer 1 Dutch.");
     }
     expect(await host.locator(".archive-screen").innerText()).toEqual(await guest.locator(".archive-screen").innerText());
@@ -449,12 +447,13 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       .locator("circle")).toHaveCount(1);
     await otherDevice.screenshot({ path: testInfo.outputPath("03-profil-apres-renommage.png"), fullPage: true });
     await host.goto(profileUrl);
-    await host.getByRole("button", { name: "Signaler cet historique" }).click();
-    await expect(host.getByRole("status")).toHaveText("Signalement transmis pour vérification.");
+    await expect(host.getByRole("heading", { name: "BobbyMobile" })).toBeVisible();
+    await expect(host.getByRole("button", { name: "Signaler cet historique" })).toHaveCount(0);
     await otherDevice.goto("/");
     await otherDevice.getByRole("button", { name: "Classement", exact: true }).click();
     const bobbyRow = otherDevice.getByRole("row").filter({ has: otherDevice.getByRole("link", { name: "BobbyMobile" }) });
-    await expect(bobbyRow.getByRole("cell")).toHaveText(["1", "0 %", "48", "-2"]);
+    await expect(bobbyRow.getByRole("cell").nth(0)).toHaveText(/^\d+$/);
+    await expect(bobbyRow.locator("td:not(:first-child)")).toHaveText(["1", "0 %", "48", "-2"]);
     await otherDevice.screenshot({ path: testInfo.outputPath("classement-rn-sept-jours.png") });
     await otherDevice.getByRole("link", { name: "Accueil", exact: true }).click();
     await otherDevice.getByRole("button", { name: "Mes stats" }).click();
@@ -463,7 +462,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await otherDevice.getByRole("listitem").filter({ hasText: "Terminée" }).getByRole("link").click();
     await expect(ready(otherDevice)).toBeVisible();
     await expect(otherDevice.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
-    await expect(otherDevice.getByRole("region", { name: "Variations de l’indice RN" })).toContainText("+2 RN");
+    await expect(otherDevice.getByRole("region", { name: "Variations de l’indice RN" })).toContainText("+2,00 RN");
     const url = otherDevice.url();
 
     const anonymous = await browser.newPage({ baseURL });
@@ -535,7 +534,12 @@ test("le bilan affiche les interactions en phrases avec leurs icônes", async ({
   const report: SavedMatch = {
     id: "00000000-0000-4000-8000-000000000001:1", startedAt: 0, endedAt: 60_000,
     status: "interrupted", partial: false, rounds: 1, awards,
-    ratingMovements: [{ accountId: "alice", name: "Alice", delta: -2 }],
+    ratingMovements: [
+      { accountId: "alice", name: "Alice", delta: -2 },
+      { accountId: "bob", name: "Bob", delta: 1.25 },
+      { accountId: "celine", name: "Céline", delta: 0.75 },
+      { accountId: "denis", name: "Denis", delta: 0 },
+    ],
     players: ["Alice", "Bob"].map((name) => ({
       id: name.toLowerCase(), name, rounds: 1, wins: 0, scoreSum: 0, bestScore: 0,
       dutch: 0, dutchWon: 0, reactions: 0, penalties: 0, exchanges: 0,
@@ -545,8 +549,14 @@ test("le bilan affiche les interactions en phrases avec leurs icônes", async ({
   await page.goto(`/parties/${encodeURIComponent(report.id)}`);
   await expect(page.getByText("Alice avec 3 erreurs pour 18 points.")).toBeVisible();
   const rn = page.getByRole("region", { name: "Variations de l’indice RN" });
-  await expect(rn.getByText("Aucun gain net", { exact: true })).toBeVisible();
-  await expect(rn.getByText("-2 RN", { exact: true })).toBeVisible();
+  await expect(rn.getByRole("link")).toHaveText(["Bob", "Céline", "Denis", "Alice"]);
+  await expect(rn.locator(".rn-change")).toHaveText(["+1,25 RN", "+0,75 RN", "0,00 RN", "-2,00 RN"]);
+  for (const tile of await rn.getByRole("listitem").all()) {
+    const name = (await tile.getByRole("link").boundingBox())!;
+    const change = (await tile.locator(".rn-change").boundingBox())!;
+    expect(name.y + name.height / 2).toBeCloseTo(change.y + change.height / 2);
+    expect(change.x).toBeGreaterThanOrEqual(name.x + name.width);
+  }
   const interactions = page.getByRole("region", { name: "Interactions et rivalités" });
   await expect(interactions.getByText("Alice et Bob ont échangé 5 fois.", { exact: true })).toBeVisible();
   await expect(interactions.getByText("Alice a donné un joker à Bob contre un as.", { exact: true })).toBeVisible();

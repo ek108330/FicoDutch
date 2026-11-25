@@ -34,7 +34,7 @@ export type Hub = {
   hostPause: { startedAt: number; until: number; transfer?: true } | null;
   manualPause?: { startedAt: number; resumeAt?: number };
   clockVersion: number;
-  roundRating?: { number: number };
+  roundRating?: { number: number; deltas: Record<string, number> };
   initialCardCounts?: Record<string, number>;
   memorizationEndsAt?: number;
   createdAt: number;

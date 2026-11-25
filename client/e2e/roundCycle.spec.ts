@@ -110,7 +110,8 @@ test("deux manches jusqu’au seuil puis nouvelle partie à zéro dans le même 
       await expect(page.getByText("Seuil de 50 points atteint.")).toBeVisible();
       await expect(page.getByRole("group", { name: "Variantes de la prochaine partie" }).getByRole("button")).toHaveCount(4);
       await expect(sixCards(page)).toHaveAttribute("aria-pressed", "true");
-      expect(await ranking(page).getByRole("columnheader").allTextContents()).toEqual(["Rang", "Joueur", "Dernière manche", "Total"]);
+      expect(await ranking(page).getByRole("columnheader").allTextContents()).toEqual(["Rang", "Joueur", "RN", "Dernière manche", "Total"]);
+      await expect(ranking(page).locator("tbody .ranking-rn")).toHaveText(["—", "—"]);
       const alice = ranking(page).getByRole("row", { name: /AliceManches/ });
       const bob = ranking(page).getByRole("row", { name: /BobManches/ });
       await expect(alice.locator(".result-total")).toHaveText("79");

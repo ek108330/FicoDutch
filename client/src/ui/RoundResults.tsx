@@ -6,11 +6,13 @@ import { VARIANT_LABELS, type GameVariants } from "../game/variants";
 import PlayingCard from "./PlayingCard";
 import PerimeterClock from "./PerimeterClock";
 import { InterruptConfirmation } from "./HubManagement";
+import RatingChange from "./RatingChange";
 
 type Props = {
   result: RoundResultView;
   settings: ReactNode;
   roundNumber: number;
+  ratingDeltas?: Record<string, number>;
   remaining: number;
   waitingForNextRound?: boolean;
   isHost: boolean;
@@ -87,14 +89,16 @@ function RankingPosition({ rank, previousRank }: { rank: number; previousRank?: 
   </span>;
 }
 
-function Ranking({ result }: { result: RoundResultView }) {
+function Ranking({ result, ratingDeltas }: Pick<Props, "result" | "ratingDeltas">) {
   return (
     <table className="score-ranking" aria-label="Classement cumulé">
       <caption className="result-section-title">Classement général</caption>
       <thead>
         <tr>
           <th scope="col" className="ranking-rank">Rang</th><th scope="col">Joueur</th>
-          <th scope="col" className="ranking-round-score">Dernière manche</th><th scope="col" className="result-total">Total</th>
+          <th scope="col" className="ranking-rn">RN</th>
+          <th scope="col" className="ranking-round-score">Dernière<br /> manche</th>
+          <th scope="col" className="result-total">Total</th>
         </tr>
       </thead>
       <tbody>
@@ -102,6 +106,7 @@ function Ranking({ result }: { result: RoundResultView }) {
           <tr key={id}>
             <td><RankingPosition rank={rank} previousRank={previousRank} /></td>
             <th scope="row"><span className="ranking-player"><span title={pseudo}>{pseudo}</span><PlayerBadges id={id} result={result} /></span></th>
+            <td className="ranking-rn">{ratingDeltas?.[id] === undefined ? "—" : <RatingChange delta={ratingDeltas[id]} />}</td>
             <td className="ranking-round-score">{signedScore.format(roundScore)}</td>
             <td className="result-total">{totalScore}</td>
           </tr>
@@ -112,7 +117,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, settings, roundNumber, remaining, waitingForNextRound, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext,
+  result, settings, roundNumber, ratingDeltas, remaining, waitingForNextRound, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext,
   onRestart, onInterrupt, canRestart, gameFinished,
 }: Props) {
   const interruptDialog = useRef<HTMLDialogElement>(null);
@@ -143,7 +148,7 @@ export default function RoundResults({
         )}
         <div className="result-details">
           {!waitingForNextRound && <ResultHands result={result} />}
-          <Ranking result={result} />
+          <Ranking result={result} ratingDeltas={ratingDeltas} />
         </div>
         <div className="result-footer">
           <fieldset className="result-variants" disabled={!canEditVariants}>
