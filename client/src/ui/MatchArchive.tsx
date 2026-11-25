@@ -124,18 +124,18 @@ function formatRatingChange(delta: number) {
 function MatchRatingMovements({ movements, navigate }: { movements: RatingMovement[]; navigate: Navigate }) {
   const changes = movements.map(({ delta }) => delta);
   const extremes = [
-    { title: "Gain de RN", delta: Math.max(0, ...changes), Icon: ArrowUpRight },
-    { title: "Perte de RN", delta: Math.min(0, ...changes), Icon: ArrowDownRight },
+    { title: "Gain de RN", delta: Math.max(0, ...changes), empty: "Aucun gain net", Icon: ArrowUpRight },
+    { title: "Perte de RN", delta: Math.min(0, ...changes), empty: "Aucune perte nette", Icon: ArrowDownRight },
   ];
   return <section className="archive-awards archive-rating-movements" aria-label="Variations de l’indice RN">
-    {extremes.map(({ title, delta, Icon }) => <article className="archive-card" key={title}>
+    {extremes.map(({ title, delta, empty, Icon }) => <article className="archive-card" key={title}>
       <h3><Icon size={16} aria-hidden="true" />{title}</h3>
       {delta ? <p>
         <strong>{movements.filter((entry) => entry.delta === delta).map(({ accountId, name }, index) =>
           <Fragment key={accountId}>{index > 0 && " & "}<Link path={profilePath(accountId)} navigate={navigate}>{name}</Link></Fragment>,
         )}</strong>
         <span className="archive-rn-delta">{formatRatingChange(delta)} RN</span>
-      </p> : <p className="archive-muted">{movements.length ? "Aucune variation" : "Aucune manche classée"}</p>}
+      </p> : <p className="archive-muted">{movements.length ? empty : "Aucune manche classée"}</p>}
     </article>)}
   </section>;
 }

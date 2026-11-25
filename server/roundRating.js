@@ -13,10 +13,12 @@ function calculateRatings(players, encounters) {
   const participation = 1 + 0.1 * (players.length - 2);
   return players.map((player) => {
     const { accountId, rating, ratedRounds, score, forfeited } = player;
-    const coefficient = (ratedRounds < 10 ? 4 : 2) * participation;
+    const playerCoefficient = ratedRounds < 10 ? 4 : 2;
     let total = 0;
     for (const opponent of players) {
       if (opponent === player) continue;
+      const opponentCoefficient = opponent.ratedRounds < 10 ? 4 : 2;
+      const coefficient = (playerCoefficient + opponentCoefficient) / 2 * participation;
       const difference = rating - opponent.rating;
       const expected = 1 / (1 + 10 ** (-difference / 40));
       const order = forfeited === opponent.forfeited
@@ -25,9 +27,10 @@ function calculateRatings(players, encounters) {
       const actual = order > 0 ? 1 : order < 0 ? 0 : 0.5;
       const change = coefficient * (actual - expected);
       const count = (encounters.get(accountId)?.get(opponent.accountId) ?? 0) + 1;
-      total += change > 0
-        ? change * repetitionFactor(count) / (1 + (Math.max(0, difference) / 20) ** 2)
-        : change;
+      const ratingAdvantage = Math.max(0, change > 0 ? difference : -difference);
+      const amount = Math.abs(change) * repetitionFactor(count) / (1 + (ratingAdvantage / 20) ** 2);
+      const available = change > 0 ? Math.min(99 - rating, opponent.rating) : Math.min(rating, 99 - opponent.rating);
+      total += Math.sign(change) * Math.min(amount, available);
     }
     return { id: player.id, accountId, before: rating, after: Math.min(99, Math.max(0, rating + total / (players.length - 1))) };
   });

@@ -18,13 +18,13 @@ test("le RN utilise les scores simultanés, les égalités et la taille de la ta
     closeTo(results.at(-1), 50 - 2 * (1 + 0.1 * (count - 2)));
     assert.deepEqual(ratings(players.map((entry) => ({ ...entry, score: 2 }))), Array(count).fill(50));
   }
-  assert.deepEqual(ratings([player(0, 50, 1, 10), player(1, 50, 0, 9)]), [49, 52]);
+  assert.deepEqual(ratings([player(0, 50, 1, 10), player(1, 50, 0, 9)]), [48.5, 51.5]);
   assert.deepEqual(ratings([player(0, 98, 0), player(1, 1, 1)]).map(Math.round), [98, 1]);
-  assert.deepEqual(ratings([player(0, 98, 0), player(1, 98, 1)]), [99, 96]);
-  assert.deepEqual(ratings([player(0, 1, 0), player(1, 1, 1)]), [3, 0]);
+  assert.deepEqual(ratings([player(0, 98, 0), player(1, 98, 1)]), [99, 97]);
+  assert.deepEqual(ratings([player(0, 1, 0), player(1, 1, 1)]), [2, 0]);
 });
 
-test("l’écart et les répétitions ne réduisent que le gain contre l’adversaire concerné", () => {
+test("l’écart et les répétitions réduisent symétriquement le gain et la perte de chaque confrontation", () => {
   const expected = 1 / (1 + 10 ** (-0.5));
   const weak = player(1, 40, 10);
   const favourite = player(0, 60, 0);
@@ -32,9 +32,13 @@ test("l’écart et les répétitions ne réduisent que le gain contre l’adver
   for (const [prior, multiplier] of [[4, 1], [5, 0.5], [9, 0.5], [10, 0.2], [14, 0.2], [15, 0]]) {
     const [wins, loses] = ratings([favourite, weak], repeated(prior));
     closeTo(wins, 60 + 4 * (1 - expected) * 0.5 * multiplier);
-    closeTo(loses, 40 - 4 * (1 - expected));
+    closeTo(loses, 40 - 4 * (1 - expected) * 0.5 * multiplier);
   }
-  closeTo(ratings([{ ...favourite, score: 20 }, weak], repeated(15))[0], 60 - 4 * expected);
+  const upset = ratings([{ ...favourite, score: 20 }, weak], repeated(5));
+  closeTo(upset[0], 60 - 2 * expected);
+  closeTo(upset[1], 40 + 2 * expected);
+  const mixed = [player(0, 98, 0, 10), player(1, 0, 1), player(2, 40, 2)];
+  closeTo(ratings(mixed).reduce((sum, rating) => sum + rating, 0), 138);
   closeTo(ratings([favourite, weak, player(2, 60, 30)], repeated(15))[0], 61.1);
   assert.deepEqual(ratings([player(0, 50, 0, 0, true), player(1, 50, 13)]), [48, 52]);
 });

@@ -528,6 +528,7 @@ test("le bilan affiche les interactions en phrases avec leurs icônes", async ({
   const report: SavedMatch = {
     id: "00000000-0000-4000-8000-000000000001:1", startedAt: 0, endedAt: 60_000,
     status: "interrupted", partial: false, rounds: 1, awards,
+    ratingMovements: [{ accountId: "alice", name: "Alice", delta: -2 }],
     players: ["Alice", "Bob"].map((name) => ({
       id: name.toLowerCase(), name, rounds: 1, wins: 0, scoreSum: 0, bestScore: 0,
       dutch: 0, dutchWon: 0, reactions: 0, penalties: 0, exchanges: 0,
@@ -536,6 +537,9 @@ test("le bilan affiche les interactions en phrases avec leurs icônes", async ({
   await page.route("**/api/matches/*", (route) => route.fulfill({ json: report }));
   await page.goto(`/parties/${encodeURIComponent(report.id)}`);
   await expect(page.getByText("Alice avec 3 erreurs pour 18 points.")).toBeVisible();
+  const rn = page.getByRole("region", { name: "Variations de l’indice RN" });
+  await expect(rn.getByText("Aucun gain net", { exact: true })).toBeVisible();
+  await expect(rn.getByText("-2 RN", { exact: true })).toBeVisible();
   const interactions = page.getByRole("region", { name: "Interactions et rivalités" });
   await expect(interactions.getByText("Alice et Bob ont échangé 5 fois.", { exact: true })).toBeVisible();
   await expect(interactions.getByText("Alice a donné un joker à Bob contre un as.", { exact: true })).toBeVisible();
