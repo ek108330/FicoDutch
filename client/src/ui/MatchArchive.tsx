@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowLeftRight, Crosshair, Crown, Gift, ShieldX,
   Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
-import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
+import type { Award, AwardId, MatchPlayer, Profile, SavedMatch } from "../../../shared/statistics";
 import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches,
   readTableSummary, tableSummaryPath, type DirectorySort } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
@@ -117,21 +117,46 @@ function Interaction({ id, award, roster, navigate }: {
   }
 }
 
-function MatchRatingMovements({ movements, navigate }: { movements: RatingMovement[]; navigate: Navigate }) {
-  const sorted = [...movements].sort((a, b) => b.delta - a.delta);
-  return <section aria-labelledby="archive-rn-title">
-    <h2 id="archive-rn-title">Variations de l’indice RN</h2>
-    {sorted.length ? <ul className="archive-rating-movements">
-      {sorted.map(({ accountId, name, delta }) => <li className="archive-card" key={accountId}>
-        <Link path={profilePath(accountId)} navigate={navigate}>{name}</Link>
-        <RatingChange delta={delta} unit />
-      </li>)}
-    </ul> : <p className="archive-muted">Aucune manche classée</p>}
+function MatchRanking({ match, navigate }: { match: SavedMatch; navigate: Navigate }) {
+  const ranked = match.players.filter(({ rank }) => rank !== undefined).sort((a, b) => a.rank! - b.rank!);
+  const movements = new Map(match.ratingMovements?.map((entry) => [entry.accountId, entry]));
+  const rows = ranked.map((player) => {
+    const movement = player.accountId ? movements.get(player.accountId) : undefined;
+    if (player.accountId) movements.delete(player.accountId);
+    return { ...player, delta: movement?.delta };
+  });
+  const unranked = [...movements.values()].sort((a, b) => b.delta - a.delta);
+  const official = ranked.length > 0;
+  const title = official ? "Classement officiel" : "Variations de l’indice RN";
+  if (!official && !unranked.length) return null;
+
+  return <section className="archive-card archive-ranking" aria-labelledby="archive-ranking-title">
+    <h2 id="archive-ranking-title">{title}</h2>
+    {official && match.status === "interrupted" && <p>Dernière partie terminée</p>}
+    <table aria-labelledby="archive-ranking-title">
+      <thead><tr>
+        {official && <th scope="col">Rang</th>}
+        <th scope="col">Joueur</th><th scope="col" className="archive-ranking-rn">RN</th>
+        {official && <th scope="col">Total</th>}
+      </tr></thead>
+      <tbody>
+        {rows.map(({ delta, ...player }) => <tr key={player.id}>
+          <td>{player.rank}</td><th scope="row"><PlayerName player={player} navigate={navigate} /></th>
+          <td className="archive-ranking-rn">{delta === undefined ? "—" : <RatingChange delta={delta} />}</td>
+          <td>{player.total}</td>
+        </tr>)}
+        {unranked.map(({ accountId, name, delta }) => <tr key={accountId}>
+          {official && <td>—</td>}
+          <th scope="row"><Link path={profilePath(accountId)} navigate={navigate}>{name}</Link></th>
+          <td className="archive-ranking-rn"><RatingChange delta={delta} /></td>
+          {official && <td>—</td>}
+        </tr>)}
+      </tbody>
+    </table>
   </section>;
 }
 
 function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Navigate }) {
-  const sorted = match.players.filter(({ rank }) => rank !== undefined).sort((a, b) => a.rank! - b.rank!);
   const roster = new Map(match.players.map((player) => [player.id, player]));
   const rounds = match.totalRounds ?? match.rounds + Number(!!match.unfinished);
   const activity = match.unfinished;
@@ -151,16 +176,7 @@ function MatchContent({ match, navigate }: { match: SavedMatch; navigate: Naviga
       <h2>Manche {activity.round} interrompue</h2>
       <p>{plural(activity.reactions, "réaction valide", "réactions valides")} · {plural(activity.penalties, "pénalité")} · {plural(activity.exchanges, "échange")} · {plural(activity.gifts, "carte donnée", "cartes données")} (Joker +)</p>
     </section>}
-    {sorted.length > 0 && <section className="archive-card archive-ranking">
-      <h2>Classement officiel</h2>
-      {match.status === "interrupted" && <p>Dernière partie terminée</p>}
-      <table><thead><tr><th>Rang</th><th>Joueur</th><th>Total</th></tr></thead>
-        <tbody>{sorted.map((player) => <tr key={player.id}>
-          <td>{player.rank}</td><th scope="row"><PlayerName player={player} navigate={navigate} /></th><td>{player.total}</td>
-        </tr>)}</tbody>
-      </table>
-    </section>}
-    <MatchRatingMovements movements={match.ratingMovements ?? []} navigate={navigate} />
+    <MatchRanking match={match} navigate={navigate} />
     <section aria-labelledby="individual-title">
       <h2 id="individual-title">Récompenses individuelles</h2>
       <div className="archive-awards">{individual.map(([id, title, Icon]) => {

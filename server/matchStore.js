@@ -241,7 +241,7 @@ function createMatchStore(db) {
   async function listPlayers(query, after = null, limit = 30, weekAt = Date.now()) {
     const { rows } = await db.query(`
       WITH ranking AS (${playerRanking}), page AS (
-        SELECT * FROM ranking WHERE lower(name) LIKE $1 AND
+        SELECT * FROM ranking WHERE replace(lower(name), ' ', '') LIKE $1 AND
           ($2::float8 IS NULL OR (rating, matches, "roundWinRate") < ($2, $3, $4)
             OR ((rating, matches, "roundWinRate") = ($2, $3, $4) AND id > $5))
         ORDER BY ${playerOrder} LIMIT $6
@@ -265,7 +265,7 @@ function createMatchStore(db) {
       ),
       filtered AS (
         SELECT ranking.* ${weekly ? `, ${weekStart("ranking", "$4", "$5")} AS "ratingWeekStart"` : ""}
-        FROM ranking WHERE lower(name) LIKE $1
+        FROM ranking WHERE replace(lower(name), ' ', '') LIKE $1
       ),
       page AS (
         SELECT * FROM filtered ORDER BY ${order} LIMIT $2 OFFSET $3

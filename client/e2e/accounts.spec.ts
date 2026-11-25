@@ -52,9 +52,9 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(page.getByRole("textbox", { name: "Pseudo", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Classement", exact: true }).click();
     const directory = page.getByRole("table", { name: "Classement des joueurs" });
-    await expect(directory.getByRole("row")).toHaveCount(11);
+    await expect(directory.getByRole("row")).toHaveCount(16);
     await expect(directory.getByRole("columnheader")).toHaveText(["Rang", "Nom", "Manches", "Victoires", "RN", "7j"]);
-    await expect(directory.locator(".directory-position")).toHaveText(Array.from({ length: 10 }, (_, i) => String(i + 1)));
+    await expect(directory.locator(".directory-position")).toHaveText(Array.from({ length: 15 }, (_, i) => String(i + 1)));
     await expect(directory.locator("tbody tr[data-place] .directory-position")).toHaveText(["1", "2", "3"]);
     expect(await directory.locator("tbody a").evaluateAll((links) => links.every((link) => {
       const range = document.createRange();
@@ -67,13 +67,13 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
     const sortBy = (name: string) => directory.getByRole("button", { name, exact: true }).click();
     await sortBy("Nom");
-    await expect(directory.locator("tbody a").first()).toHaveText("BotEnTrain");
+    await expect(directory.locator("tbody a").first()).toHaveText("Bipbipbot");
     await sortBy("Nom");
     await expect(directory.locator("tbody a").first()).toHaveText("ValteriBotAs");
     await sortBy("Rang");
     await expect(directory.locator(".directory-position").first()).toHaveText("1");
     await sortBy("Rang");
-    await expect(directory.locator(".directory-position").first()).toHaveText("10");
+    await expect(directory.locator(".directory-position").first()).toHaveText("15");
     for (const [column, index] of [["Manches", 2], ["Victoires", 3]] as const) {
       const sortedValues = async () => (await directory.locator(`tbody td:nth-of-type(${index})`).allTextContents()).map((value) => parseFloat(value));
       await sortBy(column);
@@ -90,7 +90,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await sortBy("7j");
     await expect(directory.getByRole("columnheader").last()).toHaveAttribute("aria-sort", "descending");
     await sortBy("RN");
-    await page.screenshot({ path: testInfo.outputPath("dix-bots.png"), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath("classement-bots.png"), fullPage: true });
     const search = page.getByRole("searchbox", { name: "Rechercher un joueur" });
     await expect(page.getByRole("button", { name: "Rechercher", exact: true })).toHaveCount(0);
     await Promise.all([
@@ -419,10 +419,10 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       await expect(totals.getByText("2 parties", { exact: true })).toBeVisible();
       await expect(tab.getByRole("heading", { name: "Bilan cumulé de la table" })).toHaveCount(0);
       await expect(tab.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
-      const rating = tab.getByRole("region", { name: "Variations de l’indice RN" });
-      await expect(rating.getByRole("listitem")).toHaveCount(2);
+      const rating = tab.getByRole("table", { name: "Classement officiel" });
+      await expect(rating.getByRole("columnheader")).toHaveText(["Rang", "Joueur", "RN", "Total"]);
       await expect(rating.getByRole("link")).toHaveText(["AliceCompte", "BobbyCompte"]);
-      await expect(rating.locator(".rn-change")).toHaveText(["+2,00 RN", "-2,00 RN"]);
+      await expect(rating.locator(".rn-change")).toHaveText(["+2,00", "-2,00"]);
       await expect(tab.getByRole("region", { name: "Interactions et rivalités" })).toContainText("a fait échouer 1 Dutch.");
     }
     expect(await host.locator(".archive-screen").innerText()).toEqual(await guest.locator(".archive-screen").innerText());
@@ -462,7 +462,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await otherDevice.getByRole("listitem").filter({ hasText: "Terminée" }).getByRole("link").click();
     await expect(ready(otherDevice)).toBeVisible();
     await expect(otherDevice.getByRole("heading", { name: "Classement officiel" })).toBeVisible();
-    await expect(otherDevice.getByRole("region", { name: "Variations de l’indice RN" })).toContainText("+2,00 RN");
+    await expect(otherDevice.getByRole("table", { name: "Classement officiel" }).locator(".rn-change").first()).toHaveText("+2,00");
     const url = otherDevice.url();
 
     const anonymous = await browser.newPage({ baseURL });
@@ -548,12 +548,14 @@ test("le bilan affiche les interactions en phrases avec leurs icônes", async ({
   await page.route("**/api/matches/*", (route) => route.fulfill({ json: report }));
   await page.goto(`/parties/${encodeURIComponent(report.id)}`);
   await expect(page.getByText("Alice avec 3 erreurs pour 18 points.")).toBeVisible();
-  const rn = page.getByRole("region", { name: "Variations de l’indice RN" });
+  const rn = page.getByRole("table", { name: "Variations de l’indice RN" });
   await expect(rn.getByRole("link")).toHaveText(["Bob", "Céline", "Denis", "Alice"]);
-  await expect(rn.locator(".rn-change")).toHaveText(["+1,25 RN", "+0,75 RN", "0,00 RN", "-2,00 RN"]);
-  for (const tile of await rn.getByRole("listitem").all()) {
-    const name = (await tile.getByRole("link").boundingBox())!;
-    const change = (await tile.locator(".rn-change").boundingBox())!;
+  await expect(rn.locator(".rn-change")).toHaveText(["+1,25", "+0,75", "0,00", "-2,00"]);
+  await expect(rn.locator('.rn-change[data-direction="up"]').first()).toHaveCSS("color", "rgb(171, 227, 184)");
+  await expect(rn.locator('.rn-change[data-direction="down"]')).toHaveCSS("color", "rgb(255, 179, 168)");
+  for (const row of await rn.locator("tbody tr").all()) {
+    const name = (await row.getByRole("link").boundingBox())!;
+    const change = (await row.locator(".rn-change").boundingBox())!;
     expect(name.y + name.height / 2).toBeCloseTo(change.y + change.height / 2);
     expect(change.x).toBeGreaterThanOrEqual(name.x + name.width);
   }

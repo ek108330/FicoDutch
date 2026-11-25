@@ -3393,18 +3393,6 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-meta span:first-child { color: #ffdf91; font-weight: 750; }
 .archive-screen .archive-note { margin-top: 10px; font-size: 0.9rem; }
 .archive-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 136px), 1fr)); gap: 8px; }
-.archive-rating-movements { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.archive-rating-movements .archive-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 9px;
-  border-radius: 8px;
-  font-size: 0.84rem;
-}
-.archive-rating-movements a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.archive-rating-movements .rn-change { font-weight: 750; }
 .archive-card, .account-card { padding: 12px; border: 1px solid #6d9580; border-radius: 11px; background: #153e30; }
 .archive-card h2 { margin-top: 0; }
 .archive-card > svg { color: #f4cf75; }
@@ -3431,7 +3419,8 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-ranking, .profile-numbers, .archive-screen > .archive-card { margin-top: 11px; }
 .archive-ranking table { width: 100%; border-collapse: collapse; }
 .archive-ranking :is(th, td) { text-align: left; padding: 4px; border-bottom: 1px solid #507260; }
-.archive-ranking :is(th, td):last-child { text-align: right; }
+.archive-ranking :is(th, td):is(:last-child, .archive-ranking-rn) { text-align: right; }
+.archive-ranking-rn { white-space: nowrap; font-weight: 750; }
 .directory-screen h1 { text-align: center; }
 .player-search { min-height: 37px; padding: 6px 9px; border: 1px solid #aacbb5; border-radius: 7px; font: inherit; width: 100%; }
 .directory-card { padding-inline: clamp(5px, 2vw, 12px); }

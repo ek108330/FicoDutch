@@ -642,7 +642,7 @@ async function start() {
       const { seedDemoPopulation } = require("./demoPopulation");
       await seedDemoPopulation(db, matchStore);
       demoBots = await matchStore.listBots();
-      console.log(`Population de test disponible : ${demoBots.length} bots, 100 parties simulées.`);
+      console.log(`Population de test disponible : ${demoBots.length} bots et leur historique simulé.`);
     }
     const readAccount = mountAccounts(app, io, db, acceptsOrigin, broadcastHubs);
     mountMatchRoutes(app, matchStore, readAccount, acceptsOrigin);

@@ -1,7 +1,13 @@
 const names = ["ChaBotté", "BotEnTrain", "HarryBotter", "Botus", "RobinDesBots", "Botman",
-  "Botzilla", "JamesBot", "SherlockBot", "ValteriBotAs"];
+  "Botzilla", "James Bot", "SherlockBot", "ValteriBotAs", "Bottin", "BotRoyal", "Bipbipbot", "Bottine", "Bot27Lieues"];
 const accountId = (index) => `f1c0d001-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
 const hubId = (index) => `f1c0d002-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
+const legacyBotCount = 10;
+const legacyMatchCount = 100;
+const recentDays = 7;
+const gamesPerDay = 6;
+const dayMs = 86_400_000;
+const recentOffset = (index) => Math.floor(index / gamesPerDay) * dayMs + (index % gamesPerDay) * 3_600_000;
 
 async function seedDemoPopulation(db, store) {
   const { getBotStep, playBotStep } = await import("../client/src/game/bot.ts");
@@ -12,7 +18,7 @@ async function seedDemoPopulation(db, store) {
   const { beginPlay, expireTurn, playTurn } = await import("../client/src/game/turn.ts");
   const bots = await db.transaction(async (tx) => {
     for (const [index, name] of names.entries()) {
-      const handle = name.normalize("NFD").replace(/\p{M}/gu, "");
+      const handle = name.normalize("NFD").replace(/\p{M}| /gu, "");
       await tx.query(`
         INSERT INTO accounts (id, handle, display_name, password_hash, is_demo_bot)
         SELECT $1, $2::text, $3::text, '', true
@@ -30,21 +36,34 @@ async function seedDemoPopulation(db, store) {
     }
     return rows;
   });
-  if (bots.length < 6) throw Error("Profils de démonstration insuffisants.");
-  const ids = Array.from({ length: 100 }, (_, index) => hubId(index) + ":1");
-  const { rows: existing } = await db.query("SELECT id FROM matches WHERE id = ANY($1::text[]) AND ended_at IS NOT NULL", [ids]);
-  const finished = new Set(existing.map(({ id }) => id));
-  const origin = Date.now() - 7 * 86_400_000;
+  const byId = new Map(bots.map((bot) => [bot.id, bot]));
+  const legacy = names.slice(0, legacyBotCount).map((_, index) => byId.get(accountId(index))).filter(Boolean);
+  const recent = [byId.get(accountId(names.indexOf("James Bot"))),
+    ...names.slice(legacyBotCount).map((_, index) => byId.get(accountId(legacyBotCount + index)))].filter(Boolean);
+  if (legacy.length < 6) throw Error("Profils de démonstration insuffisants.");
+  const ids = Array.from({ length: legacyMatchCount + (recent.length >= 2 ? recentDays * gamesPerDay : 0) },
+    (_, index) => hubId(index) + ":1");
+  const { rows } = await db.query("SELECT id, started_at, ended_at FROM matches WHERE id = ANY($1::text[])", [ids]);
+  const existing = new Map(rows.map((entry) => [entry.id, entry]));
+  const origin = Date.now() - recentDays * dayMs;
+  const firstRecent = existing.get(ids[legacyMatchCount]);
+  const recentOrigin = firstRecent ? Number(firstRecent.started_at) : origin;
 
   for (const [index, id] of ids.entries()) {
-    if (finished.has(id)) continue;
-    const roster = [...bots.slice(index % bots.length), ...bots.slice(0, index % bots.length)]
-      .slice(0, 2 + Math.floor(index / bots.length) % 5)
+    const previous = existing.get(id);
+    if (previous && previous.ended_at !== null) continue;
+    const isRecent = index >= legacyMatchCount;
+    const pool = isRecent ? recent : legacy;
+    const game = isRecent ? index - legacyMatchCount : index;
+    const first = game % pool.length;
+    const roster = [...pool.slice(first), ...pool.slice(0, first)]
+      .slice(0, 2 + Math.floor(game / pool.length) % 5)
       .map((bot) => ({ id: bot.id, accountId: bot.id, pseudo: bot.name, connected: true, isBot: true, totalScore: 0 }));
     const variants = {
       sixCards: index % 3 === 0, infinitePose: index % 2 === 0, plusMinusOne: index % 3 === 1, jokerPlus: index % 2 === 1,
     };
-    const startedAt = origin + index * 1_800_000;
+    const startedAt = previous ? Number(previous.started_at)
+      : isRecent ? recentOrigin + recentOffset(game) : origin + index * 1_800_000;
     let now = 0;
     let state = beginPlay(logDeal({ ...createRound(roster, variants, 50), matchId: id }, now), now);
     for (let stepNumber = 0; stepNumber < 8_000 && !state.result?.gameWinnerIds.length; stepNumber++) {
