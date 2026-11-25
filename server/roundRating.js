@@ -10,7 +10,7 @@ function repetitionFactor(count) {
 
 function calculateRatings(players, encounters) {
   if (players.length < 2) return [];
-  const participation = 1 + 0.1 * (players.length - 2);
+  const participation = 1 + 0.25 * (players.length - 2);
   return players.map((player) => {
     const { accountId, rating, ratedRounds, score, forfeited } = player;
     const playerCoefficient = ratedRounds < 10 ? 4 : 2;

@@ -14,8 +14,10 @@ test("le RN utilise les scores simultanés, les égalités et la taille de la ta
   for (let count = 2; count <= 6; count++) {
     const players = Array.from({ length: count }, (_, id) => player(id, 50, id));
     const results = ratings(players);
-    closeTo(results[0], 50 + 2 * (1 + 0.1 * (count - 2)));
-    closeTo(results.at(-1), 50 - 2 * (1 + 0.1 * (count - 2)));
+    const winnerGain = [2, 2.5, 3, 3.5, 4][count - 2];
+    closeTo(results[0], 50 + winnerGain);
+    closeTo(results.at(-1), 50 - winnerGain);
+    closeTo(results.reduce((sum, rating) => sum + rating, 0), 50 * count);
     assert.deepEqual(ratings(players.map((entry) => ({ ...entry, score: 2 }))), Array(count).fill(50));
   }
   assert.deepEqual(ratings([player(0, 50, 1, 10), player(1, 50, 0, 9)]), [48.5, 51.5]);
@@ -39,7 +41,7 @@ test("l’écart et les répétitions réduisent symétriquement le gain et la p
   closeTo(upset[1], 40 + 2 * expected);
   const mixed = [player(0, 98, 0, 10), player(1, 0, 1), player(2, 40, 2)];
   closeTo(ratings(mixed).reduce((sum, rating) => sum + rating, 0), 138);
-  closeTo(ratings([favourite, weak, player(2, 60, 30)], repeated(15))[0], 61.1);
+  closeTo(ratings([favourite, weak, player(2, 60, 30)], repeated(15))[0], 61.25);
   assert.deepEqual(ratings([player(0, 50, 0, 0, true), player(1, 50, 13)]), [48, 52]);
 });
 
