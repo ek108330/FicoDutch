@@ -12,6 +12,7 @@ type Props = {
   settings: ReactNode;
   roundNumber: number;
   remaining: number;
+  waitingForNextRound?: boolean;
   isHost: boolean;
   canEditVariants: boolean;
   canStartNext: boolean;
@@ -111,7 +112,7 @@ function Ranking({ result }: { result: RoundResultView }) {
 }
 
 export default function RoundResults({
-  result, settings, roundNumber, remaining, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext,
+  result, settings, roundNumber, remaining, waitingForNextRound, isHost, canEditVariants, canStartNext, waitingPlayers, toggleVariant, startNext,
   onRestart, onInterrupt, canRestart, gameFinished,
 }: Props) {
   const interruptDialog = useRef<HTMLDialogElement>(null);
@@ -135,12 +136,13 @@ export default function RoundResults({
             <p className="round-winners">{winnerNames} {gameWinners.length > 1 ? "remportent" : "remporte"} la partie.</p>
             <p>Seuil de {result.endThreshold} points atteint.</p>
           </div>
-        ) : seconds === 0 && <p role="status">En attente de joueurs disponibles.</p>}
+        ) : waitingForNextRound ? <p role="status">Tu entreras en jeu à la prochaine manche.</p>
+          : seconds === 0 && <p role="status">En attente de joueurs disponibles.</p>}
         {!isFinal && waitingPlayers.length > 0 && (
           <p>En attente de la prochaine manche · {new Intl.ListFormat("fr").format(waitingPlayers)}</p>
         )}
         <div className="result-details">
-          <ResultHands result={result} />
+          {!waitingForNextRound && <ResultHands result={result} />}
           <Ranking result={result} />
         </div>
         <div className="result-footer">

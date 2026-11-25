@@ -212,6 +212,7 @@ export default function RoundScreen({
         settings={settings}
         roundNumber={roundNumber}
         remaining={turn.remaining}
+        waitingForNextRound={scene.waitingForNextRound}
         isHost={playerId === hostId}
         canEditVariants={playerId === hostId && !restarting}
         canStartNext={turn.canStartNext}

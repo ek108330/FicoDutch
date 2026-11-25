@@ -4,6 +4,7 @@ import { openSettings, discardDrawn, drawDeck, fixDeckOrder, openLobby, openTwoP
 const hub = (page: Page) => page.locator(".hub-item").filter({ hasText: "Hub de AliceEntree" });
 const join = (page: Page) => hub(page).getByRole("button", { name: "Rejoindre", exact: true });
 const waiting = (page: Page) => page.getByRole("heading", { name: "En attente de la prochaine manche" });
+const ranking = (page: Page) => page.getByRole("table", { name: "Classement cumulé" });
 
 async function playTurn(page: Page, announceDutch = false) {
   await expectLocalTurn(page, 18_000);
@@ -35,6 +36,7 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await join(newcomer).click();
     await expect(waiting(newcomer)).toBeVisible();
     await expect(newcomer.getByText("Tu entreras en jeu après la manche 1.")).toBeVisible();
+    await expect(ranking(newcomer)).toHaveCount(0);
     await expect(newcomer.locator(".game-table")).toHaveCount(0);
     await newcomer.reload();
     await expect(waiting(newcomer)).toBeVisible();
@@ -45,10 +47,21 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await playTurn(host);
     await expect(host.getByRole("region", { name: "Main de BobEntree" })).toContainText("36 +10");
     await expect(host.getByText("En attente de la prochaine manche · ChloeEntree")).toBeVisible();
-    await expect(waiting(newcomer)).toBeVisible();
+    await expect(ranking(newcomer)).toBeVisible();
     await expect(newcomer.getByRole("region", { name: "Main de BobEntree" })).toHaveCount(0);
     await expect(host.getByRole("region", { name: "Main de ChloeEntree" })).toHaveCount(0);
     await host.screenshot({ path: testInfo.outputPath("02-classement-et-joueuse-en-attente.png") });
+
+    await join(late).click();
+    for (const observer of [newcomer, late]) {
+      await expect(ranking(observer).getByRole("row")).toHaveText(await ranking(host).getByRole("row").allTextContents());
+      await expect(observer.getByRole("status")).toHaveText("Tu entreras en jeu à la prochaine manche.");
+      await expect(observer.getByRole("region", { name: "Détail de la manche" })).toHaveCount(0);
+      await expect(observer.getByRole("button", { name: "Lancer la manche suivante" })).toHaveCount(0);
+    }
+    await newcomer.screenshot({ path: testInfo.outputPath("02-classement-nouvel-invite-portrait.png") });
+    await (await openSettings(late)).getByRole("button", { name: "Quitter la table" }).click();
+    await expect(host.getByText("En attente de la prochaine manche · ChloeEntree", { exact: true })).toBeVisible();
 
     await host.getByRole("button", { name: "Lancer la manche suivante" }).click();
     await expect(newcomer.getByRole("region", { name: "Distribution des cartes" })).toBeVisible();
@@ -83,7 +96,8 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await expect(newScore.locator(".ranking-round-score")).toHaveText("+26");
     await expect(newcomer.getByRole("region", { name: "Main de DanaEntree" })).toHaveCount(0);
     await newcomer.screenshot({ path: testInfo.outputPath("05-score-herite-portrait.png") });
-    await expect(late.getByRole("heading", { name: "La partie est terminée" })).toBeVisible();
+    await expect(late.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();
+    await expect(ranking(late).getByRole("row")).toHaveText(await ranking(newcomer).getByRole("row").allTextContents());
     await (await openSettings(late)).getByRole("button", { name: "Quitter la table" }).click();
     await expect(hub(late).getByText("Terminée", { exact: true })).toBeVisible();
     await expect(join(late)).toBeDisabled();

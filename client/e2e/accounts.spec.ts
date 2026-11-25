@@ -335,6 +335,11 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     await expect(guest.locator(".hub-item").filter({ hasText: "Hub de AliceCompte" })
       .locator(".hub-name .player-avatar-mini img")).toHaveJSProperty("naturalWidth", 128);
     await join(guest, "AliceCompte");
+    const roster = guest.getByRole("list", { name: "Joueurs présents" });
+    const playerTile = (name: string) => roster.getByRole("listitem").filter({ hasText: name });
+    await expect(playerTile("AliceCompte").locator(".lobby-player-avatar img")).toHaveJSProperty("naturalWidth", 128);
+    await expect(playerTile("BobbyCompte").locator(".lobby-player-avatar .avatar-symbol")).toBeVisible();
+    await guest.screenshot({ path: testInfo.outputPath("avatars-hub-portrait.png") });
     await expect(game(host)).toBeEnabled({ timeout: 12_000 });
     const rejected = otherDevice.waitForEvent("dialog").then(async (dialog) => {
       const message = dialog.message();
@@ -391,7 +396,7 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
       await expect(rating.getByRole("article").last()).toContainText(/[-−]2 RN/);
       const [gain, loss] = await Promise.all([rating.getByRole("article").first().boundingBox(), rating.getByRole("article").last().boundingBox()]);
       expect(gain!.y).toBeCloseTo(loss!.y);
-      await expect(tab.getByRole("region", { name: "Interactions et rivalités" })).toContainText("a fait échouer 1 annonce Dutch");
+      await expect(tab.getByRole("region", { name: "Interactions et rivalités" })).toContainText("a fait échouer 1 Dutch.");
     }
     expect(await host.locator(".archive-screen").innerText()).toEqual(await guest.locator(".archive-screen").innerText());
     await guest.screenshot({ path: testInfo.outputPath("02-bilan-cumule-portrait.png"), fullPage: true });

@@ -102,14 +102,15 @@ export function finishRound(state: GameState, now: number, emptyHandPlayerId: st
   });
 }
 
-export function getRoundResultView(state: GameState) {
+export function getRoundResultView(state: GameState, includeHands = true) {
   if (state.phase !== "results" || !state.result) return null;
   return {
     ...state.result,
     endThreshold: state.endThreshold,
     players: state.players.map(({ id, pseudo, roundScore, totalScore, cards, handLayout, previousRank }) => ({
-      id, pseudo, roundScore, totalScore, penaltyPoints: roundScore - handPoints(cards),
-      cards: cards.map(getCardFace), ...(handLayout && { handLayout }), ...(previousRank !== undefined && { previousRank }),
+      id, pseudo, roundScore, totalScore, penaltyPoints: includeHands ? roundScore - handPoints(cards) : 0,
+      cards: includeHands ? cards.map(getCardFace) : [],
+      ...(includeHands && handLayout && { handLayout }), ...(previousRank !== undefined && { previousRank }),
     })),
   };
 }

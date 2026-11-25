@@ -30,6 +30,12 @@ test("au seuil exact, le plus petit total remporte la partie et les égalités s
   assert.deepEqual(result.result?.gameWinnerIds, ["alice", "charlie"]);
   assert.equal(result.phaseDeadline, null);
   assert.deepEqual(getRoundResultView(result)?.players.map(({ totalScore }) => totalScore), [23, 50, 23]);
+  const observerView = getRoundResultView(result, false);
+  assert.deepEqual(observerView?.players.map(({ roundScore, totalScore, cards }) => ({ roundScore, totalScore, cards })), [
+    { roundScore: 1, totalScore: 23, cards: [] },
+    { roundScore: 1, totalScore: 50, cards: [] },
+    { roundScore: 2, totalScore: 23, cards: [] },
+  ]);
   assert.deepEqual(rankPlayers(result.players).map(({ player, rank }) => [player.id, rank]),
     [["alice", 1], ["charlie", 1], ["bob", 3]]);
   assert.equal(startNextRound(result, 1, members, 1_100), result);

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Crown, Search, X } from "lucide-react";
+import { Check, Crown, Search, UserRound, X } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
@@ -128,14 +128,16 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
         <div className="lobby-roster">
           <ul className="lobby-players" aria-label="Joueurs présents">
             {hub.players.map((player) => {
-              const status = player.connected ? "Connecté" : "Déconnecté";
+              const status = player.isBot ? "Bot" : player.connected ? "Connecté" : "Déconnecté";
               return (
                 <li key={player.id}>
-                  {player.isBot ? <span className="player-bot" role="img" aria-label="Bot">
-                    <PlayerAvatar id={player.accountId ?? player.id} name={player.pseudo} style={player.avatarStyle} isBot mini />
+                  <span className="lobby-player-avatar" data-connected={player.connected} role="img"
+                    aria-label={status} title={status}>
+                    {player.accountId || player.isBot
+                      ? <PlayerAvatar id={player.accountId ?? player.id} name={player.pseudo}
+                        style={player.avatarStyle} photoId={player.avatarPhotoId} isBot={player.isBot} mini />
+                      : <UserRound className="lobby-guest-icon" size={22} aria-hidden="true" />}
                   </span>
-                    : <span className="player-connection" data-connected={player.connected} role="img"
-                      aria-label={status} title={status} />}
                   {isHost && !player.isHost
                     ? <button className="lobby-player-name" type="button" title={player.pseudo}
                       aria-haspopup="dialog" disabled={!connected}

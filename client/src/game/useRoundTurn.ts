@@ -19,7 +19,7 @@ type RoundView = { roundNumber: number; clockVersion: number; remainingMs: numbe
   | { phase: "dealing"; players: SetupPlayers; sixCards: boolean }
   | { phase: "memorization"; players: SetupPlayers; sixCards: boolean; memorized: MemorizedCard[] }
   | { phase: "playing"; turn: TurnView }
-  | { phase: "results"; result: RoundResultView; cardMotion: CardMotionView | null }
+  | { phase: "results"; result: RoundResultView; cardMotion: CardMotionView | null; waitingForNextRound?: true }
 );
 type ReceivedView = { view: RoundView; deadline: number | null; receivedAt: number };
 export type UpdateHostRound = (hubId: string, update: (state: GameState, members: HubPlayer[]) => GameState) => void;
@@ -57,7 +57,8 @@ function getDeadline(state: GameState, firstDeadline: number) {
 function projectRound(
   state: GameState, viewer: string, now: number, firstDeadline: number, clockVersion: number
 ): RoundView | null {
-  if (!state.players.some(({ id, hasLeft }) => id === viewer && !hasLeft)) {
+  const isPlayingRound = state.players.some(({ id, hasLeft }) => id === viewer && !hasLeft);
+  if (!isPlayingRound && state.phase !== "results") {
     return { phase: "waiting", roundNumber: state.roundNumber, clockVersion, remainingMs: null };
   }
   const deadline = getDeadline(state, firstDeadline);
@@ -72,8 +73,10 @@ function projectRound(
     return turn && { ...base, phase: "playing", turn };
   }
   if (state.phase === "results") {
-    const result = getRoundResultView(state);
-    return result && { ...base, phase: "results", result, cardMotion: getCardMotionView(state, now) };
+    const result = getRoundResultView(state, isPlayingRound);
+    return result && { ...base, phase: "results", result,
+      cardMotion: isPlayingRound ? getCardMotionView(state, now) : null,
+      ...(!isPlayingRound && { waitingForNextRound: true as const }) };
   }
   const setup = {
     ...base,

@@ -537,27 +537,22 @@ input {
 .lobby-player-actions { max-width: 300px; }
 
 .player-host,
-.player-bot,
-.player-connection {
+.lobby-player-avatar {
   flex-shrink: 0;
 }
 
-.player-bot { display: inline-flex; }
+.lobby-player-avatar { display: inline-flex; }
+.lobby-player-avatar[data-connected="false"] { opacity: 0.5; }
+.lobby-guest-icon {
+  padding: 3px;
+  border: 1px solid #b8c7b9;
+  border-radius: 50%;
+  background: #e7ece3;
+  color: #21573d;
+}
 
 .player-host {
   color: #896415;
-}
-
-.player-connection {
-  width: 8px;
-  height: 8px;
-  border: 1px solid #81442d;
-  border-radius: 50%;
-}
-
-.player-connection[data-connected="true"] {
-  border-color: #1b6545;
-  background: #1b6545;
 }
 
 .lobby-footer {
@@ -2474,6 +2469,8 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   align-items: start;
   gap: 6px 14px;
 }
+
+.result-details > .score-ranking:only-child { grid-column: 1 / -1; }
 
 .round-results .result-section-title {
   margin: 2px 0 4px;
