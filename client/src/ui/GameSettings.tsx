@@ -55,7 +55,7 @@ export default function GameSettings({ dialog, sound, toggleSound, management, o
             <button type="button" onClick={() => setPanel("rules")}>
               <BookOpen size={19} aria-hidden="true" /> Règles du jeu
             </button>
-            {onAccount && <button className="account-danger" type="button" onClick={() => { dialog.current?.close(); onAccount(); }}>
+            {onAccount && <button type="button" onClick={() => { dialog.current?.close(); onAccount(); }}>
               <UserRound size={19} aria-hidden="true" /> Mon compte
             </button>}
             {onSignOut && <button className="account-danger" type="button" disabled={signingOut} onClick={() => void disconnect()}>

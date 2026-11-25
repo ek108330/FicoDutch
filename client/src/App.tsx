@@ -599,6 +599,7 @@ function App() {
 
   function canJoinHub(hub: HubListing) {
     return networkReady && !pendingAdmission && (!!account || !!pseudo.trim()) &&
+      (!hub.isFriendsOnly || !!account || !!readHubReturnToken(hub.id)) &&
       (hub.status === "waiting" || (hub.status === "in-progress" && (!hub.isPrivate || !!readHubReturnToken(hub.id))));
   }
 
@@ -690,7 +691,7 @@ function App() {
                 hostRound?.hubId !== currentHub.id}
               onStart={() => startGame(currentHub)} onLeave={leaveHub}
               onAddBot={() => socket.emit("hub:add-bot", { hubId: currentHub.id })}
-              onUpdate={(variants, endThreshold, isPrivate) => socket.emit("hub:update-settings", { variants, endThreshold, isPrivate })}
+              onUpdate={(variants, endThreshold, access) => socket.emit("hub:update-settings", { variants, endThreshold, ...access })}
               onRemove={(playerId) => socket.emit("hub:remove-guest", { hubId: currentHub.id, playerId })}
               onDecision={(requestId, accept) => socket.emit("hub:admission-decision", { hubId: currentHub.id, requestId, accept })} />
           ) : (
@@ -731,8 +732,8 @@ function App() {
                         <div className="hub-info">
                           <strong><HubName hub={hub} /></strong>
                           {hub.isPrivate
-                            ? <span>Hub Privé · {hub.gameFinished ? "Terminée" : hub.gameStarted ? "En partie" : "En attente"}</span>
-                            : <span>{hub.players.length}/{hub.maxPlayers} joueurs · <span>{hubStatusLabels[hub.status]}</span></span>}
+                            ? <span>Hub Privé{hub.isFriendsOnly && " · Amis"} · {hub.gameFinished ? "Terminée" : hub.gameStarted ? "En partie" : "En attente"}</span>
+                            : <span>{hub.isFriendsOnly ? "Hub Amis · " : `${hub.players.length}/${hub.maxPlayers} joueurs · `}{hubStatusLabels[hub.status]}</span>}
                           {pendingAdmission === hub.id && <span role="status">En attente de validation</span>}
                         </div>
                         <div className="hub-actions">

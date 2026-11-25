@@ -5,6 +5,16 @@ const otherAccount = "CASE WHEN first_id = $1 THEN second_id ELSE first_id END";
 const profileRoom = (id) => "profile:" + id;
 const relationship = (row, id) => !row ? "none" : row.accepted ? "friends" : row.requester_id === id ? "sent" : "received";
 
+async function acceptedFriends(db, id, candidates) {
+  if (!db || !id || !candidates.length) return new Set();
+  const { rows } = await db.query(`
+    SELECT ${otherAccount} AS id FROM friendships
+    WHERE accepted AND ((first_id = $1 AND second_id = ANY($2::uuid[]))
+      OR (second_id = $1 AND first_id = ANY($2::uuid[])))
+  `, [id, candidates]);
+  return new Set(rows.map((friend) => friend.id));
+}
+
 function mountFriends(app, io, db, readAccount, acceptsOrigin) {
   const online = (id) => (io.sockets.adapter.rooms.get(profileRoom(id))?.size ?? 0) > 0;
 
@@ -114,4 +124,4 @@ function mountFriends(app, io, db, readAccount, acceptsOrigin) {
   });
 }
 
-module.exports = { mountFriends };
+module.exports = { mountFriends, acceptedFriends };

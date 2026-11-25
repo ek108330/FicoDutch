@@ -22,6 +22,7 @@ export type Hub = {
   name: string;
   creatorAvatar?: { id: string; style?: number; photoId?: string };
   isPrivate?: true;
+  isFriendsOnly?: true;
   joinRequests?: { id: string; pseudo: string }[];
   hostId: string;
   hostPseudo: string;
@@ -53,7 +54,7 @@ export type CreateHubRequest = {
 };
 
 export type HubListing = Hub | (Pick<Hub, "id" | "name" | "creatorAvatar" | "status" |
-  "gameStarted" | "gameFinished"> & { isPrivate: true; players: [] });
+  "gameStarted" | "gameFinished" | "isFriendsOnly"> & { isPrivate: true; players: [] });
 
 export type HubSession = { hubId: string; playerId: string; token: string; isHost: boolean; matchId?: string };
 export type HubMembership = { hub: Hub; session: HubSession };

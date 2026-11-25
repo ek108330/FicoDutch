@@ -293,10 +293,9 @@ test("le compte sur mobile valide le pseudo, remplace l’avatar et se déconnec
   const settings = await openSettings(page);
   const settingsAccount = settings.getByRole("button", { name: "Mon compte" });
   const settingsSignOut = settings.getByRole("button", { name: "Se déconnecter" });
-  for (const button of [settingsAccount, settingsSignOut]) {
-    await expect(button).toHaveCSS("background-color", "rgb(145, 59, 54)");
-    await expect(button).toHaveCSS("color", "rgb(255, 255, 255)");
-  }
+  await expect(settingsAccount).not.toHaveCSS("background-color", "rgb(145, 59, 54)");
+  await expect(settingsSignOut).toHaveCSS("background-color", "rgb(145, 59, 54)");
+  await expect(settingsSignOut).toHaveCSS("color", "rgb(255, 255, 255)");
   await settingsAccount.click();
   const pseudo = page.getByLabel("Pseudo", { exact: true });
   const change = page.getByRole("button", { name: "Changer", exact: true });
@@ -450,6 +449,76 @@ test("les amis se valident sur demande, voient leur présence et peuvent se reti
     await expect(friend(alice, "BobbyAmis")).toHaveCount(0);
   } finally {
     await Promise.all([bobContext.close(), ...[claire, david].map((tab) => tab.isClosed() ? undefined : tab.close())]);
+  }
+});
+
+test("le Hub Amis exige une amitié acceptée, avec ou sans validation de l’hôte", async ({ page: host, browser, baseURL }, testInfo) => {
+  const [friend, stranger, guest] = await Promise.all(Array.from({ length: 3 }, () => browser.newPage({ baseURL })));
+  const name = "HoteAmis";
+  const listing = (tab: Page) => tab.locator(".hub-item").filter({ hasText: `Hub de ${name}` });
+  const create = (tab: Page) => tab.getByRole("button", { name: "Créer un Hub", exact: true }).click();
+  const leave = (tab: Page) => tab.getByRole("button", { name: "Quitter le Hub" }).click();
+  const accessError = "Ce Hub est réservé aux amis de l’hôte.";
+  const expectRejection = async (tab: Page) => {
+    const rejected = tab.waitForEvent("dialog").then(async (dialog) => {
+      const message = dialog.message();
+      await dialog.dismiss();
+      return message;
+    });
+    await join(tab, name);
+    expect(await rejected).toBe(accessError);
+  };
+  try {
+    await host.setViewportSize({ width: 360, height: 740 });
+    await signIn(host, name, true);
+    await signIn(friend, "MembreAmis", true);
+    await signIn(stranger, "InconnuAmis", true);
+    await friend.goto("/joueurs");
+    await friend.getByRole("link", { name, exact: true }).click();
+    await friend.getByRole("button", { name: "Ajouter en ami" }).click();
+    await expect(friend.getByText("Demande envoyée", { exact: true })).toBeVisible();
+    await guest.goto("/");
+    await guest.getByRole("textbox", { name: "Pseudo" }).fill("InviteAmis");
+    await create(guest);
+    await expect(guest.getByRole("checkbox", { name: "Hub Amis" })).toBeDisabled();
+    await leave(guest);
+
+    await create(host);
+    const privateSetting = host.getByRole("checkbox", { name: "Hub Privé" });
+    const friendsSetting = host.getByRole("checkbox", { name: "Hub Amis" });
+    await friendsSetting.click();
+    await expect(friendsSetting).toBeChecked();
+    await expect(listing(stranger)).toContainText("Hub Amis");
+    await expect(listing(guest).getByRole("button", { name: "Rejoindre" })).toBeDisabled();
+    await expectRejection(stranger);
+    await friend.goto("/");
+    await expectRejection(friend);
+    await leave(host);
+    await host.getByRole("button", { name: "1 demande d’amitié" }).click();
+    await host.getByRole("button", { name: "Accepter la demande de MembreAmis" }).click();
+    await host.getByRole("button", { name: "Fermer les demandes d’amitié" }).click();
+    await create(host);
+    await friendsSetting.click();
+    await expect(friendsSetting).toBeChecked();
+    await join(friend, name);
+    await expect(friend.getByRole("heading", { name: `Hub de ${name}` })).toBeVisible();
+    await leave(friend);
+
+    await privateSetting.click();
+    await expect(privateSetting).toBeChecked();
+    await expect(friendsSetting).toBeChecked();
+    await expect(listing(stranger)).toContainText("Hub Privé · Amis");
+    await expect(listing(stranger).getByRole("button", { name: /Aperçu/ })).toHaveCount(0);
+    await expectRejection(stranger);
+    await join(friend, name);
+    await expect(friend.getByText("En attente de validation")).toBeVisible();
+    await expect(host.getByRole("heading", { name: `Hub de ${name}` }).locator("img, svg")).toHaveCount(0);
+    expect((await friendsSetting.boundingBox())!.y).toBeGreaterThan((await privateSetting.boundingBox())!.y);
+    await host.screenshot({ path: testInfo.outputPath("hub-prive-amis-mobile.png") });
+    await host.getByRole("button", { name: "Accepter MembreAmis" }).click();
+    await expect(friend.getByRole("heading", { name: `Hub de ${name}` })).toBeVisible();
+  } finally {
+    await Promise.all([friend.close(), stranger.close(), guest.close()]);
   }
 });
 

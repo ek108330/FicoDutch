@@ -3,7 +3,6 @@ import { Check, Crown, Search, UserRound, WifiOff, X } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
-import HubName from "./HubName";
 import PlayerAvatar from "./PlayerAvatar";
 import RatingBadge from "./RatingBadge";
 
@@ -17,7 +16,9 @@ type Props = {
   onStart: () => void;
   onAddBot: () => void;
   onLeave: () => void;
-  onUpdate: (variants: Hub["variants"], endThreshold: Hub["endThreshold"], isPrivate?: boolean) => void;
+  onUpdate: (variants: Hub["variants"], endThreshold: Hub["endThreshold"], access?: {
+    isPrivate?: boolean; isFriendsOnly?: boolean;
+  }) => void;
   onRemove: (playerId: string) => void;
   onDecision: (requestId: string, accept: boolean) => void;
 };
@@ -83,6 +84,7 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
     : undefined;
   const points = hub.endThreshold === null ? "Sans limite" : `${hub.endThreshold} points`;
   const managesAdmission = isHost && hub.isPrivate;
+  const hostHasAccount = !!hub.players.find((player) => player.isHost)?.accountId;
 
   useEffect(() => {
     const dialog = playerActions.current;
@@ -100,12 +102,21 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
     <section className={`home-panel lobby-panel${managesAdmission ? " private-lobby" : ""}`} aria-labelledby="lobby-title">
       <header className="lobby-heading">
         <div className="lobby-title-row">
-          <label className="private-setting">
-            <input type="checkbox" checked={!!hub.isPrivate} disabled={!isHost || !connected}
-              onChange={(event) => onUpdate(hub.variants, hub.endThreshold, event.target.checked)} />
-            Hub Privé
-          </label>
-          <h1 id="lobby-title"><HubName hub={hub} /></h1>
+          <div className="lobby-access" role="group" aria-label="Accès au Hub">
+            <label className="lobby-access-setting">
+              <input type="checkbox" checked={!!hub.isPrivate} disabled={!isHost || !connected}
+                onChange={(event) => onUpdate(hub.variants, hub.endThreshold, { isPrivate: event.target.checked })} />
+              Hub Privé
+            </label>
+            <label className="lobby-access-setting" title={isHost && !hostHasAccount
+              ? "Connecte-toi à un compte pour créer un Hub Amis." : undefined}>
+              <input type="checkbox" checked={!!hub.isFriendsOnly}
+                disabled={!isHost || !connected || !hostHasAccount}
+                onChange={(event) => onUpdate(hub.variants, hub.endThreshold, { isFriendsOnly: event.target.checked })} />
+              Hub Amis
+            </label>
+          </div>
+          <h1 id="lobby-title">{hub.name}</h1>
         </div>
       </header>
       <fieldset className="hub-settings" aria-label="Paramètres de la partie" disabled={!isHost || !connected}>

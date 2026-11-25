@@ -6,7 +6,7 @@ const { randomUUID } = require("node:crypto");
 const { Server } = require("socket.io");
 const { openDatabase } = require("./database");
 const { mountAccounts } = require("./accounts");
-const { mountFriends } = require("./friends");
+const { mountFriends, acceptedFriends } = require("./friends");
 const { createMatchStore, mountMatchRoutes, matchId } = require("./matchStore");
 const {
   getAllHubs, createHub, joinHub, updateHubSettings, startHubGame, resolvePeerRelay, removePlayer,
@@ -35,6 +35,7 @@ const io = new Server(httpServer, {
 
 app.get("/healthz", (_request, response) => response.json({ status: "online" }));
 let matchStore;
+let accountDatabase;
 let demoBots = [];
 const closing = new Set();
 const recentCheckpoints = new WeakMap();
@@ -93,6 +94,26 @@ function broadcastHubs() {
 
 function canRequestAdmission(hub) {
   return hub?.isPrivate && !hub.gameStarted && hub.players.length < hub.maxPlayers;
+}
+
+async function friendHostFor(hub, accountId) {
+  const host = hub.players.find(({ isHost }) => isHost);
+  if (!host || !accountId) return;
+  const friends = await acceptedFriends(accountDatabase, host.accountId, [accountId]);
+  if (friends.has(accountId)) return host.id;
+}
+
+async function filterPrivateRequests(hub, host) {
+  const requests = [...privateRequests].filter(([, entry]) => entry.hubId === hub.id);
+  if (!requests.length) return;
+  const candidates = requests.map(([, entry]) => entry.identity.id).filter(Boolean);
+  const friends = await acceptedFriends(accountDatabase, host.accountId, candidates);
+  if (!getHub(hub.id)?.isFriendsOnly) return;
+  for (const [socketId, entry] of requests) {
+    if (privateRequests.get(socketId) !== entry || friends.has(entry.identity.id)) continue;
+    privateRequests.delete(socketId);
+    io.to(socketId).emit("hub:admission", { hubId: hub.id, status: "closed" });
+  }
 }
 
 function saveRoundBackup(current, request, now = Date.now()) {
@@ -323,7 +344,11 @@ io.on("connection", (socket) => {
         socket.emit("hub:error", "Ce compte a déjà une place dans cette partie, ou la table est en cours de fermeture.");
         return;
       }
+      const friendHostId = hub?.isFriendsOnly && !returning ? await friendHostFor(hub, identity.id) : undefined;
       if (!socket.connected || closing.has(hubId)) return;
+      if (hub?.isFriendsOnly && !returning && friendHostId !== hub.hostId) {
+        return socket.emit("hub:error", "Ce Hub est réservé aux amis de l’hôte.");
+      }
       if (hub?.isPrivate && !returning) {
         if (!canRequestAdmission(hub) || findPlayerHub(socket.id) ||
             (identity.id && hub.players.some(({ accountId }) => accountId === identity.id)) ||
@@ -338,7 +363,7 @@ io.on("connection", (socket) => {
         return;
       }
       const membership = joinHub(hubId, socket.id, identity.pseudo, identity.id, identity.avatarStyle, identity.avatarPhotoId,
-        rating, false, returnToken);
+        rating, false, returnToken, friendHostId);
       if (!membership) {
         socket.emit("hub:error", "Impossible de rejoindre ce Hub. Vérifie qu’il est disponible et que ce compte n’y occupe pas déjà une place.");
         return;
@@ -394,10 +419,11 @@ io.on("connection", (socket) => {
       const identity = id ? accountIdentity(applicant) : entry.identity;
       const allowed = request.accept && identity && !findPlayerHub(socketId) &&
         (id ? identity.id === id : !guestNameInUse(pseudo) && !await matchStore?.nameReserved(pseudo));
+      const friendHostId = allowed && current.hub.isFriendsOnly ? await friendHostFor(current.hub, id) : undefined;
       if (!stillPending()) return;
       privateRequests.delete(socketId);
       const membership = allowed && joinHub(entry.hubId, socketId, identity.pseudo, identity.id,
-        identity.avatarStyle, identity.avatarPhotoId, entry.rating, true);
+        identity.avatarStyle, identity.avatarPhotoId, entry.rating, true, undefined, friendHostId);
       if (membership) applicant.emit("hub:joined", membership, Date.now());
       else applicant.emit("hub:admission", { hubId: entry.hubId, status: request.accept ? "closed" : "refused" });
       broadcastHubs();
@@ -552,11 +578,16 @@ io.on("connection", (socket) => {
     broadcastHubs();
   });
 
-  socket.on("hub:update-settings", (settings) => {
+  socket.on("hub:update-settings", async (settings) => {
+    const current = findPlayerHub(socket.id);
+    const wasFriendsOnly = current?.hub.isFriendsOnly;
     const hub = updateHubSettings(socket.id, settings);
     if (!hub) {
       socket.emit("hub:error", "Seul le créateur peut modifier les paramètres du Hub.");
       return;
+    }
+    if (hub.isFriendsOnly && !wasFriendsOnly) {
+      await filterPrivateRequests(hub, current.player).catch((error) => socketError(socket, error));
     }
     broadcastHubs();
     console.log("Paramètres du Hub modifiés :", hub.name);
@@ -638,6 +669,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 async function start() {
   const db = await openDatabase();
   if (db) {
+    accountDatabase = db;
     matchStore = createMatchStore(db);
     if (process.env.FICODUTCH_DEMO === "1") {
       const { seedDemoPopulation } = require("./demoPopulation");

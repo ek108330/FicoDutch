@@ -103,7 +103,7 @@ function membership(hub, player) {
 
 function getAllHubs() {
   return Array.from(hubs.values(), (hub) => hub.isPrivate ? {
-    id: hub.id, name: hub.name, creatorAvatar: hub.creatorAvatar, isPrivate: true,
+    id: hub.id, name: hub.name, creatorAvatar: hub.creatorAvatar, isPrivate: true, isFriendsOnly: hub.isFriendsOnly,
     gameStarted: hub.gameStarted, gameFinished: hub.gameFinished,
     players: [], status: getHubStatus(hub),
   } : getPublicHub(hub));
@@ -167,7 +167,7 @@ function createHub(socketId, pseudo, accountId, tracked = false, avatarStyle, av
   return membership(hub, host);
 }
 
-function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating, approved = false, token) {
+function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId, rating, approved = false, token, friendHostId) {
   const existing = findPlayerHub(socketId);
   if (existing) return existing.hub.id === hubId ? membership(existing.hub, existing.player) : null;
 
@@ -175,6 +175,7 @@ function joinHub(hubId, socketId, pseudo, accountId, avatarStyle, avatarPhotoId,
   const returning = hub && returningPlayer(hub, { id: accountId, pseudo }, token);
   if (!hub || hub.gameFinished || hub.players.length >= hub.maxPlayers ||
       (hub.isPrivate && !returning && (!approved || hub.gameStarted)) ||
+      (hub.isFriendsOnly && !returning && (!accountId || friendHostId !== hub.hostId)) ||
       (accountId && hub.players.some((player) => player.accountId === accountId))) return null;
   const player = returning
     ? { ...returning, socketId, pseudo, connected: true, isHost: false,
@@ -202,6 +203,8 @@ function updateHubSettings(socketId, settings) {
   hub.endThreshold = threshold;
   if (settings.isPrivate === true) hub.isPrivate = true;
   if (settings.isPrivate === false) delete hub.isPrivate;
+  if (settings.isFriendsOnly === true && current.player.accountId) hub.isFriendsOnly = true;
+  if (settings.isFriendsOnly === false) delete hub.isFriendsOnly;
   return getPublicHub(hub);
 }
 

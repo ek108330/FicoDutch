@@ -344,7 +344,7 @@ input {
   gap: 9px;
 }
 
-.home-content:has(.private-lobby) {
+.home-content:has(.lobby-panel) {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -362,7 +362,7 @@ input {
 
 .lobby-heading h1 {
   margin: 0;
-  font: 800 clamp(1.2rem, 5vw, 1.7rem)/1.12 var(--sans);
+  font: 800 clamp(1.45rem, 6vw, 2.15rem)/1.12 var(--sans);
   letter-spacing: -0.035em;
   color: var(--ink);
   overflow-wrap: anywhere;
@@ -420,21 +420,22 @@ input {
 
 .home-identity,
 .hub-name,
-.private-setting {
+.lobby-access-setting {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
 .hub-name .player-avatar { flex: 0 0 auto; }
-.private-setting {
+.lobby-access { display: grid; }
+.lobby-access-setting {
   min-height: 24px;
   font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.private-setting input {
+.lobby-access-setting input {
   width: 16px;
   height: 16px;
   margin: 0;
@@ -743,8 +744,9 @@ input {
 
 @media (orientation: portrait) and (max-height: 600px) {
   .home-content:has(.lobby-panel) { padding-block: 6px; }
-  .lobby-panel { gap: 7px; padding-block: 9px; }
-  .lobby-panel:not(.private-lobby) .chat-log { height: clamp(38px, 8dvh, 48px); }
+  .lobby-panel { gap: 5px; padding-block: 9px; }
+  .lobby-access-setting { min-height: 21px; }
+  .lobby-panel:not(.private-lobby) .chat-log { height: clamp(35px, 7dvh, 44px); }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
