@@ -76,6 +76,8 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   assert.equal(await store.recordRounds(first, [round(4, [score(azure, 2), score(betty, 1), score(celine, 2)])], now + 200_000), null);
   const profile = await store.getProfile(azure.accountId);
   assert.equal(profile.ratings.length, 3);
+  const rivalry = profile.rivals.find(({ id }) => id === celine.accountId);
+  assert.deepEqual([rivalry.played, rivalry.wins, rivalry.losses], [2, 0, 1]);
   assert.equal(profile.rating, profile.ratings.at(-1).rating);
   const week = 7 * 24 * 60 * 60 * 1_000;
   const readAzure = async (at) => (await store.listPlayers("azure", null, 1, at)).players[0];

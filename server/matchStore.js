@@ -296,10 +296,17 @@ function createMatchStore(db) {
         JOIN accounts a ON a.id = rival.id GROUP BY recent.match_id, recent.ended_at ORDER BY recent.ended_at DESC
       `, [id]),
       db.query(`
-        WITH top AS (
-          (SELECT * FROM rivalries WHERE account_id = $1 ORDER BY played DESC, rival_id LIMIT 12)
-          UNION (SELECT * FROM rivalries WHERE account_id = $1 AND wins > losses ORDER BY played DESC, rival_id LIMIT 8)
-          UNION (SELECT * FROM rivalries WHERE account_id = $1 AND losses > wins ORDER BY played DESC, rival_id LIMIT 8)
+        WITH rounds_by_rival AS (
+          SELECT rival.account_id AS rival_id, count(*)::int AS played,
+            count(*) FILTER (WHERE player.result_score < rival.result_score)::int AS wins,
+            count(*) FILTER (WHERE player.result_score > rival.result_score)::int AS losses
+          FROM round_rating_entries player JOIN round_rating_entries rival USING (match_id, number)
+          WHERE player.account_id = $1 AND rival.account_id <> $1
+          GROUP BY rival.account_id
+        ), top AS (
+          (SELECT * FROM rounds_by_rival ORDER BY played DESC, rival_id LIMIT 12)
+          UNION (SELECT * FROM rounds_by_rival WHERE wins > losses ORDER BY played DESC, rival_id LIMIT 8)
+          UNION (SELECT * FROM rounds_by_rival WHERE losses > wins ORDER BY played DESC, rival_id LIMIT 8)
         ) SELECT a.id, a.display_name AS name, played, wins, losses, s.rn AS rating FROM top
           JOIN accounts a ON a.id = top.rival_id JOIN player_stats s ON s.account_id = a.id ORDER BY played DESC, name
       `, [id]),

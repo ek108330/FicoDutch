@@ -101,6 +101,12 @@ test("un nouvel invité attend, rejoint la manche suivante et hérite du plus ha
     await newcomer.setViewportSize({ width: 390, height: 844 });
 
     await playTurn(host, true);
+    const dutch = newcomer.getByRole("alert").filter({ hasText: "Dutch !" });
+    await expect(dutch).toBeInViewport({ ratio: 1 });
+    await expect(newcomer.locator(".table-center")).toHaveCSS("z-index", "13");
+    const [bannerBox, pilesBox] = await Promise.all([dutch.boundingBox(), newcomer.locator(".table-piles").boundingBox()]);
+    expect(bannerBox!.y + bannerBox!.height).toBeLessThan(pilesBox!.y);
+    await newcomer.screenshot({ path: testInfo.outputPath("dutch-trois-joueurs-portrait.png"), animations: "disabled" });
     await playTurn(guest);
     await playTurn(newcomer);
     await expect(newcomer.getByRole("heading", { name: "Fin de la partie" })).toBeVisible();

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
-import { Crown, Megaphone } from "lucide-react";
+import { Crown, Megaphone, WifiOff } from "lucide-react";
 import { emojis } from "../../../shared/hubSocial.json";
+import type { HubPlayer } from "../../../shared/hubTypes";
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { CardFace } from "../game/cards";
 import type { CardTarget, PowerKind } from "../game/gameTypes";
@@ -29,7 +30,7 @@ export type TablePlayer = {
 type GameTableProps = {
   localPlayerId: string;
   players: TablePlayer[];
-  members?: ReadonlyMap<string, { accountId?: string; avatarStyle?: number; avatarPhotoId?: string; rating?: number; isBot?: boolean }>;
+  members?: ReadonlyMap<string, HubPlayer>;
   controls: ReactNode;
   piles?: ReactNode;
   activePlayerId?: string;
@@ -41,7 +42,6 @@ type GameTableProps = {
   onReplace?: (position: number) => void;
   onDiscardDrawn?: () => void;
   dutchControl?: { armed: boolean; toggle: () => void };
-  dutchAnnouncement?: string;
   look?: { target: CardTarget; remaining: number };
   reaction?: { scope: string; play: (position: number) => void };
   drawnCard?: CardFace;
@@ -97,7 +97,6 @@ export default function GameTable({
   onReplace,
   onDiscardDrawn,
   dutchControl,
-  dutchAnnouncement,
   look,
   reaction,
   drawnCard,
@@ -186,11 +185,6 @@ export default function GameTable({
             <div className="discard-placeholder">Défausse</div>
           </div>
         ) : piles}
-        {dutchAnnouncement && <div className="dutch-banner" role="alert">
-          <Megaphone aria-hidden="true" />
-          <strong>Dutch !</strong>
-          <span>{dutchAnnouncement}</span>
-        </div>}
       </div>
 
       {positionedPlayers.map(({ player, position }) => {
@@ -204,6 +198,7 @@ export default function GameTable({
         const canChooseFromHand = power && power.selection.remaining > 0 &&
           canTargetCard(power.kind, localPlayerId, player.id, protectedPlayerId);
         const member = members?.get(player.id);
+        const disconnected = members !== undefined && !member?.connected;
         const name = tablePlayerName(player.pseudo, member?.accountId);
         const announce = position === "bottom" ? dutchControl : undefined;
         const emoji = tableEmojis?.get(player.id);
@@ -216,7 +211,9 @@ export default function GameTable({
             data-gift-recipient={giveToPlayer ? player.id : undefined}>
             <div className="player-name">
               <span className="player-identity">
-                {(member?.accountId || member?.isBot) && <span className="player-credentials">
+                {disconnected ? <span className="table-disconnected" role="img" aria-label="Déconnecté" title="Déconnecté">
+                  <WifiOff size={15} aria-hidden="true" />
+                </span> : (member?.accountId || member?.isBot) && <span className="player-credentials">
                   <PlayerAvatar id={member.accountId ?? player.id} name={player.pseudo} style={member.avatarStyle}
                     photoId={member.avatarPhotoId} isBot={member.isBot} mini />
                   {member.rating !== undefined && <small className="table-rn" aria-label={`Indice RN ${Math.round(member.rating)}`}

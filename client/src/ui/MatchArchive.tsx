@@ -299,14 +299,14 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   ];
   const details: [string, string | number][] = [
     ["Score moyen par manche", profile.rounds ? number.format(profile.scoreSum / profile.rounds) : "—"],
-    ["Meilleur score de manche", profile.bestScore ?? "—"],
     ["Réactions réussies", profile.reactions], ["Pénalités de réaction", profile.penalties], ["10 et Valets utilisés", profile.exchanges],
   ];
   const groups = [
     { title: "Rivaux réguliers", rivals: profile.rivals.filter(({ played }) => played >= 3).slice(0, 3) },
-    { title: "Joueurs dominés", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && wins > losses).slice(0, 3) },
+    { title: "Joueurs dominés", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && wins > losses).slice(0, 3),
+      rate: "wins" as const },
     { title: "Bêtes noires", rivals: profile.rivals.filter(({ played, wins, losses }) => played >= 3 && losses > wins).slice(0, 3),
-      showLossRate: true },
+      rate: "losses" as const },
   ];
   return <>
     <div className="profile-overview">
@@ -336,15 +336,18 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
       <h2>Évolution de l’indice RN</h2>
       <RatingHistory ratings={profile.ratings} />
     </section>
-    {groups.map(({ title, rivals, showLossRate }) => <section key={title} className="archive-card profile-rival-group" aria-label={title}>
+    {groups.map(({ title, rivals, rate }) => <section key={title} className="archive-card profile-rival-group" aria-label={title}>
       <h2>{title}</h2>
       {rivals.length ? <ul className="archive-list profile-rivals">{rivals.map((rival) => <li key={rival.id}>
         <Link path={profilePath(rival.id)} navigate={navigate}>{rival.name}</Link>
-        <span>RN {Math.round(rival.rating)}</span>
-        <span>{plural(rival.played, "partie")}</span>
+        <span className="profile-rival-rating"><small className="table-rn"
+          title={`Indice RN ${Math.round(rival.rating)}`}>{Math.round(rival.rating)}</small></span>
+        <span>{plural(rival.played, "manche")}</span>
         <div className="rival-record">
           <RivalResults wins={rival.wins} losses={rival.losses} />
-          {showLossRate && <span className="rival-loss-rate">{outcomeRate(rival.losses, rival.played)} de défaites</span>}
+          {rate && <span className={`rival-rate rival-${rate}`}>
+            {outcomeRate(rival[rate], rival.played)} de {rate === "wins" ? "victoires" : "défaites"}
+          </span>}
         </div>
       </li>)}</ul> : <p className="archive-muted">Aucun résultat à afficher.</p>}
     </section>)}

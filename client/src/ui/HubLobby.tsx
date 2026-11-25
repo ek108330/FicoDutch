@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Crown, Search, UserRound, X } from "lucide-react";
+import { Check, Crown, Search, UserRound, WifiOff, X } from "lucide-react";
 import type { Hub } from "../../../shared/hubTypes";
 import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
@@ -131,9 +131,10 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
               const status = player.isBot ? "Bot" : player.connected ? "Connecté" : "Déconnecté";
               return (
                 <li key={player.id}>
-                  <span className="lobby-player-avatar" data-connected={player.connected} role="img"
+                  <span className="lobby-player-avatar" role="img"
                     aria-label={status} title={status}>
-                    {player.accountId || player.isBot
+                    {!player.connected ? <WifiOff className="lobby-disconnected" size={22} aria-hidden="true" />
+                      : player.accountId || player.isBot
                       ? <PlayerAvatar id={player.accountId ?? player.id} name={player.pseudo}
                         style={player.avatarStyle} photoId={player.avatarPhotoId} isBot={player.isBot} mini />
                       : <UserRound className="lobby-guest-icon" size={22} aria-hidden="true" />}
@@ -144,7 +145,7 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
                       onClick={() => setSelectedPlayerId(player.id)}>{player.pseudo}</button>
                     : <strong title={player.pseudo}>{player.pseudo}</strong>}
                   {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
-                  {player.rating !== undefined && <small className="lobby-rn"
+                  {player.connected && player.rating !== undefined && <small className="lobby-rn"
                     aria-label={`Indice RN ${Math.round(player.rating)}`}>{Math.round(player.rating)}</small>}
                 </li>
               );

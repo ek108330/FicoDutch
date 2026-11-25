@@ -42,10 +42,13 @@ input {
 
 .brand {
   gap: 8px;
-  font-size: clamp(1.35rem, 5.5vw, 1.85rem);
+  font-size: clamp(1.65rem, 8.8vw, 2.65rem);
   font-weight: 800;
+  line-height: 1;
   color: #f5d46b;
 }
+
+.brand span { flex: 1; text-align: center; }
 
 .brand img {
   flex-shrink: 0;
@@ -542,13 +545,19 @@ input {
 }
 
 .lobby-player-avatar { display: inline-flex; }
-.lobby-player-avatar[data-connected="false"] { opacity: 0.5; }
 .lobby-guest-icon {
   padding: 3px;
   border: 1px solid #b8c7b9;
   border-radius: 50%;
   background: #e7ece3;
   color: #21573d;
+}
+.lobby-disconnected {
+  padding: 3px;
+  border: 1px solid #e8b4aa;
+  border-radius: 50%;
+  background: #fae9e4;
+  color: #8a342a;
 }
 
 .player-host {
@@ -695,7 +704,7 @@ input {
     padding-block: 2px;
   }
   .top-bar .settings-trigger { width: 30px; height: 30px; border-radius: 8px; }
-  .top-bar .brand { line-height: 1; }
+  .top-bar .brand { font-size: clamp(1.55rem, 4vw, 2rem); }
   .top-bar .brand img { width: 42px; }
   .top-bar .version { font-size: 0.65rem; }
 
@@ -2251,6 +2260,7 @@ button.pile-slot:not(:disabled) .pile-card,
 
 .player-identity { display: inline-grid; justify-items: center; max-width: 100%; }
 .player-credentials { display: flex; gap: 3px; align-items: center; }
+.table-disconnected { display: inline-flex; color: #ffb3a8; }
 
 .player-name-label {
   position: relative;
@@ -2350,6 +2360,8 @@ button.dutch-icon { cursor: pointer; touch-action: manipulation; }
   33% { scale: 1.23; }
   100% { scale: 1; box-shadow: 0 0 0 12px rgb(255 227 154 / 0%); }
 }
+
+.game-screen .game-table .table-center:has(.dutch-banner) { z-index: 13; }
 
 .dutch-banner {
   position: absolute;
@@ -3434,7 +3446,7 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 .archive-list { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
 .archive-list li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
 .archive-screen > .profile-rival-group { margin-top: 7px; padding-block: 7px; }
-.profile-rival-group h2 { margin-bottom: 4px; }
+.profile-rival-group h2 { margin-bottom: 4px; color: #fff; }
 .profile-rival-group .archive-muted { margin: 0; }
 .profile-rivals { row-gap: 2px; }
 .profile-rivals li {
@@ -3447,12 +3459,13 @@ body:has(.archive-screen) > :is(.flying-card, .discard-cover) { visibility: hidd
 }
 .profile-rivals a { min-width: 0; overflow-wrap: anywhere; }
 .profile-rivals span { text-align: right; white-space: nowrap; }
+.profile-rival-rating .table-rn { font-size: 0.9em; padding-inline: 5px; }
 .rival-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
 .rival-results span { display: flex; justify-content: flex-end; align-items: center; gap: 3px; }
 .rival-results svg { flex: none; }
 .rival-wins { color: #ffdf91; }
-.rival-losses, .rival-loss-rate { color: #ffb3a8; }
-.rival-loss-rate { display: block; font-size: 0.68rem; line-height: 1.3; }
+.rival-losses { color: #ffb3a8; }
+.rival-rate { display: block; font-size: 0.68rem; line-height: 1.3; }
 .account-card { width: min(100%, 430px); display: grid; gap: 14px; margin: clamp(10px, 7vh, 55px) auto 0; }
 .account-card h1 { display: flex; align-items: center; gap: 8px; }
 .account-card form label { display: grid; gap: 6px; }

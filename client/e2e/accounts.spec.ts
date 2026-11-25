@@ -110,8 +110,8 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
         rating, date: Date.UTC(2026, 0, index + 1),
       }));
       const rivals = [
-        { ...profile.rivals[0], name: "RivalFort", played: 10, wins: 1, losses: 6 },
-        { ...profile.rivals[1], name: "RivalFaible", played: 10, wins: 7, losses: 2 },
+        { id: "rival-fort", name: "RivalFort", played: 10, wins: 1, losses: 6, rating: 53 },
+        { id: "rival-faible", name: "RivalFaible", played: 10, wins: 7, losses: 2, rating: 47 },
         ...Array.from({ length: 6 }, (_, index) => ({
           id: `rival-${index}`, name: `Rival${index}`, played: 9,
           wins: index < 3 ? 2 : 6, losses: index < 3 ? 7 : 1, rating: 50,
@@ -134,9 +134,18 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(blackBeasts.getByRole("img", { name: "6 défaites" })).toBeVisible();
     await expect(blackBeasts).toContainText("60 % de défaites");
     await expect(blackBeasts.getByText("78 % de défaites", { exact: true })).toHaveCount(2);
-    await expect(page.getByRole("region", { name: "Joueurs dominés" })).not.toContainText("de défaites");
+    const dominated = page.getByRole("region", { name: "Joueurs dominés" });
+    await expect(dominated).not.toContainText("de défaites");
+    await expect(dominated).toContainText("70 % de victoires");
+    await expect(dominated).toContainText("10 manches");
+    await expect(page.getByText("Meilleur score de manche", { exact: true })).toHaveCount(0);
     for (const group of ["Rivaux réguliers", "Joueurs dominés", "Bêtes noires"]) {
-      await expect(page.getByRole("region", { name: group }).getByRole("listitem")).toHaveCount(3);
+      const section = page.getByRole("region", { name: group });
+      await expect(section.getByRole("listitem")).toHaveCount(3);
+      await expect(section.getByRole("heading")).toHaveCSS("color", "rgb(255, 255, 255)");
+      const badge = section.locator(".profile-rival-rating .table-rn").first();
+      await expect(badge).toHaveText(/^\d+$/);
+      await expect(badge).toHaveCSS("background-color", "rgb(243, 222, 154)");
     }
     const columns = await page.locator(".profile-rivals").evaluateAll((lists) =>
       lists.map((list) => Array.from(list.querySelectorAll("li:first-child > span"), (cell) => cell.getBoundingClientRect().x)));
@@ -245,11 +254,11 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     const targets = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Cible dans le dos" }) });
     await expect(targets.locator("p")).toHaveText(/.+ & .+ ont chacun subi 3 actions de 2 adversaires\./);
     const interactions = page.getByRole("region", { name: "Interactions et rivalités" });
-    await expect(interactions.locator(".archive-card")).toHaveCount(5);
+    await expect(interactions.locator(".archive-card")).toHaveCount(4);
     const interactionColumns = await interactions.locator(".archive-card").evaluateAll((cards) =>
       new Set(cards.map((card) => card.getBoundingClientRect().x)).size);
     expect(interactionColumns).toBe(1);
-    await expect(interactions).toContainText(/a donné un roi noir à .+ contre une dame\./);
+    await expect(interactions).toContainText(/a donné une dame à .+ contre un roi noir\./);
     await expect(interactions).not.toContainText("entre leurs mains");
     await page.screenshot({ path: testInfo.outputPath("bilan-invite.png"), fullPage: true });
     await page.getByRole("button", { name: "Revenir à l’accueil", exact: true }).click();
@@ -358,6 +367,19 @@ test("les comptes voient le même classement, et le bilan survit au Hub, au reno
     const name = (await guest.locator(".position-top .player-name-label").boundingBox())!;
     expect(badge.y + badge.height).toBeLessThanOrEqual(name.y);
     await expect(guest.locator(".position-top .table-rn")).toHaveText("50");
+    await expectLocalTurn(guest, 20_000);
+    const opponent = host.locator(".position-top");
+    await expect(opponent.locator(".player-credentials .table-rn")).toHaveText("50");
+    await guest.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await guest.context().setOffline(true);
+    await expect(opponent.getByRole("img", { name: "Déconnecté" })).toBeVisible();
+    await expect(opponent.locator(".player-credentials")).toHaveCount(0);
+    await host.setViewportSize({ width: 390, height: 844 });
+    await host.screenshot({ path: testInfo.outputPath("joueur-deconnecte-portrait.png") });
+    await guest.context().setOffline(false);
+    await guest.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect(opponent.getByRole("img", { name: "Déconnecté" })).toHaveCount(0);
+    await expect(opponent.locator(".player-credentials .table-rn")).toHaveText("50");
     await expectLocalTurn(guest, 20_000);
     await guest.screenshot({ path: testInfo.outputPath("icones-en-jeu.png") });
     await drawDeck(guest).click();

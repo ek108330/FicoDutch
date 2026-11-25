@@ -266,7 +266,6 @@ export default function RoundScreen({
           !turnControls.view.finalReaction && !power?.lookTarget && !power?.pendingSwap
           ? { turn: turnControls.view.number, remaining: turn.remaining } : undefined}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
-        dutchAnnouncement={announcement && tablePlayerName(announcement.pseudo, membersById.get(announcement.id)?.accountId)}
         dutchControl={turnControls?.canPlay && turnControls.view.canAnnounceDutch ? {
           armed: turnControls.view.dutchArmed,
           toggle: () => turn.act({ kind: "dutch-intent", enabled: !turnControls.view.dutchArmed }),
@@ -294,6 +293,7 @@ export default function RoundScreen({
             <TurnPanel
               {...turnControls}
               displayName={(id, name) => tablePlayerName(name, membersById.get(id)?.accountId)}
+              dutchAnnouncement={announcement && tablePlayerName(announcement.pseudo, membersById.get(announcement.id)?.accountId)}
               remaining={turn.remaining}
               piles={<TurnPiles {...turnControls} feedback={feedback} onGiftSlide={() => playSound("slide")} />}
             />

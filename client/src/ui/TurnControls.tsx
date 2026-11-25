@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowDownUp, X } from "lucide-react";
+import { ArrowDownUp, Megaphone, X } from "lucide-react";
 import type { PowerKind } from "../game/gameTypes";
 import { BLIND_SWAP_PREVIEW_MS, powerCardCount, type PowerView } from "../game/powers";
 import { FINAL_REACTION_MS, TURN_DURATION_MS, type TurnAction, type TurnView } from "../game/turn";
@@ -63,11 +63,12 @@ function PowerControls({ power, act }: {
 }
 
 export function TurnPanel({
-  view, canPlay, act, remaining, piles, displayName,
+  view, canPlay, act, remaining, piles, displayName, dutchAnnouncement,
 }: TurnControlsProps & {
   remaining: number;
   piles: ReactNode;
   displayName: (id: string, name: string) => string;
+  dutchAnnouncement?: string;
 }) {
   const power = canPlay ? view.power : null;
   const showCenter = canPlay || view.finalReaction;
@@ -82,6 +83,11 @@ export function TurnPanel({
   }[notice.outcome] : null;
   return (
     <section className="turn-layout" aria-label="Tour de jeu">
+      {dutchAnnouncement && <div className="dutch-banner" role="alert">
+        <Megaphone aria-hidden="true" />
+        <strong>Dutch !</strong>
+        <span>{dutchAnnouncement}</span>
+      </div>}
       {piles}
       {showCenter ? <div className="round-panel turn-panel" data-local-turn={canPlay || undefined} data-power={power?.kind}>
         {!power?.lookTarget && <PerimeterClock key={`${view.number}:${power?.kind ?? "turn"}:${view.finalReaction}:${!!power?.pendingSwap}`}
