@@ -10,13 +10,14 @@ type Props = {
   onChange: (session: AccountSession) => void;
   navigate: (path: string) => void;
   forStats?: boolean;
+  startRegistration?: boolean;
 };
 
 const namePattern = "[A-Za-z][A-Za-z0-9]{4,14}";
 const validName = new RegExp(`^${namePattern}$`);
 
-export default function AccountScreen({ account, onChange, navigate, forStats }: Props) {
-  const [creating, setCreating] = useState(false);
+export default function AccountScreen({ account, onChange, navigate, forStats, startRegistration = false }: Props) {
+  const [creating, setCreating] = useState(startRegistration);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");

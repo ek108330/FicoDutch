@@ -59,6 +59,12 @@ try {
   assert.match(adb("install", "-r", apk).toString(), /Success/);
   adb("shell", "am", "force-stop", appId);
   adb("shell", "am", "start", "-W", "-n", `${appId}/.MainActivity`);
+  const playAsGuest = /^Jouer en tant qu[’']invité$/;
+  const welcome = await find(playAsGuest, 15_000).catch(() => null);
+  if (welcome) {
+    capture("00-invitation-compte-android");
+    await tap(playAsGuest);
+  }
   await find("Créer un Hub", 120_000);
   capture("01-accueil-android");
   adb("shell", "input", "keyevent", "KEYCODE_BACK");

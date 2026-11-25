@@ -170,16 +170,14 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
         {awaitingPeers && <PlayerConnectionNotice />}
         {!awaitingPeers && usingRelay && <p role="status">Le relais chiffré est actif.</p>}
         {!isHost && <p>En attente du lancement de la partie…</p>}
-        {isHost && (
-          <button type="button" className="start-game-button" disabled={!canStart} onClick={onStart}>
-            Lancer la partie
-          </button>
-        )}
         <div className="lobby-actions">
           {isHost && <button type="button" onClick={onAddBot} disabled={!connected || hub.players.length >= hub.maxPlayers}>
             Ajouter un bot
           </button>}
-          <button type="button" className="lobby-leave" onClick={onLeave}>Quitter le Hub</button>
+          {isHost && <button type="button" className="start-game-button" disabled={!canStart} onClick={onStart}>
+            Lancer la partie
+          </button>}
+          <button type="button" className="lobby-leave" onClick={onLeave}>Annuler</button>
         </div>
       </footer>
       <dialog className="hub-management lobby-player-actions" ref={playerActions} aria-labelledby={playerActionsTitle}

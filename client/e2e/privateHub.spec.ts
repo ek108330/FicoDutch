@@ -18,7 +18,7 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     const privateSetting = host.getByRole("checkbox", { name: "Hub Privé" });
     const hubName = host.getByRole("heading", { name: "Hub de SalonPrive" });
-    const [checkbox, title] = await Promise.all([privateSetting.boundingBox(), hubName.boundingBox()]);
+    const [checkbox, title] = await Promise.all([host.getByRole("group", { name: "Accès au Hub" }).boundingBox(), hubName.boundingBox()]);
     expect(checkbox!.x + checkbox!.width).toBeLessThan(title!.x);
     expect(checkbox!.y + checkbox!.height / 2).toBeCloseTo(title!.y + title!.height / 2, 0);
     await privateSetting.click();
@@ -30,7 +30,7 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await expect(privateHub(guest).getByRole("status")).toHaveText("En attente de validation");
     await expect(privateHub(outsider)).not.toContainText("InvitePrive");
     await expectScreenFits(host);
-    await expect(host.getByRole("group", { name: "Emojis du Hub" }).getByRole("button")).toHaveCount(9);
+    await expect(host.getByRole("button", { name: "Émojis du Hub" })).toBeVisible();
     await expect(host.getByRole("button", { name: "Accepter InvitePrive" })).toBeVisible();
     await host.screenshot({ path: testInfo.outputPath("hub-prive-admissions.png") });
     await guest.screenshot({ path: testInfo.outputPath("accueil-hub-prive.png") });
@@ -71,12 +71,16 @@ test("une longue file privée défile et se filtre sans déplacer le bouton de l
   page: host,
 }, testInfo) => {
   await host.setViewportSize({ width: 390, height: 800 });
-  const applicants = Array.from({ length: 12 }, () => io("http://127.0.0.1:15300", {
+  const [request] = await Promise.all([
+    host.waitForRequest((request) => new URL(request.url()).pathname === "/socket.io/"),
+    openLobby(host, "FilePrivee"),
+  ]);
+  const server = new URL(request.url()).origin;
+  const applicants = Array.from({ length: 12 }, () => io(server, {
     autoConnect: false, reconnection: false,
     auth: { buildRevision: "abcdef0123456789abcdef0123456789abcdef01" },
   }));
   try {
-    await openLobby(host, "FilePrivee");
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     const privateSetting = host.getByRole("checkbox", { name: "Hub Privé" });
     await privateSetting.click();

@@ -5,12 +5,49 @@ import { discard, discardDrawn, drawDeck, expectLocalTurn, expectScreenFits, fix
 const password = "essai";
 const ready = (page: Page) => page.getByRole("heading", { name: "Statistiques de la partie" });
 const game = (page: Page) => page.getByRole("button", { name: "Lancer la partie", exact: true });
+const welcome = (page: Page) => page.getByRole("dialog", { name: "Bienvenue sur FicoDutch" });
+
+async function openAsGuest(page: Page) {
+  await page.goto("/");
+  await welcome(page).getByRole("button", { name: "Jouer en tant qu’invité" }).click();
+}
+
+test("l’accueil propose connexion, inscription ou jeu invité lors de l’ouverture", async ({ page, browser, baseURL }, testInfo) => {
+  const registration = await browser.newPage({ baseURL });
+  try {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto("/");
+    const prompt = welcome(page);
+    await expect(prompt).toBeInViewport({ ratio: 1 });
+    await expect(prompt).toContainText("conserver tes statistiques");
+    await page.screenshot({ path: testInfo.outputPath("accueil-invite-compte-mobile.png") });
+    await prompt.getByRole("button", { name: "Se connecter", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Connexion", exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("textbox", { name: "Pseudo" })).toBeVisible();
+    await expect(prompt).not.toBeVisible();
+
+    await registration.goto("/");
+    await welcome(registration).getByRole("button", { name: "Créer un compte", exact: true }).click();
+    await expect(registration.getByRole("heading", { name: "Créer un compte", exact: true })).toBeVisible();
+    await registration.reload();
+    await expect(registration.getByRole("button", { name: "Créer mon compte", exact: true })).toBeVisible();
+
+    const guest = await browser.newPage({ baseURL });
+    try {
+      await openAsGuest(guest);
+      await expect(guest.getByRole("textbox", { name: "Pseudo" })).toBeVisible();
+      await guest.reload();
+      await expect(welcome(guest)).not.toBeVisible();
+    } finally { await guest.close(); }
+  } finally { await registration.close(); }
+});
 
 test("un invité garde un pseudo unique et peut jouer contre un bot de test", async ({ page, browser, baseURL }, testInfo) => {
   test.setTimeout(45_000);
   const guest = await browser.newPage({ baseURL });
   try {
-    await page.goto("/");
+    await openAsGuest(page);
     await expect(page.getByText("Jouer sans compte")).toBeVisible();
     const hubPanel = page.locator(".home-entry");
     const statistics = page.getByRole("navigation", { name: "Statistiques" });
@@ -181,7 +218,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await pseudo(page).fill("InviteLibre");
     await create(page).click();
     await expect(game(page)).toBeVisible();
-    await guest.goto("/");
+    await openAsGuest(guest);
     await pseudo(guest).fill("invitelibre");
     await Promise.all([rejected(guest), create(guest).click()]);
     for (let i = 0; i < 5; i++) await page.getByRole("button", { name: "Ajouter un bot" }).click();
@@ -204,7 +241,14 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.screenshot({ path: testInfo.outputPath("hub-six-joueurs-rn.png") });
     await page.setViewportSize({ width: 320, height: 568 });
     await expectScreenFits(page);
-    await expect(page.getByRole("button", { name: "Quitter le Hub" })).toBeInViewport({ ratio: 1 });
+    const cancel = page.getByRole("button", { name: "Annuler", exact: true });
+    const lobbyActions = [page.getByRole("button", { name: "Ajouter un bot" }), game(page), cancel];
+    const boxes = await Promise.all(lobbyActions.map((button) => button.boundingBox()));
+    expect(boxes[0]!.y).toBe(boxes[1]!.y);
+    expect(boxes[1]!.y).toBe(boxes[2]!.y);
+    await expect(cancel).toHaveCSS("background-color", "rgb(145, 59, 54)");
+    await expect(cancel).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("log", { name: "Messages du Hub" }).getByText("Aucun message pour le moment.")).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: testInfo.outputPath("hub-six-joueurs-rn-320.png") });
     await page.setViewportSize({ width: 360, height: 640 });
     await game(page).click();
@@ -457,7 +501,7 @@ test("le Hub Amis exige une amitié acceptée, avec ou sans validation de l’h�
   const name = "HoteAmis";
   const listing = (tab: Page) => tab.locator(".hub-item").filter({ hasText: `Hub de ${name}` });
   const create = (tab: Page) => tab.getByRole("button", { name: "Créer un Hub", exact: true }).click();
-  const leave = (tab: Page) => tab.getByRole("button", { name: "Quitter le Hub" }).click();
+  const leave = (tab: Page) => tab.getByRole("button", { name: "Annuler", exact: true }).click();
   const accessError = "Ce Hub est réservé aux amis de l’hôte.";
   const expectRejection = async (tab: Page) => {
     const rejected = tab.waitForEvent("dialog").then(async (dialog) => {
@@ -477,7 +521,7 @@ test("le Hub Amis exige une amitié acceptée, avec ou sans validation de l’h�
     await friend.getByRole("link", { name, exact: true }).click();
     await friend.getByRole("button", { name: "Ajouter en ami" }).click();
     await expect(friend.getByText("Demande envoyée", { exact: true })).toBeVisible();
-    await guest.goto("/");
+    await openAsGuest(guest);
     await guest.getByRole("textbox", { name: "Pseudo" }).fill("InviteAmis");
     await create(guest);
     await expect(guest.getByRole("checkbox", { name: "Hub Amis" })).toBeDisabled();
@@ -810,7 +854,7 @@ test("la disparition du dernier humain ferme la table des bots avec un bilan par
   const guest = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 } });
   try {
     await signIn(host, "AlicePause", true);
-    await guest.goto("/");
+    await openAsGuest(guest);
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     await host.getByRole("button", { name: "Ajouter un bot" }).click();
     await expect(game(host)).toBeEnabled({ timeout: 12_000 });

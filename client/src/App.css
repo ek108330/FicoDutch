@@ -209,8 +209,7 @@ input {
   line-height: 1.3;
 }
 
-.primary-button,
-.start-game-button {
+.primary-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,9 +223,6 @@ input {
   color: #26351e;
   font-weight: 750;
   cursor: pointer;
-}
-
-.primary-button {
   margin-top: 8px;
 }
 
@@ -238,21 +234,6 @@ input {
   background: #e6eee6;
   color: #40584a;
   cursor: default;
-}
-
-.start-game-button {
-  background: #176343;
-  color: #fff;
-}
-
-.start-game-button:not(:disabled):hover {
-  background: #104c33;
-}
-
-.start-game-button:disabled {
-  background: #d5e1d7;
-  color: #4a6153;
-  cursor: not-allowed;
 }
 
 .home-join {
@@ -395,13 +376,14 @@ input {
 }
 
 .lobby-actions > button {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   min-height: 38px;
-  padding: 4px 8px;
+  padding: 4px 3px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -620,17 +602,34 @@ input {
   border-color: #b8c7b9;
 }
 
-.lobby-actions > button:hover {
+.lobby-actions > button:not(.start-game-button, .lobby-leave):not(:disabled):hover {
   background: #e7ece3;
 }
 
+.lobby-actions > .start-game-button {
+  flex-grow: 1.2;
+  border-color: transparent;
+  background: #176343;
+  color: #fff;
+}
+
+.lobby-actions > .start-game-button:not(:disabled):hover { background: #104c33; }
+
+.lobby-actions > .start-game-button:disabled {
+  background: #d5e1d7;
+  color: #4a6153;
+  cursor: not-allowed;
+}
+
 .lobby-actions > .lobby-leave {
-  color: #813e2e;
+  border-color: transparent;
+  background: #913b36;
+  color: #fff;
 }
 
 .lobby-chat {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 5px;
   min-height: 0;
 }
@@ -663,8 +662,9 @@ input {
 }
 
 .chat-composer {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 5px;
 }
 
@@ -699,13 +699,32 @@ input {
   padding: 0;
 }
 
+.chat-composer .chat-emoji-trigger {
+  display: grid;
+  width: 36px;
+  height: 37px;
+  padding: 0;
+  place-items: center;
+}
+
+.chat-emoji-options {
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 calc(100% + 5px);
+  padding: 5px;
+  border: 1px solid #6b9c80;
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+}
+
 .lobby-chat .emoji-buttons {
   flex-wrap: nowrap;
   gap: clamp(2px, 0.7vw, 5px);
 }
 
 .lobby-chat .emoji-buttons button {
-  width: min(34px, calc((100% - 8 * clamp(2px, 0.7vw, 5px)) / 9));
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -746,7 +765,7 @@ input {
   .home-content:has(.lobby-panel) { padding-block: 6px; }
   .lobby-panel { gap: 5px; padding-block: 9px; }
   .lobby-access-setting { min-height: 21px; }
-  .lobby-panel:not(.private-lobby) .chat-log { height: clamp(35px, 7dvh, 44px); }
+  .lobby-panel:not(.private-lobby) .chat-log { height: clamp(46px, 12dvh, 72px); }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
@@ -1484,6 +1503,18 @@ input {
 .hub-management button.hub-danger {
   border-color: #ffb49f;
   background: #713627;
+}
+
+.welcome-dialog form {
+  display: grid;
+  gap: 8px;
+}
+
+.welcome-dialog button:first-child {
+  background: #f3de9a;
+  border-color: #f3de9a;
+  color: #20382c;
+  font-weight: 750;
 }
 
 @media (max-width: 600px) {

@@ -28,6 +28,8 @@ import type { HostRound } from "./game/roundBackup";
 import { matchStatistics } from "./game/matchStatistics";
 
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number; manualResumeDeadline?: number; manualPauseClock?: number };
+const registrationPath = "/compte/inscription";
+const welcomeSeenKey = "ficodutch-welcome-seen";
 
 function prepareGame(hub: Hub) {
   const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
@@ -55,6 +57,7 @@ function routeId(path: string, prefix: string) {
 function App() {
   const [pseudo, setPseudo] = useState(localStorage.getItem("ficodutch-pseudo") || "");
   const settingsDialog = useRef<HTMLDialogElement>(null);
+  const welcomeDialog = useRef<HTMLDialogElement>(null);
   const { sound, toggleSound, playSound } = useGameAudio();
   const [hubs, setHubs] = useState<HubListing[]>([]);
   const [pendingAdmission, setPendingAdmission] = useState<string | null>(null);
@@ -68,6 +71,7 @@ function App() {
   const [accountSession, setAccountSession] = useState<AccountSession>();
   const [path, setPath] = useState(() => window.location.pathname);
   const pathRef = useRef(path);
+  const checkWelcome = useRef(path === "/" && !sessionStorage.getItem(welcomeSeenKey));
   const sealed = useRef<string>(null);
   const hubRef = useRef<CurrentHub | null>(null);
   const sessionRef = useRef(session);
@@ -92,7 +96,7 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    if ((pathRef.current === "/compte" || pathRef.current === "/mes-stats") && !window.history.state?.ficoDutch) {
+    if (["/compte", registrationPath, "/mes-stats"].includes(pathRef.current) && !window.history.state?.ficoDutch) {
       const destination = window.location.href;
       window.history.replaceState({ ficoDutch: true }, "", "/");
       window.history.pushState({ ficoDutch: true, previous: "/" }, "", destination);
@@ -124,6 +128,12 @@ function App() {
       window.removeEventListener("ficodutch:back", onAndroidBack);
     };
   }, []);
+
+  useEffect(() => {
+    if (!accountSession || !checkWelcome.current) return;
+    checkWelcome.current = false;
+    if (accountSession.enabled && !accountSession.account && !session && path === "/") welcomeDialog.current?.showModal();
+  }, [accountSession, path, session]);
 
   function changeAccount(next: AccountSession) {
     setAccountSession(next);
@@ -622,8 +632,9 @@ function App() {
     if (path === "/joueurs") return <PlayersDirectory {...archiveProps} />;
     if (path === "/bots") return <DemoBots {...archiveProps} />;
     if (path === "/mes-stats" && account) return <PublicProfile key={account.id} id={account.id} personal {...archiveProps} />;
-    if (path === "/compte" || (accountSession?.enabled && !account && ((match && !guestMatchToken(match)) || path === "/mes-parties" || path === "/mes-stats"))) {
-      return <AccountScreen account={account} onChange={changeAccount} navigate={navigate} forStats={path === "/mes-stats"} />;
+    if (path === "/compte" || path === registrationPath || (accountSession?.enabled && !account && ((match && !guestMatchToken(match)) || path === "/mes-parties" || path === "/mes-stats"))) {
+      return <AccountScreen key={path} account={account} onChange={changeAccount} navigate={navigate}
+        forStats={path === "/mes-stats"} startRegistration={path === registrationPath} />;
     }
     if (match && accountSession) return <MatchArchive key={path} id={match} tableSummary={!!tableMatch} {...archiveProps} />;
     if (path === "/mes-parties" && accountSession) return <RecentMatches {...archiveProps} />;
@@ -768,6 +779,20 @@ function App() {
   return (
     <>
       {renderScreen()}
+      <dialog ref={welcomeDialog} className="hub-management welcome-dialog" aria-labelledby="welcome-title"
+        aria-describedby="welcome-description" onClose={(event) => {
+          sessionStorage.setItem(welcomeSeenKey, "1");
+          if (event.currentTarget.returnValue === "signin") navigate("/compte");
+          if (event.currentTarget.returnValue === "register") navigate(registrationPath);
+        }}>
+        <h2 id="welcome-title">Bienvenue sur FicoDutch</h2>
+        <p id="welcome-description">Connecte-toi ou crée un compte pour conserver tes statistiques.</p>
+        <form method="dialog">
+          <button type="submit" value="signin">Se connecter</button>
+          <button type="submit" value="register">Créer un compte</button>
+          <button type="submit" value="guest">Jouer en tant qu’invité</button>
+        </form>
+      </dialog>
       <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
         onLeave={currentHub?.gameStarted && networkReady ? leaveHub : undefined}
         onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined}

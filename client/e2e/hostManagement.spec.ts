@@ -28,7 +28,7 @@ test("l’hôte peut éjecter un invité depuis son pseudo", async ({ page: host
     await expect(guest.getByRole("status").filter({ hasText: "L’hôte t’a retiré de la table." })).toBeVisible();
     await expect(start).toBeDisabled();
     await expect(roster.getByRole("listitem")).toHaveCount(1);
-    await host.getByRole("button", { name: "Quitter le Hub" }).click();
+    await host.getByRole("button", { name: "Annuler", exact: true }).click();
     await expect(guest.getByText("Hub de AliceSalon", { exact: true })).toHaveCount(0);
   } finally {
     await guest.close();

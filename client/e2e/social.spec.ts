@@ -38,7 +38,16 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await expect(input).toHaveValue("");
     await input.fill("Message trop rapide");
     await input.press("Enter");
+    const emojiPicker = host.getByRole("button", { name: "Émojis du Hub" });
+    const emojiOptions = host.getByRole("group", { name: "Choisir un émoji" });
+    const logHeight = (await messages(host).boundingBox())!.height;
+    await expect(emojiOptions).not.toBeVisible();
+    await emojiPicker.click();
+    await expect(emojiOptions.getByRole("button")).toHaveCount(9);
+    expect((await messages(host).boundingBox())!.height).toBe(logHeight);
+    await host.screenshot({ path: testInfo.outputPath("00-selecteur-emojis-hub.png") });
     await emoji(host, "Salut").click();
+    await expect(emojiOptions).not.toBeVisible();
     await expect(messages(guest).getByRole("img", { name: "Salut" })).toBeVisible();
     await expect(messages(guest)).toContainText("AliceChat");
     await expect(messages(host)).not.toContainText("Message trop rapide");
@@ -48,7 +57,7 @@ test("le chat reste dans le lobby de son Hub et les emojis de table disparaissen
     await expect(messages(newcomer)).toHaveText("Aucun message pour le moment.");
     await chat(guest).screenshot({ path: testInfo.outputPath("01-chat-lobby-portrait.png") });
 
-    await newcomer.getByRole("button", { name: "Quitter le Hub" }).click();
+    await newcomer.getByRole("button", { name: "Annuler", exact: true }).click();
     await newcomer.locator(".hub-item").filter({ hasText: "Hub de AliceChat" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
     await expect(messages(newcomer)).toHaveText("Aucun message pour le moment.");
