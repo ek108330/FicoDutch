@@ -5,6 +5,7 @@ import { VARIANT_LABELS } from "../game/variants";
 import LobbyChat from "./LobbyChat";
 import HubName from "./HubName";
 import PlayerAvatar from "./PlayerAvatar";
+import RatingBadge from "./RatingBadge";
 
 type Props = {
   hub: Hub;
@@ -145,8 +146,7 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
                       onClick={() => setSelectedPlayerId(player.id)}>{player.pseudo}</button>
                     : <strong title={player.pseudo}>{player.pseudo}</strong>}
                   {player.isHost && <Crown className="player-host" size={14} role="img" aria-label="Hôte"><title>Hôte</title></Crown>}
-                  {player.connected && player.rating !== undefined && <small className="lobby-rn"
-                    aria-label={`Indice RN ${Math.round(player.rating)}`}>{Math.round(player.rating)}</small>}
+                  {player.connected && player.rating !== undefined && <RatingBadge className="lobby-rn" rating={player.rating} />}
                 </li>
               );
             })}

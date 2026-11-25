@@ -2,9 +2,10 @@ import { Fragment, useCallback, useEffect, useState, type ReactNode } from "reac
 import { ArrowDownRight, ArrowLeft, ArrowLeftRight, ArrowUpRight, Crosshair, Crown, Gift, ShieldX,
   Swords, Timer, TriangleAlert, Trophy } from "lucide-react";
 import type { Award, AwardId, MatchPlayer, Profile, RatingMovement, SavedMatch } from "../../../shared/statistics";
-import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches, reportProfile,
+import { matchPath, profilePath, readDemoBots, readMatch, readPlayers, readPodium, readProfile, readRecentMatches,
   readTableSummary, tableSummaryPath, type DirectorySort } from "../network/accountApi";
 import PlayerAvatar from "./PlayerAvatar";
+import RatingBadge from "./RatingBadge";
 import { describeCardFace, suits } from "./cardLabels";
 import type { CardRank } from "../game/cards";
 
@@ -315,7 +316,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
         <h2>{profile.name}</h2>
       </div>
       <dl className="archive-card profile-headline" aria-label="Indicateurs du profil">
-        <div><dt>Indice RN</dt><dd>{rating}<small>{ratingLevel(rating)}</small></dd></div>
+        <div><dt>Indice RN</dt><dd><RatingBadge rating={rating} /><small>{ratingLevel(rating)}</small></dd></div>
         <div><dt>Manches gagnées</dt><dd>{roundWinRate}</dd></div>
       </dl>
     </div>
@@ -340,8 +341,7 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
       <h2>{title}</h2>
       {rivals.length ? <ul className="archive-list profile-rivals">{rivals.map((rival) => <li key={rival.id}>
         <Link path={profilePath(rival.id)} navigate={navigate}>{rival.name}</Link>
-        <span className="profile-rival-rating"><small className="table-rn"
-          title={`Indice RN ${Math.round(rival.rating)}`}>{Math.round(rival.rating)}</small></span>
+        <span className="profile-rival-rating"><RatingBadge className="table-rn" rating={rival.rating} /></span>
         <span>{plural(rival.played, "manche")}</span>
         <div className="rival-record">
           <RivalResults wins={rival.wins} losses={rival.losses} />
@@ -354,32 +354,11 @@ function ProfileContent({ profile, navigate }: { profile: Profile; navigate: Nav
   </>;
 }
 
-export function PublicProfile({ id, personal, canReport, ...props }: RouteProps & { id: string; personal?: boolean; canReport?: boolean }) {
+export function PublicProfile({ id, personal, ...props }: RouteProps & { id: string; personal?: boolean }) {
   const [loader] = useState(() => (signal: AbortSignal) => readProfile(id, signal));
-  const [reporting, setReporting] = useState(false);
-  const [reported, setReported] = useState(false);
-  const [reportStatus, setReportStatus] = useState("");
-  async function report() {
-    setReporting(true);
-    try {
-      await reportProfile(id);
-      setReported(true);
-      setReportStatus("Signalement transmis pour vérification.");
-    } catch (error) {
-      setReportStatus(error instanceof Error ? error.message : "Signalement indisponible.");
-    } finally {
-      setReporting(false);
-    }
-  }
   return <ArchiveFrame title={personal ? "Mes stats" : "Profil public"} {...props}>
     {personal && <div className="archive-actions"><Link path="/mes-parties" navigate={props.navigate}>Mes parties</Link></div>}
-    <Load loader={loader}>{(profile) => <>
-      <ProfileContent profile={profile} navigate={props.navigate} />
-      {canReport && <div className="archive-actions">
-        <button type="button" disabled={reporting || reported} onClick={() => { void report(); }}>Signaler cet historique</button>
-        {reportStatus && <span role="status">{reportStatus}</span>}
-      </div>}
-    </>}</Load>
+    <Load loader={loader}>{(profile) => <ProfileContent profile={profile} navigate={props.navigate} />}</Load>
   </ArchiveFrame>;
 }
 
@@ -413,7 +392,8 @@ export function PlayersDirectory(props: RouteProps) {
     ...await readPlayers(query, cursor, sort, signal), key: requestKey,
   }), [query, cursor, sort, requestKey]);
   const columns = [
-    ["name", "Nom", "Pseudo du joueur"], ["rounds", "Manches", "Nombre de manches jouées"],
+    ["position", "Rang", "Position au classement RN"], ["name", "Nom", "Pseudo du joueur"],
+    ["rounds", "Manches", "Nombre de manches jouées"],
     ["wins", "Victoires", "Taux de victoire des manches"], ["rating", "RN", "Indice RN"],
     ["week", "7j", "Évolution du RN sur les sept derniers jours"],
   ] as const;
@@ -425,13 +405,14 @@ export function PlayersDirectory(props: RouteProps) {
       }} />
     <Load loader={loader}>{({ players, next, key }) => <section className="archive-card directory-card" aria-busy={key !== requestKey}>
       {players.length ? <table className="directory-ranking" aria-label="Classement des joueurs">
-        <colgroup><col /><col className="directory-rounds" /><col className="directory-win-rate" />
+        <colgroup><col className="directory-rank" /><col /><col className="directory-rounds" /><col className="directory-win-rate" />
           <col className="directory-rating" /><col className="directory-rating-week" /></colgroup>
         <thead><tr>{columns.map(([column, label, title]) => {
           const active = sort.column === column;
           return <th key={column} scope="col" aria-sort={active ? sort.direction === "asc" ? "ascending" : "descending" : undefined}>
             <button type="button" title={title} onClick={() => {
-              const direction = active ? sort.direction === "desc" ? "asc" : "desc" : column === "name" ? "asc" : "desc";
+              const direction = active ? sort.direction === "desc" ? "asc" : "desc" :
+                column === "name" || column === "position" ? "asc" : "desc";
               setSort({ column, direction });
               setPages([""]);
             }}>
@@ -442,13 +423,15 @@ export function PlayersDirectory(props: RouteProps) {
         <tbody>{players.map((player) => {
           const weekStart = player.ratingWeekStart;
           const change = weekStart == null ? null : player.rating - weekStart;
-          return <tr key={player.id}>
+          const place = player.position <= 3 ? player.position : undefined;
+          return <tr key={player.id} data-place={place}>
+            <td><span className="directory-position">{player.position ?? "—"}</span></td>
             <th scope="row"><span className="directory-player">
               <PlayerAvatar id={player.id} name={player.name} style={player.avatarStyle} photoId={player.avatarPhotoId} isBot={player.demoBot} mini />
               <Link path={profilePath(player.id)} navigate={props.navigate}>{player.name}</Link>
             </span></th>
             <td>{number.format(player.rounds)}</td><td>{percent.format(player.roundWinRate)}</td>
-            <td><strong>{Math.round(player.rating)}</strong></td>
+            <td><RatingBadge rating={player.rating} /></td>
             <td data-change={change != null && Math.abs(change) >= 0.5 ? Math.sign(change) : undefined}
               title={weekStart == null ? "Aucune manche classée ces sept derniers jours" :
                 `RN au début de la période · ${Math.round(weekStart)}`}>
@@ -479,7 +462,7 @@ export function RatingPodium({ navigate }: { navigate: Navigate }) {
         <Link path={profilePath(id)} navigate={navigate}>
           <PlayerAvatar id={id} name={name} style={avatarStyle} photoId={avatarPhotoId} isBot={demoBot} mini />
           <span className="podium-name" title={name}>{name}</span>
-          <small>RN {Math.round(rating)}</small>
+          <RatingBadge className="podium-rating" rating={rating} showLabel />
           <span className="podium-step"><span className="sr-only">Rang </span>{index + 1}</span>
         </Link>
       </li>,

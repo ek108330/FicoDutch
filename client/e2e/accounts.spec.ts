@@ -53,7 +53,9 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await page.getByRole("button", { name: "Classement", exact: true }).click();
     const directory = page.getByRole("table", { name: "Classement des joueurs" });
     await expect(directory.getByRole("row")).toHaveCount(11);
-    await expect(directory.getByRole("columnheader")).toHaveText(["Nom", "Manches", "Victoires", "RN", "7j"]);
+    await expect(directory.getByRole("columnheader")).toHaveText(["Rang", "Nom", "Manches", "Victoires", "RN", "7j"]);
+    await expect(directory.locator(".directory-position")).toHaveText(Array.from({ length: 10 }, (_, i) => String(i + 1)));
+    await expect(directory.locator("tbody tr[data-place] .directory-position")).toHaveText(["1", "2", "3"]);
     expect(await directory.locator("tbody a").evaluateAll((links) => links.every((link) => {
       const range = document.createRange();
       range.selectNodeContents(link);
@@ -68,7 +70,11 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(directory.locator("tbody a").first()).toHaveText("BotEnTrain");
     await sortBy("Nom");
     await expect(directory.locator("tbody a").first()).toHaveText("ValteriBotAs");
-    for (const [column, index] of [["Manches", 1], ["Victoires", 2]] as const) {
+    await sortBy("Rang");
+    await expect(directory.locator(".directory-position").first()).toHaveText("1");
+    await sortBy("Rang");
+    await expect(directory.locator(".directory-position").first()).toHaveText("10");
+    for (const [column, index] of [["Manches", 2], ["Victoires", 3]] as const) {
       const sortedValues = async () => (await directory.locator(`tbody td:nth-of-type(${index})`).allTextContents()).map((value) => parseFloat(value));
       await sortBy(column);
       await expect.poll(async () => {
@@ -93,6 +99,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     ]);
     await search.pressSequentially("haBotté");
     await expect(directory.getByRole("row")).toHaveCount(2);
+    await expect(directory.locator(".directory-position")).toHaveText(String(names.indexOf("ChaBotté") + 1));
     await page.screenshot({ path: testInfo.outputPath("autres-joueurs.png") });
     await page.getByRole("link", { name: "ChaBotté", exact: true }).click();
     await expect(page.getByText(/historique initial simulé/)).toBeVisible();
@@ -145,7 +152,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
       await expect(section.getByRole("heading")).toHaveCSS("color", "rgb(255, 255, 255)");
       const badge = section.locator(".profile-rival-rating .table-rn").first();
       await expect(badge).toHaveText(/^\d+$/);
-      await expect(badge).toHaveCSS("background-color", "rgb(243, 222, 154)");
+      await expect(badge).toHaveCSS("background-color", group === "Joueurs dominés" ? "rgb(132, 155, 36)" : "rgb(77, 115, 38)");
     }
     const columns = await page.locator(".profile-rivals").evaluateAll((lists) =>
       lists.map((list) => Array.from(list.querySelectorAll("li:first-child > span"), (cell) => cell.getBoundingClientRect().x)));
@@ -184,7 +191,7 @@ test("un invité garde un pseudo unique et peut jouer contre un bot de test", as
     await expect(hubRatings).toHaveCount(5);
     for (const rating of await hubRatings.all()) {
       await expect(rating).toHaveText(/^\d+$/);
-      await expect(rating).toHaveCSS("background-color", "rgb(243, 222, 154)");
+      await expect(rating).toHaveAttribute("data-rn-band", String(Math.floor(Number(await rating.innerText()) / 10)));
       const rightInset = await rating.evaluate((badge) =>
         badge.parentElement!.getBoundingClientRect().right - badge.getBoundingClientRect().right);
       expect(rightInset).toBeCloseTo(6);

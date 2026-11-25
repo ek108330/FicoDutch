@@ -41,15 +41,11 @@ export const readMatch = (id: string, signal?: AbortSignal) =>
   request<SavedMatch>(`/matches/${encodeURIComponent(id)}`, matchOptions(id, signal));
 export const readTableSummary = (id: string, signal?: AbortSignal) =>
   request<SavedMatch>(`/matches/${encodeURIComponent(id)}?table=1`, matchOptions(id, signal));
-export type DirectorySort = { column: "name" | "rounds" | "wins" | "rating" | "week"; direction: "asc" | "desc" };
+export type DirectorySort = { column: "position" | "name" | "rounds" | "wins" | "rating" | "week"; direction: "asc" | "desc" };
 export const readPlayers = (query: string, after: string, sort: DirectorySort, signal?: AbortSignal) =>
-  request<{ players: DirectoryPlayer[]; next: string | null }>(
-    "/players?" + new URLSearchParams({ q: query, after,
-      ...(sort.column === "rating" && sort.direction === "desc" ? {} : { sort: sort.column, direction: sort.direction }) }), { signal });
+  request<{ players: (DirectoryPlayer & { position: number })[]; next: string | null }>(
+    "/players?" + new URLSearchParams({ q: query, after, sort: sort.column, direction: sort.direction }), { signal });
 export const readProfile = (id: string, signal?: AbortSignal) => request<Profile>(`/players/${encodeURIComponent(id)}`, { signal });
-export const reportProfile = (id: string) => request<{ ok: true }>(`/players/${encodeURIComponent(id)}/report`, {
-  method: "POST", body: "{}",
-});
 export const readPodium = (signal?: AbortSignal) => request<DirectoryPlayer[]>("/podium", { signal });
 export const readDemoBots = (signal?: AbortSignal) => request<Array<{ id: string; name: string; matches: number }>>("/demo-bots", { signal });
 export const readRecentMatches = (cursor: string | null, signal?: AbortSignal) =>

@@ -9,7 +9,7 @@ const playerRanking = `
   FROM accounts a JOIN player_stats s ON a.id = s.account_id
 `;
 const playerOrder = 'rating DESC, matches DESC, "roundWinRate" DESC, id';
-const sortColumns = { name: "lower(name)", rounds: "rounds", wins: '"roundWinRate"', rating: "rating",
+const sortColumns = { position: "position", name: "lower(name)", rounds: "rounds", wins: '"roundWinRate"', rating: "rating",
   week: 'rating - "ratingWeekStart"' };
 
 function weekStart(row, since, until) {
@@ -259,7 +259,10 @@ function createMatchStore(db) {
     const order = `${sortColumns[sort]} ${direction === "asc" ? "ASC" : "DESC"} NULLS LAST, ${playerOrder}`;
     const weekly = sort === "week";
     const { rows } = await db.query(`
-      WITH ranking AS (${playerRanking}),
+      WITH ranking AS (
+        SELECT players.*, row_number() OVER (ORDER BY ${playerOrder})::int AS position
+        FROM (${playerRanking}) players
+      ),
       filtered AS (
         SELECT ranking.* ${weekly ? `, ${weekStart("ranking", "$4", "$5")} AS "ratingWeekStart"` : ""}
         FROM ranking WHERE lower(name) LIKE $1

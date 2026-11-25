@@ -107,6 +107,12 @@ test("le serveur valide les manches et les forfaits, mémorise le RN et départa
   assert.equal(podium[1].rounds, 4);
   assert.ok(cursor);
   assert.equal((await store.listPlayers("", podium[1])).players.length, 2);
+  const { players: ranked, next: nextRank } = await store.listSortedPlayers("", "position", "asc", 0, 1);
+  assert.deepEqual(ranked.map(({ name, position }) => [name, position]), [["Denis", 1]]);
+  const { players: nextRanked } = await store.listSortedPlayers("", "position", "asc", Number(nextRank), 1);
+  assert.deepEqual(nextRanked.map(({ name, position }) => [name, position]), [["Celine", 2]]);
+  const { players: searched } = await store.listSortedPlayers("cel", "name", "asc", 0);
+  assert.deepEqual(searched.map(({ name, position }) => [name, position]), [["Celine", 2]]);
   await store.reportHistory(denis.accountId, azure.accountId, now);
   await store.reportHistory(denis.accountId, azure.accountId, now + 100);
   const { rows: reports } = await db.query("SELECT reported_at FROM rating_reports");

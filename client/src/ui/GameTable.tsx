@@ -18,6 +18,7 @@ import { describeCardFace } from "./cardLabels";
 import { useTapAction } from "./useTapAction";
 import PerimeterClock from "./PerimeterClock";
 import PlayerAvatar from "./PlayerAvatar";
+import RatingBadge from "./RatingBadge";
 import { tablePlayerName } from "./playerAvatarConfig";
 
 export type TablePlayer = {
@@ -216,8 +217,7 @@ export default function GameTable({
                 </span> : (member?.accountId || member?.isBot) && <span className="player-credentials">
                   <PlayerAvatar id={member.accountId ?? player.id} name={player.pseudo} style={member.avatarStyle}
                     photoId={member.avatarPhotoId} isBot={member.isBot} mini />
-                  {member.rating !== undefined && <small className="table-rn" aria-label={`Indice RN ${Math.round(member.rating)}`}
-                    title={`Indice RN ${Math.round(member.rating)}`}>{Math.round(member.rating)}</small>}
+                  {member.rating !== undefined && <RatingBadge className="table-rn" rating={member.rating} />}
                 </span>}
                 <span className="player-name-label" title={player.pseudo !== name ? player.pseudo : undefined}>
                   <span className="player-name-text">

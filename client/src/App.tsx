@@ -615,7 +615,7 @@ function App() {
       navigate, backToTable: !!currentHub,
       ...(currentHub?.gameFinished && { leaveTable: () => { leaveHub(); navigate("/"); } }),
     };
-    if (profile) return <PublicProfile key={profile} id={profile} canReport={!!account && account.id !== profile} {...archiveProps} />;
+    if (profile) return <PublicProfile key={profile} id={profile} {...archiveProps} />;
     if (path === "/joueurs") return <PlayersDirectory {...archiveProps} />;
     if (path === "/bots") return <DemoBots {...archiveProps} />;
     if (path === "/mes-stats" && account) return <PublicProfile key={account.id} id={account.id} personal {...archiveProps} />;
@@ -671,10 +671,10 @@ function App() {
     const previewHub = hubs.find((hub): hub is Hub => hub.id === previewHubId && !hub.isPrivate && "variants" in hub);
     return (
       <main className="home-page">
-        <header className={currentHub ? "top-bar" : "top-bar home-top-bar"}>
+        <header className="top-bar home-top-bar">
           <div className="brand">
             <img src="/ficodutch-logo.png" alt="" width="30" height="20" />
-            <span>FicoDutch{!currentHub && <sup className="brand-signature">by Kevin</sup>}</span>
+            <span>FicoDutch<sup className="brand-signature">by Kevin</sup></span>
           </div>
           {settings}
           <span className="version">Version {GAME_CONFIG.version}</span>

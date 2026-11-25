@@ -18,7 +18,7 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     const versionBox = (await page.locator(".top-bar .version").boundingBox())!;
     expect(logoBox.width).toBeCloseTo(250, 0);
     expect(logoBox.x + logoBox.width / 2).toBeCloseTo(titleBox.x + titleBox.width / 2, 0);
-    expect(titleBox.y + titleBox.height / 2).toBeCloseTo(logoBox.y + logoBox.height / 2 + 12, 0);
+    expect(titleBox.y + titleBox.height / 2).toBeCloseTo(logoBox.y + logoBox.height / 2 + 14.4, 1);
     expect(titleBox.x + titleBox.width).toBeLessThan(gearBox.x);
     expect(logoBox.y + logoBox.height / 2).toBeCloseTo(gearBox.y + gearBox.height / 2, 0);
     expect(versionBox.y).toBeGreaterThanOrEqual(gearBox.y + gearBox.height);
@@ -59,7 +59,8 @@ test("l’accueil et le Hub tiennent à l’écran et les règles peuvent défil
     await guest.locator(".hub-item").filter({ hasText: "Hub de AliceLayout" })
       .getByRole("button", { name: "Rejoindre", exact: true }).click();
     await expect(start).toBeEnabled();
-    await expect(logo).toHaveCSS("width", "36px");
+    expect((await logo.boundingBox())!.width).toBeCloseTo(229, 0);
+    await expect(signature).toBeVisible();
     await expectScreenFits(page);
     await expect(start).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath("hub-360.png") });
