@@ -54,6 +54,7 @@ export type Turn = {
   drawnCard: Card | null;
   power: Power | null;
   dutchArmed: boolean;
+  completed?: { discarded: boolean };
   finalReaction?: true;
 };
 

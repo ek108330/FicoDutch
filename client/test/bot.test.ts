@@ -42,6 +42,19 @@ function step(state: GameState, now = 1_000) {
   return playBotStep(state, nextBot(state, now)!, now);
 }
 
+test("Bot +1s ne ralentit que la défausse et le remplacement", () => {
+  for (const state of [table(["6", "4", "Q"], "3"), table(["6", "4", "Q"], "7")]) {
+    const normal = nextBot(state)!;
+    assert.ok(normal.action.kind === "replace" || normal.action.kind === "discard");
+    assert.deepEqual(getBotStep(state, 0, () => 900, true), { ...normal, delay: normal.delay + 1_000 });
+  }
+  const draw = table(["6", "4", "Q"]);
+  assert.deepEqual(getBotStep(draw, 0, () => 900, true), nextBot(draw));
+  const reaction = presentDiscard(draw, [card("6", "discard")], 0);
+  assert.equal(nextBot(reaction)?.action.kind, "reaction");
+  assert.deepEqual(getBotStep(reaction, 0, () => 900, true), nextBot(reaction));
+});
+
 test("un bot ne mémorise que les cartes autorisées et ignore les valeurs cachées", () => {
   for (const sixCards of [false, true]) {
     const round = createRound(members, { ...DEFAULT_VARIANTS, sixCards }, 100);

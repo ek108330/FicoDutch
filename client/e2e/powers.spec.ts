@@ -21,6 +21,36 @@ async function playSpecialCard(page: Page, position: number, power: string) {
   await expect(drawnCard(page)).toHaveCount(0);
 }
 
+test("l’animation du 10 précède le Dutch sur les deux écrans", async ({ page: host, browser, baseURL }, testInfo) => {
+  test.setTimeout(45_000);
+  await fixDeckOrder(host);
+  const guest = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 } });
+  await host.setViewportSize({ width: 390, height: 844 });
+  try {
+    const start = await openTwoPlayerHub(host, guest, "AliceEchange", "BobEchange");
+    await start.click();
+    await expectLocalTurn(guest, 20_000);
+    await playSpecialCard(guest, 2, "10");
+    const dutch = guest.getByRole("button", { name: "Annoncer Dutch en fin de tour" });
+    await dutch.click();
+    await expect(dutch).toHaveAttribute("aria-pressed", "true");
+    await targetCard(guest, 1, "BobEchange").click();
+    await targetCard(guest, 1, "AliceEchange").click();
+    const flights = (page: Page) => page.locator('[data-card-animation="swap"]');
+    const banner = (page: Page) => page.getByRole("alert").filter({ hasText: "Dutch !" });
+    await Promise.all([host, guest].map(async (page) => {
+      await expect(flights(page)).toHaveCount(2);
+      await expect(banner(page)).toHaveCount(0);
+    }));
+    await host.screenshot({ path: testInfo.outputPath("echange-avant-dutch.png") });
+    await Promise.all([host, guest].map(async (page) => {
+      await expect(banner(page)).toBeVisible();
+      await expect(flights(page)).toHaveCount(0);
+    }));
+    await host.screenshot({ path: testInfo.outputPath("dutch-apres-echange.png") });
+  } finally { await guest.close(); }
+});
+
 test("vision et échange des cartes spéciales", async ({ page: host, browser, baseURL }, testInfo) => {
   test.setTimeout(110_000);
   await fixDeckOrder(host);

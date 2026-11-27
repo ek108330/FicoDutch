@@ -205,6 +205,8 @@ function updateHubSettings(socketId, settings) {
   if (settings.isPrivate === false) delete hub.isPrivate;
   if (settings.isFriendsOnly === true && current.player.accountId) hub.isFriendsOnly = true;
   if (settings.isFriendsOnly === false) delete hub.isFriendsOnly;
+  if (settings.extraBotDiscardDelay === true) hub.extraBotDiscardDelay = true;
+  if (settings.extraBotDiscardDelay === false) delete hub.extraBotDiscardDelay;
   return getPublicHub(hub);
 }
 

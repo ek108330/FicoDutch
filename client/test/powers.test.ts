@@ -4,7 +4,7 @@ import { getCardFace, type Card, type CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import type { CardTarget, GameState } from "../src/game/gameTypes.ts";
 import { BLIND_SWAP_PREVIEW_MS, LOOK_DURATION_MS, POWER_DURATION_MS } from "../src/game/powers.ts";
-import { beginPlay, expireTurn, getCardMotionView, getTurnView, playTurn } from "../src/game/turn.ts";
+import { beginPlay, DUTCH_GRACE_MS, expireTurn, getCardMotionView, getTurnView, playTurn, SWAP_SETTLE_MS } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 
 const players = ["alice", "bob", "charlie"].map((id) => ({ id, pseudo: id, totalScore: 0 }));
@@ -47,8 +47,9 @@ for (const [rank, valid, invalid, ownerIndex] of [["8", own, other, 0], ["9", ot
     assert.equal(getTurnView(selected, "alice", deadline)?.power?.selection, null);
     assert.equal(choose(selected, { ...valid, position: 2 }), selected);
     assert.equal(playTurn(selected, "alice", 1, { kind: "power-pass" }, 1_200), selected);
-    assert.equal(playTurn(selected, "alice", 1, { kind: "power-hide" }, 1_200).currentPlayerId, "bob");
-    assert.equal(expireTurn(selected, 1, deadline).currentPlayerId, "bob");
+    const hidden = playTurn(selected, "alice", 1, { kind: "power-hide" }, 1_200);
+    assert.equal(expireTurn(hidden, 1, 1_200 + DUTCH_GRACE_MS).currentPlayerId, "bob");
+    assert.equal(expireTurn(expireTurn(selected, 1, deadline), 1, deadline + DUTCH_GRACE_MS).currentPlayerId, "bob");
   });
 }
 
@@ -73,7 +74,7 @@ test("le 10 surligne les deux cibles pendant 500 ms puis échange sans révéler
   const result = expireTurn(highlighted, 1, deadline);
   assert.equal(result.players[0].cards[0], initial.players[0].cards[1]);
   assert.equal(result.players[0].cards[1], initial.players[0].cards[0]);
-  assert.equal(result.currentPlayerId, "bob");
+  assert.equal(expireTurn(result, 1, deadline + SWAP_SETTLE_MS + DUTCH_GRACE_MS).currentPlayerId, "bob");
   assert.equal(result.turn?.power, null);
   assert.deepEqual(getTurnView(result, "charlie", deadline)?.cardMotion?.move,
     { kind: "swap", targets: [own, second] });
@@ -97,16 +98,34 @@ test("le Valet révèle ses deux cibles puis permet de garder les cartes ou de l
 
   const kept = playTurn(preview, "alice", 1, { kind: "power-pass" }, 1_200);
   assert.equal(kept.players, initial.players);
-  assert.equal(kept.currentPlayerId, "bob");
+  assert.equal(expireTurn(kept, 1, 1_200 + DUTCH_GRACE_MS).currentPlayerId, "bob");
   assert.equal(getTurnView(kept, "bob", 1_200)?.cardMotion, null);
   const swapped = playTurn(preview, "alice", 1, { kind: "power-swap" }, 1_200);
   assert.equal(swapped.players[0].cards[0], initial.players[1].cards[1]);
   assert.equal(swapped.players[1].cards[1], initial.players[0].cards[0]);
-  assert.equal(swapped.currentPlayerId, "bob");
+  assert.equal(expireTurn(swapped, 1, 1_200 + SWAP_SETTLE_MS + DUTCH_GRACE_MS).currentPlayerId, "bob");
   const publicMotion = getTurnView(swapped, "charlie", 1_200)?.cardMotion;
   assert.deepEqual(publicMotion?.move, { kind: "swap", targets: [own, other] });
   assert.deepEqual(getTurnView(swapped, "alice", 1_200)?.cardMotion, publicMotion);
 });
+
+for (const rank of ["10", "J"] as const) {
+  test(`le Dutch déjà armé attend la fin de l’animation du ${rank}`, () => {
+    const armed = playTurn(startWithCard(rank), "alice", 1, { kind: "dutch-intent", enabled: true }, 800);
+    const selected = choose(choose(activate(armed), own), other);
+    const swapAt = rank === "10" ? selected.turn!.deadline : 1_200;
+    const swapped = rank === "10" ? expireTurn(selected, 1, swapAt)
+      : playTurn(selected, "alice", 1, { kind: "power-swap" }, swapAt);
+    const announceAt = swapAt + SWAP_SETTLE_MS;
+    assert.equal(swapped.turn?.deadline, announceAt);
+    assert.equal(swapped.dutch, null);
+    assert.equal(getTurnView(swapped, "bob", swapAt)?.cardMotion?.move.kind, "swap");
+    assert.equal(expireTurn(swapped, 1, announceAt - 1), swapped);
+    const announced = expireTurn(swapped, 1, announceAt);
+    assert.equal(announced.dutch?.announcedAt, announceAt);
+    assert.equal(getTurnView(announced, "bob", announceAt)?.cardMotion, null);
+  });
+}
 
 test("l’échange du dernier tour est publié même quand la manche se termine", () => {
   const playing = startWithCard("10");
@@ -138,7 +157,7 @@ test("le Joker+ donne une carte cachée à un adversaire dont la main est encore
   assert.equal(result.players[1].cards.at(-1), gift);
   assert.equal(result.players[1].cards.length, 5);
   assert.equal(result.discardPile.at(-1)?.rank, "JOKER");
-  assert.equal(result.currentPlayerId, "charlie");
+  assert.equal(expireTurn(result, 1, 1_200 + DUTCH_GRACE_MS).currentPlayerId, "charlie");
   const view = getTurnView(result, "bob", 1_200);
   assert.deepEqual(view?.players[1], {
     id: "bob", pseudo: "bob", cardCount: 5, handVersion: 1, handLayout: { columns: 3, slots: [0, 2, 1, 3, 4] },
@@ -169,7 +188,7 @@ test("l’expiration du pouvoir masque les cartes et conserve la défausse sans 
   assert.equal(getTurnView(selected, "alice", end)?.power?.selection, null);
   assert.equal(playTurn(selected, "alice", 1, { kind: "power-swap" }, end), selected);
   const expired = expireTurn(selected, 1, end);
-  assert.equal(expired.currentPlayerId, "bob");
+  assert.equal(expireTurn(expired, 1, end + DUTCH_GRACE_MS).currentPlayerId, "bob");
   assert.equal(expired.players, initial.players);
   assert.equal(expired.discardPile.at(-1)?.rank, "J");
   assert.equal(expired.turn?.power, null);

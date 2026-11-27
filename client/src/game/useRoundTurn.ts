@@ -8,7 +8,7 @@ import { getBotReactionDelay, getBotStep, playBotStep } from "./bot";
 import { allPlayersMemorized, getMemorizedCards, memorizeCard, setMemorizationReady, type MemorizedCard, type MemorizeRequest } from "./memorization";
 import { advanceRoundSetup, startNextRound, toggleNextVariant } from "./roundCycle";
 import {
-  beginPlay, dutchAnnouncementRemaining, expireTurn, getCardMotionView, getTurnView, playTurn, TURN_DURATION_MS,
+  beginPlay, dutchAnnouncementRemaining, expireTurn, getCardMotionView, getTurnView, playTurn, SWAP_SETTLE_MS, TURN_DURATION_MS,
   type CardMotionView, type TurnAction, type TurnRequest, type TurnView,
 } from "./turn";
 import type { GameVariants } from "./variants";
@@ -33,6 +33,7 @@ type Options = {
   paused: boolean;
   clockVersion: number;
   hostRound: GameState | null;
+  extraBotDiscardDelay: boolean;
   updateHostRound: UpdateHostRound;
   peers: ReturnType<typeof useHubPeers>;
   now: number;
@@ -117,7 +118,7 @@ function acceptRoundView(current: ReceivedView | null, view: RoundView, received
       if (view.turn.number < previous.turn.number) return current;
       sameStage = view.turn.number === previous.turn.number && view.turn.power?.kind === previous.turn.power?.kind &&
         view.turn.power?.pendingSwap === previous.turn.power?.pendingSwap &&
-        view.turn.finalReaction === previous.turn.finalReaction;
+        view.turn.finalReaction === previous.turn.finalReaction && view.turn.ending === previous.turn.ending;
     }
     if (sameStage && previous.clockVersion === view.clockVersion && current.deadline !== null && deadline !== null) {
       return { view, deadline: Math.min(current.deadline, deadline), receivedAt };
@@ -127,7 +128,7 @@ function acceptRoundView(current: ReceivedView | null, view: RoundView, received
 }
 
 export function useRoundTurn({
-  hubId, hostId, playerId, members, firstDeadline, paused, clockVersion, hostRound, updateHostRound, peers, now,
+  hubId, hostId, playerId, members, firstDeadline, paused, clockVersion, hostRound, extraBotDiscardDelay, updateHostRound, peers, now,
 }: Options) {
   const { connectedPeers, hostConnected, send } = peers;
   const [received, setReceived] = useState<ReceivedView | null>(null);
@@ -166,16 +167,16 @@ export function useRoundTurn({
       const delay = getBotReactionDelay();
       reactions.delays.set(id, delay);
       return delay;
-    });
+    }, extraBotDiscardDelay);
     if (!step) return;
     const motionEnd = step.action.kind !== "reaction" && hostRound.cardMotion?.move.kind === "swap"
-      ? hostRound.cardMotion.at + 1_100 : 0;
+      ? hostRound.cardMotion.at + SWAP_SETTLE_MS : 0;
     const delay = Math.ceil(Math.max(announcementPause + step.delay, motionEnd - time));
     const timer = window.setTimeout(() => updateHostRound(hubId, (state) =>
       state === hostRound ? playBotStep(state, step, performance.now()) : state
     ), delay);
     return () => window.clearTimeout(timer);
-  }, [hostRound, hubId, isHost, paused, updateHostRound]);
+  }, [extraBotDiscardDelay, hostRound, hubId, isHost, paused, updateHostRound]);
 
   useEffect(() => {
     if (isHost && !paused && hostRound && allPlayersMemorized(hostRound)) {
@@ -248,7 +249,9 @@ export function useRoundTurn({
   const remaining = scene ? Math.max(0, Math.min(phaseLength[scene.phase], (deadline ?? now) - now - announcementMs)) : 0;
   const announcement = announcementMs > 0 ? view?.players.find(({ id }) => id === dutch?.announcerId) : undefined;
   const waitingForClock = !isHost && (!received || clockVersion > received.view.clockVersion);
-  const canPlay = !paused && announcementMs === 0 && !waitingForClock && view?.playerId === playerId && !view.finalReaction && remaining > 0 && (isHost || hostConnected);
+  const canAct = !paused && announcementMs === 0 && !waitingForClock && remaining > 0 && (isHost || hostConnected);
+  const canPlay = canAct && view?.playerId === playerId && !view.finalReaction && !view.ending;
+  const canAnnounceDutch = canAct && !!view?.canAnnounceDutch;
   const canReact = !paused && announcementMs === 0 && !waitingForClock && !!view?.reaction.canAttempt &&
     (!view.finalReaction || remaining > 0) && (isHost || hostConnected);
   const canStartNext = !paused && isHost && members.filter(({ connected }) => connected).length >= GAME_CONFIG.players.min &&
@@ -292,7 +295,7 @@ export function useRoundTurn({
   }
 
   function act(action: TurnAction) {
-    if (!canPlay || deadline === null || performance.now() >= deadline) return;
+    if (!(action.kind === "dutch-intent" ? canAnnounceDutch : canPlay) || deadline === null || performance.now() >= deadline) return;
     dispatch(action);
   }
 
@@ -311,6 +314,6 @@ export function useRoundTurn({
       startNextRound(state, roundNumber, currentMembers, performance.now()));
   }
 
-  return { scene, deadline, view, finalMotion, announcement, remaining, canPlay, canReact, receive, memorize, confirmMemorization, act, react,
+  return { scene, deadline, view, finalMotion, announcement, remaining, canPlay, canAnnounceDutch, canReact, receive, memorize, confirmMemorization, act, react,
     canStartNext, toggleVariant, startNext, waitingForClock };
 }

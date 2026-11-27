@@ -23,6 +23,7 @@ export type Hub = {
   creatorAvatar?: { id: string; style?: number; photoId?: string };
   isPrivate?: true;
   isFriendsOnly?: true;
+  extraBotDiscardDelay?: true;
   joinRequests?: { id: string; pseudo: string }[];
   hostId: string;
   hostPseudo: string;

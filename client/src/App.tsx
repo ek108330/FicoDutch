@@ -657,6 +657,7 @@ function App() {
           playerId={playerId ?? ""}
           deadline={memorizationDeadline}
           members={currentHub.players}
+          extraBotDiscardDelay={!!currentHub.extraBotDiscardDelay}
           roundRating={currentHub.roundRating}
           gameFinished={currentHub.gameFinished}
           hostRound={hostRound?.hubId === currentHub.id && hostRound.gameNumber === currentHub.gameNumber ? hostRound.state : null}

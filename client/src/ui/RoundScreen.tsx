@@ -23,6 +23,7 @@ type RoundScreenProps = {
   playerId: string;
   deadline: number;
   members: HubPlayer[];
+  extraBotDiscardDelay: boolean;
   roundRating: Hub["roundRating"];
   gameFinished: boolean;
   hostRound: GameState | null;
@@ -44,7 +45,7 @@ type Memorization = { roundNumber: number; chosen: number[]; visible: number[] }
 const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] };
 
 export default function RoundScreen({
-  hubId, hostId, playerId, deadline: firstDeadline, members, roundRating, gameFinished, hostRound,
+  hubId, hostId, playerId, deadline: firstDeadline, members, extraBotDiscardDelay, roundRating, gameFinished, hostRound,
   peers, updateHostRound, onRestart, onLeave, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
@@ -57,7 +58,7 @@ export default function RoundScreen({
   const paused = pause !== null;
   const manualPause = pause?.reason === "manual" ? pause : null;
   const turn = useRoundTurn({ hubId, hostId, playerId, members, firstDeadline,
-    hostRound, peers, updateHostRound, now: manualPause?.startedAt ?? now, paused, clockVersion });
+    hostRound, extraBotDiscardDelay, peers, updateHostRound, now: manualPause?.startedAt ?? now, paused, clockVersion });
   const { scene, deadline, receive: receiveTurn } = turn;
   const phase = scene?.phase;
   const roundNumber = scene?.roundNumber ?? 0;
@@ -265,10 +266,10 @@ export default function RoundScreen({
         leaderIds={scene.leaderIds}
         activePlayerId={turnControls?.view.playerId}
         opponentClock={turnControls && turnControls.view.playerId !== playerId &&
-          !turnControls.view.finalReaction && !power?.lookTarget && !power?.pendingSwap
+          !turnControls.view.finalReaction && !turnControls.view.ending && !power?.lookTarget && !power?.pendingSwap
           ? { turn: turnControls.view.number, remaining: turn.remaining } : undefined}
         protectedPlayerId={turnControls?.view.dutch?.announcerId}
-        dutchControl={turnControls?.canPlay && turnControls.view.canAnnounceDutch ? {
+        dutchControl={turnControls && turn.canAnnounceDutch ? {
           armed: turnControls.view.dutchArmed,
           toggle: () => turn.act({ kind: "dutch-intent", enabled: !turnControls.view.dutchArmed }),
         } : undefined}

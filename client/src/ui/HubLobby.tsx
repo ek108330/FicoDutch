@@ -17,7 +17,7 @@ type Props = {
   onAddBot: () => void;
   onLeave: () => void;
   onUpdate: (variants: Hub["variants"], endThreshold: Hub["endThreshold"], access?: {
-    isPrivate?: boolean; isFriendsOnly?: boolean;
+    isPrivate?: boolean; isFriendsOnly?: boolean; extraBotDiscardDelay?: boolean;
   }) => void;
   onRemove: (playerId: string) => void;
   onDecision: (requestId: string, accept: boolean) => void;
@@ -102,7 +102,8 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
     <section className={`home-panel lobby-panel${managesAdmission ? " private-lobby" : ""}`} aria-labelledby="lobby-title">
       <header className="lobby-heading">
         <div className="lobby-title-row">
-          <div className="lobby-access" role="group" aria-label="Accès au Hub">
+          <h1 id="lobby-title">{hub.name}</h1>
+          <div className="lobby-access" role="group" aria-label="Options du Hub">
             <label className="lobby-access-setting">
               <input type="checkbox" checked={!!hub.isPrivate} disabled={!isHost || !connected}
                 onChange={(event) => onUpdate(hub.variants, hub.endThreshold, { isPrivate: event.target.checked })} />
@@ -115,8 +116,12 @@ export default function HubLobby({ hub, connected, awaitingPeers, usingRelay, is
                 onChange={(event) => onUpdate(hub.variants, hub.endThreshold, { isFriendsOnly: event.target.checked })} />
               Hub Amis
             </label>
+            <label className="lobby-access-setting" title="Ajoute une seconde avant la défausse des bots à leur tour.">
+              <input type="checkbox" checked={!!hub.extraBotDiscardDelay} disabled={!isHost || !connected}
+                onChange={(event) => onUpdate(hub.variants, hub.endThreshold, { extraBotDiscardDelay: event.target.checked })} />
+              Bot +1s
+            </label>
           </div>
-          <h1 id="lobby-title">{hub.name}</h1>
         </div>
       </header>
       <fieldset className="hub-settings" aria-label="Paramètres de la partie" disabled={!isHost || !connected}>

@@ -18,11 +18,14 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await host.getByRole("button", { name: "Créer un Hub" }).click();
     const privateSetting = host.getByRole("checkbox", { name: "Hub Privé" });
     const hubName = host.getByRole("heading", { name: "Hub de SalonPrive" });
-    const [checkbox, title] = await Promise.all([host.getByRole("group", { name: "Accès au Hub" }).boundingBox(), hubName.boundingBox()]);
-    expect(checkbox!.x + checkbox!.width).toBeLessThan(title!.x);
+    const [checkbox, title] = await Promise.all([host.getByRole("group", { name: "Options du Hub" }).boundingBox(), hubName.boundingBox()]);
+    expect(title!.x + title!.width).toBeLessThan(checkbox!.x);
     expect(checkbox!.y + checkbox!.height / 2).toBeCloseTo(title!.y + title!.height / 2, 0);
     await privateSetting.click();
     await expect(privateSetting).toBeChecked();
+    const botDelay = host.getByRole("checkbox", { name: "Bot +1s" });
+    await botDelay.click();
+    await expect(botDelay).toBeChecked();
     await expect(privateHub(guest)).toContainText("Hub Privé · En attente");
     await expect(privateHub(guest)).not.toContainText("/6 joueurs");
     await expect(privateHub(guest).getByRole("button", { name: /Aperçu/ })).toHaveCount(0);
@@ -37,6 +40,8 @@ test("le Hub privé réserve les admissions à l’hôte et ferme la file au com
     await host.getByRole("button", { name: "Accepter InvitePrive" }).click();
     await expect(guest.getByRole("list", { name: "Joueurs présents" }).getByRole("listitem")).toHaveCount(2);
     await expect(guest.getByRole("checkbox", { name: "Hub Privé" })).toBeDisabled();
+    await expect(guest.getByRole("checkbox", { name: "Bot +1s" })).toBeChecked();
+    await expect(guest.getByRole("checkbox", { name: "Bot +1s" })).toBeDisabled();
     await host.getByRole("button", { name: "InvitePrive", exact: true }).click();
     await host.getByRole("button", { name: "Éjecter du Hub" }).click();
     await expect(guest.getByText("L’hôte t’a retiré de la table.")).toBeVisible();

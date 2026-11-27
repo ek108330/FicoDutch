@@ -1,10 +1,11 @@
 import { GAME_CONFIG } from "../config/gameConfig";
 import type { CardTarget, PublicCardMove } from "../game/gameTypes";
+import { SWAP_MOTION_MS } from "../game/turn";
 
 type Flight = "reaction" | "reaction-discard" | "bot-discard" | "swap" | "gift" | "penalty" | "discard";
 type DiscardFlight = Extract<Flight, "reaction" | "reaction-discard" | "bot-discard" | "discard">;
 const flightDuration: Record<Flight, number> = {
-  reaction: 360, "reaction-discard": 640, "bot-discard": 640, swap: 1_060, gift: 460, penalty: 540, discard: 360,
+  reaction: 360, "reaction-discard": 640, "bot-discard": 640, swap: SWAP_MOTION_MS, gift: 460, penalty: 540, discard: 360,
 };
 const arrivalOffset = 0.83;
 const flightEasing = "ease-in-out";

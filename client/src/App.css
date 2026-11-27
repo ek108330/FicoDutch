@@ -335,7 +335,7 @@ input {
 
 .lobby-title-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   margin-bottom: 3px;
@@ -409,9 +409,15 @@ input {
 }
 
 .hub-name .player-avatar { flex: 0 0 auto; }
-.lobby-access { display: grid; }
+.lobby-access {
+  display: grid;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f0f3eb;
+}
 .lobby-access-setting {
-  min-height: 24px;
+  min-height: 19px;
   font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
@@ -764,7 +770,7 @@ input {
 @media (orientation: portrait) and (max-height: 600px) {
   .home-content:has(.lobby-panel) { padding-block: 6px; }
   .lobby-panel { gap: 5px; padding-block: 9px; }
-  .lobby-access-setting { min-height: 21px; }
+  .lobby-access { padding-block: 1px; }
   .lobby-panel:not(.private-lobby) .chat-log { height: clamp(46px, 12dvh, 72px); }
 }
 

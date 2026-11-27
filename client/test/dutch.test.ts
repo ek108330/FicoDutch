@@ -3,7 +3,7 @@ import test from "node:test";
 import type { Card, CardRank } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
 import { getRoundResultView } from "../src/game/hands.ts";
-import { beginPlay, expireTurn, FINAL_REACTION_MS, getTurnView, playTurn, TURN_DURATION_MS } from "../src/game/turn.ts";
+import { beginPlay, DUTCH_GRACE_MS, expireTurn, FINAL_REACTION_MS, getTurnView, playTurn, TURN_DURATION_MS } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 import type { GameState, PowerKind } from "../src/game/gameTypes.ts";
 
@@ -34,6 +34,24 @@ function discardFromDeck(state: GameState, playerId: string, now: number) {
 function armDutch(state: GameState) {
   return act(state, "alice", { kind: "dutch-intent", enabled: true }, 500);
 }
+
+test("seul le joueur qui vient de terminer peut activer Dutch dans les 500 ms", () => {
+  const end = discardFromDeck(setup([["A"], ["6"], ["7"]]), "alice", 600);
+  const deadline = 601 + DUTCH_GRACE_MS;
+  const intent = { kind: "dutch-intent", enabled: true };
+  assert.equal(end.turn?.deadline, deadline);
+  assert.equal(getTurnView(end, "alice", 602)?.canAnnounceDutch, true);
+  assert.equal(getTurnView(end, "bob", 602)?.canAnnounceDutch, false);
+  assert.equal(act(end, "bob", intent, 602), end);
+  assert.equal(act(end, "alice", { kind: "draw", source: "deck" }, 602), end);
+  assert.equal(act(end, "alice", intent, deadline), end);
+  const armed = act(end, "alice", intent, deadline - 1);
+  assert.equal(getTurnView(armed, "alice", deadline - 1)?.dutchArmed, true);
+  const announced = expireTurn(armed, 1, deadline);
+  assert.equal(announced.dutch?.announcerId, "alice");
+  assert.equal(announced.currentPlayerId, "bob");
+  assert.equal(expireTurn(end, 1, deadline).dutch, null);
+});
 
 test("Dutch est annoncé en fin de tour et laisse exactement un dernier tour à chacun", () => {
   const start = setup([["A"], ["6"], ["7"]]);

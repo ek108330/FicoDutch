@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getCardFace } from "../src/game/cards.ts";
 import { createRound } from "../src/game/createRound.ts";
-import { applyDepartures, beginPlay, expireTurn, getTurnView, playTurn, TURN_DURATION_MS } from "../src/game/turn.ts";
+import { applyDepartures, beginPlay, DUTCH_GRACE_MS, expireTurn, getTurnView, playTurn, TURN_DURATION_MS } from "../src/game/turn.ts";
 import { DEFAULT_VARIANTS } from "../src/game/variants.ts";
 
 const players = [
@@ -46,22 +46,24 @@ test("la défausse se publie et un remplacement conserve la taille de la main", 
   const replaced = state.players[1].cards[0];
   state = playTurn(state, "host", 1, draw, 1_100);
   state = playTurn(state, "host", 1, { kind: "discard" }, 1_200);
-  assert.equal(state.currentPlayerId, "guest");
   assert.equal(state.discardPile.at(-1), expected);
   assert.deepEqual(getTurnView(state, "guest", 1_200)?.topDiscard, getCardFace(expected));
+  state = expireTurn(state, 1, 1_200 + DUTCH_GRACE_MS);
+  assert.equal(state.currentPlayerId, "guest");
 
   assert.equal(playTurn(state, "guest", 2,
-    { kind: "draw", source: "discard", reference: state.reaction.reference }, 1_300), state);
+    { kind: "draw", source: "discard", reference: state.reaction.reference }, 1_800), state);
   const secondDraw = state.drawPile.at(-1);
-  state = playTurn(state, "guest", 2, draw, 1_300);
+  state = playTurn(state, "guest", 2, draw, 1_800);
   assert.deepEqual(state.discardPile, [expected]);
-  assert.equal(playTurn(state, "guest", 1, { kind: "replace", position: 0, handVersion: 0 }, 1_400), state);
-  assert.equal(playTurn(state, "guest", 2, { kind: "replace", position: 9, handVersion: 0 }, 1_400), state);
-  state = playTurn(state, "guest", 2, { kind: "replace", position: 0, handVersion: 0 }, 1_400);
+  assert.equal(playTurn(state, "guest", 1, { kind: "replace", position: 0, handVersion: 0 }, 1_900), state);
+  assert.equal(playTurn(state, "guest", 2, { kind: "replace", position: 9, handVersion: 0 }, 1_900), state);
+  state = playTurn(state, "guest", 2, { kind: "replace", position: 0, handVersion: 0 }, 1_900);
 
   assert.equal(state.players[1].cards[0], secondDraw);
   assert.equal(state.players[1].cards.length, 4);
   assert.equal(state.discardPile.at(-1), replaced);
+  state = expireTurn(state, 2, 1_900 + DUTCH_GRACE_MS);
   assert.equal(state.currentPlayerId, "host");
   assert.equal(state.turn?.number, 3);
   assert.equal(state.turn?.drawnCard, null);
@@ -91,12 +93,14 @@ test("à l’expiration, la carte en attente est défaussée et le tour passe", 
   assert.equal(playTurn(start, "host", 1, draw, deadline), start);
 
   const skipped = expireTurn(start, 1, deadline);
-  assert.equal(skipped.currentPlayerId, "guest");
+  assert.equal(expireTurn(skipped, 1, deadline + DUTCH_GRACE_MS).currentPlayerId, "guest");
   assert.equal(skipped.discardPile.length, 0);
   const expired = expireTurn(playTurn(start, "host", 1, draw, deadline - 1), 1, deadline);
-  assert.equal(expired.currentPlayerId, "guest");
   assert.equal(expired.discardPile.at(-1), drawn);
-  assert.equal(expired.turn?.deadline, deadline + TURN_DURATION_MS);
+  assert.equal(expired.turn?.deadline, deadline + DUTCH_GRACE_MS);
+  const next = expireTurn(expired, 1, expired.turn!.deadline);
+  assert.equal(next.currentPlayerId, "guest");
+  assert.equal(next.turn?.deadline, deadline + DUTCH_GRACE_MS + TURN_DURATION_MS);
 });
 
 test("retirer le joueur actif conserve sa main, défausse sa pioche et passe immédiatement le tour", () => {

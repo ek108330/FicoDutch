@@ -81,7 +81,8 @@ function playPower(state: GameState, bot: GamePlayer, opponents: GamePlayer[], w
   return selected.length ? chooseCard(target.player, target.position) : chooseCard(bot, worst);
 }
 
-export function getBotStep(state: GameState, now: number, reactionDelay: (playerId: string) => number = () => getBotReactionDelay()): BotStep | null {
+export function getBotStep(state: GameState, now: number, reactionDelay: (playerId: string) => number = () => getBotReactionDelay(),
+  extraDiscardDelay = false): BotStep | null {
   const { turn } = state;
   if (state.phase !== "playing" || !turn) return null;
 
@@ -108,7 +109,7 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
     if (nextReaction) return nextReaction;
   }
 
-  const bot = turn.finalReaction || turn.power?.pendingSwap ? undefined : bots.find(({ id }) => id === state.currentPlayerId);
+  const bot = turn.finalReaction || turn.completed || turn.power?.pendingSwap ? undefined : bots.find(({ id }) => id === state.currentPlayerId);
   if (!bot) return null;
   const playerId = bot.id;
   const opponents = state.players.filter(({ id, hasLeft }) => id !== playerId && !hasLeft)
@@ -130,7 +131,7 @@ export function getBotStep(state: GameState, now: number, reactionDelay: (player
   }
 
   return {
-    playerId, delay: 820,
+    playerId, delay: 820 + (extraDiscardDelay ? 1_000 : 0),
     action: take ? { kind: "replace", position: worst, handVersion: bot.handVersion } : { kind: "discard" },
   };
 }
