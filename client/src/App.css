@@ -411,15 +411,16 @@ input {
 .hub-name .player-avatar { flex: 0 0 auto; }
 .lobby-access {
   display: grid;
+  row-gap: 2px;
   padding: 3px 7px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #f0f3eb;
 }
 .lobby-access-setting {
-  min-height: 19px;
   font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1.1;
   white-space: nowrap;
 }
 
