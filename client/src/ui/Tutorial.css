@@ -60,6 +60,13 @@
 
 .tutorial-chapters strong { color: #f3de9a; }
 .tutorial-chapters span { font-size: 0.88rem; line-height: 1.3; }
+.tutorial-chapters strong:has(.tutorial-completed) { display: flex; align-items: center; gap: 6px; }
+.tutorial-completed { color: #abe3b8; }
+
+.tutorial-recaps { margin-block: 10px; }
+.tutorial-recaps h2 { margin-block: 0 4px; color: #f3de9a; font-size: 1rem; }
+.tutorial-recaps p { margin-block: 5px; }
+.tutorial-recaps summary { cursor: pointer; text-decoration: underline; }
 
 .tutorial-end-actions {
   display: flex;
@@ -135,9 +142,7 @@
   box-shadow: 0 0 12px #ffe29c99;
 }
 
-.tutorial-game:not([data-timed]) :is(.perimeter-clock, .power-card-turn + .perimeter-clock) {
-  visibility: hidden;
-}
+.tutorial-game .perimeter-clock, .tutorial-practice .perimeter-clock { display: none; }
 
 @media (orientation: portrait) and (max-height: 650px) {
   .game-screen.table-screen.tutorial-game > .game-table[data-player-count="3"] {

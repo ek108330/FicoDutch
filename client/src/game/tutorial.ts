@@ -21,7 +21,6 @@ type Prompt = {
   hint?: "draw" | "drawn" | "discard" | "discard-drag" | "dutch" | "swap" | "pass" | "gift";
   target?: CardTarget;
   gesture?: TutorialGesture;
-  timed?: true;
 };
 type Automatic = {
   kind: "wait";
@@ -54,7 +53,8 @@ const discard = (text: string, gesture?: TutorialGesture) => prompt(text, "disca
 const select = (text: string, target: CardTarget) => prompt(text, "power-card", { target });
 const finish = (text: string, delay = 800) => wait(text, Math.max(delay, Math.min(3_500, 550 + text.split(/\s+/).length * 130)));
 const introducePower = (rank: string): Step[] => [
-  draw(), discard(`Pose ${rank} sur la défausse pour activer son pouvoir.`),
+  wait(`Défausser ${rank} pendant ton tour active son pouvoir.`, 850, "draw"),
+  wait(`La partie reprend au moment où tu poses ${rank}.`, 650, "discard"),
 ];
 const reaction = (text: string, position: number, gesture?: TutorialGesture) =>
   prompt(text, "reaction", { target: own(position), gesture });
@@ -187,7 +187,7 @@ export const tutorialChapters: Chapter[] = [
     ],
   },
   {
-    id: "dutch", title: "Annoncer Dutch", description: "Armer Dutch, essayer les 0,5 s et lire le score final.",
+    id: "dutch", title: "Annoncer Dutch", description: "Armer Dutch avant ou après la défausse et lire le score final.",
     drills: [
       { title: "Annoncer pendant ton tour", deck: ["Q"], steps: [
         draw(), prompt("Touche le mégaphone à côté de ton nom pour armer Dutch.", "dutch-intent", { hint: "dutch" }),
@@ -196,24 +196,27 @@ export const tutorialChapters: Chapter[] = [
       ] },
       { title: "Repérer l’icône après la défausse", deck: ["Q"], steps: [
         draw(), discard("Défausse la Dame. Repère l’icône Dutch près de ton nom."),
-        prompt("Touche le mégaphone maintenant. Cette répétition suspend le chrono.", "dutch-intent", { hint: "dutch" }),
+        prompt("Prends le temps de repérer le mégaphone, puis touche-le.", "dutch-intent", { hint: "dutch" }),
         wait("Ton annonce est prête.", DUTCH_GRACE_MS, "expire"),
         finish("En partie, tu as 0,5 s après ton tour pour activer Dutch.", 2_850),
       ] },
-      { title: "Défi Dutch · 0,5 seconde", deck: ["Q", "3", "4"], hand: ["K", "A", "2", "3"], steps: [
-        draw(), discard("Défausse la Dame, puis touche immédiatement le mégaphone. Tu auras 0,5 s."),
-        prompt("Touche le mégaphone maintenant !", "dutch-intent", { hint: "dutch", timed: true }),
+      { title: "Tester Dutch en fin de manche", deck: ["Q", "4", "3"], hand: ["K", "A", "2", "3"], steps: [
+        draw(), discard("Défausse la Dame, puis active Dutch après la défausse."),
+        prompt("Touche le mégaphone. La manche reprendra ensuite avec les derniers tours des bots.", "dutch-intent", { hint: "dutch" }),
         wait("Ton annonce est prête.", DUTCH_GRACE_MS, "expire"),
         wait("Dutch ! Les deux bots ont encore un tour. Tu es protégé des échanges et du Joker+.", 2_850),
         wait("Nora pioche pour son dernier tour.", 650, "draw"), wait("Nora défausse.", 900, "discard"),
         wait("Milo pioche pour son dernier tour.", 650, "draw"), wait("Milo défausse.", 900, "discard"),
-        wait("La dernière défausse reste réactive trois secondes.", 3_000, "expire"),
+        reaction("Milo a posé un 3. Réagis avec ta carte 4 avant de calculer les scores.", 3),
+        wait("En partie, tu as trois secondes pour réagir à la dernière défausse.", 3_000, "expire"),
       ] },
     ],
   },
 ];
 
 export const allTutorialDrills = tutorialChapters.flatMap(({ drills }) => drills);
+export const chapterByDrill = new Map(tutorialChapters.flatMap((chapter) =>
+  chapter.drills.map((drill) => [drill, chapter] as const)));
 const suits: Suit[] = ["spades", "hearts", "clubs", "diamonds"];
 const makeCards = (ranks: CardRank[], prefix: string, offset = 0): Card[] =>
   ranks.map((rank, index) => ({ id: `${prefix}-${index}`, rank, suit: rank === "JOKER" ? undefined : suits[(index + offset) % 4] }));

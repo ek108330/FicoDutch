@@ -39,6 +39,7 @@ type RoundScreenProps = {
   clockVersion: number;
   pause: { reason: "host" | "transfer" | "local" | "manual"; deadline?: number; startedAt?: number } | null;
   onTogglePause?: () => void;
+  practice?: boolean;
 };
 
 type Memorization = { roundNumber: number; chosen: number[]; visible: number[] };
@@ -46,7 +47,7 @@ const emptySelection: Memorization = { roundNumber: 0, chosen: [], visible: [] }
 
 export default function RoundScreen({
   hubId, hostId, playerId, deadline: firstDeadline, members, extraBotDiscardDelay, roundRating, gameFinished, hostRound,
-  peers, updateHostRound, onRestart, onLeave, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause,
+  peers, updateHostRound, onRestart, onLeave, onInterrupt, restarting, settings, playSound, connected, clockVersion, pause, onTogglePause, practice,
 }: RoundScreenProps) {
   const { hostConnected, send, subscribe } = peers;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
@@ -72,7 +73,7 @@ export default function RoundScreen({
   const canSelect = !paused && !turn.waitingForClock && memorizing && connectionReady;
   const finished = !paused && (phase === "results" && deadline === null || phase === "waiting" && gameFinished);
   const ticking = !finished || !!turn.finalMotion;
-  const emojisEnabled = !paused && !turn.waitingForClock && connectionReady && connected &&
+  const emojisEnabled = !practice && !paused && !turn.waitingForClock && connectionReady && connected &&
     (phase === "memorization" || phase === "playing");
   const feedback = useCardFeedback(
     !paused && !turn.waitingForClock && connectionReady ? turn.view : null, roundNumber, clockVersion, playSound,
@@ -139,7 +140,7 @@ export default function RoundScreen({
 
   const pauseLabel = manualPause ? "Reprendre la partie" : "Mettre la partie en pause";
   const toolbar = <div className="table-options">
-    {(emojisEnabled || manualPause || phase === "dealing") &&
+    {!practice && (emojisEnabled || manualPause || phase === "dealing") &&
       <EmojiButtons label="Emojis de la table" disabled={!emojisEnabled} onChoose={chooseEmoji} />}
     {onTogglePause && (manualPause || (phase && phase !== "waiting" && phase !== "results")) &&
       <button type="button" className="pause-trigger" aria-label={pauseLabel} title={pauseLabel}

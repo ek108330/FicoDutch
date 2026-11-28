@@ -185,7 +185,7 @@ export function useRoundTurn({
   }, [hostRound, hubId, isHost, paused, updateHostRound]);
 
   useEffect(() => {
-    if (paused || hostDeadline === null || hostRoundNumber === undefined || !hostPhase) return;
+    if (paused || hostDeadline === null || !Number.isFinite(hostDeadline) || hostRoundNumber === undefined || !hostPhase) return;
     const roundNumber = hostRoundNumber;
     const phase = hostPhase;
     const deadline = hostDeadline;

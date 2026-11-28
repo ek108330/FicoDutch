@@ -48,7 +48,7 @@ test("chaque exercice guidé accepte ses gestes et ses transitions dans le moteu
     }
     if (drill.title === "Reconnaître une erreur") assert.equal(state.reaction.notice?.outcome, "penalty");
     else if (reactions) assert.equal(state.players[0].cards.length, 4 - reactions);
-    if (drill.title.startsWith("Défi Dutch")) {
+    if (drill.title === "Tester Dutch en fin de manche") {
       assert.equal(state.phase, "results");
       assert.equal(state.result?.dutchAnnouncerId, learnerId);
       assert.ok(state.result?.winnerIds.includes(learnerId));

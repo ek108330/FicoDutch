@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GAME_CONFIG, hubStatusLabels } from "./config/gameConfig";
-import { Plus, Settings } from "lucide-react";
+import { BookOpen, Plus, Settings, X } from "lucide-react";
 import "./App.css";
 import { socket, connectToServer, disconnectFromServer } from "./network/socket";
 import { useHubPeers } from "./network/useHubPeers";
@@ -22,6 +22,7 @@ import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
 import FriendsPanel from "./ui/FriendsPanel";
 import TutorialScreen, { tutorialPath } from "./ui/TutorialScreen";
+import { tutorialChapters } from "./game/tutorial";
 import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RatingPodium, RecentMatches } from "./ui/MatchArchive";
 import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, signOut, tableSummaryPath, type AccountSession } from "./network/accountApi";
 import { completedRoundsAfter, logDeal, logMatch } from "./game/matchJournal";
@@ -31,6 +32,15 @@ import { matchStatistics } from "./game/matchStatistics";
 type CurrentHub = Hub & { memorizationDeadline?: number; pauseDeadline?: number; manualResumeDeadline?: number; manualPauseClock?: number };
 const registrationPath = "/compte/inscription";
 const welcomeSeenKey = "ficodutch-welcome-seen";
+const tutorialProgressKey = "ficodutch-tutorial-progress";
+const tutorialHiddenKey = "ficodutch-tutorial-hidden";
+
+function readTutorialProgress(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(tutorialProgressKey) ?? "[]");
+    return Array.isArray(saved) ? tutorialChapters.filter(({ id }) => saved.includes(id)).map(({ id }) => id) : [];
+  } catch { return []; }
+}
 
 function prepareGame(hub: Hub) {
   const state = createRound(hub.players.map(({ id, pseudo, accountId, isBot }) => ({ id, pseudo, accountId, isBot, totalScore: 0 })),
@@ -71,6 +81,9 @@ function App() {
   const [restarting, setRestarting] = useState(false);
   const [accountSession, setAccountSession] = useState<AccountSession>();
   const [path, setPath] = useState(() => window.location.pathname);
+  const [tutorialProgress, setTutorialProgress] = useState(readTutorialProgress);
+  const [tutorialHidden, setTutorialHidden] = useState(() => localStorage.getItem(tutorialHiddenKey) === "1");
+  const showTutorial = path === tutorialPath || path.startsWith(`${tutorialPath}/`);
   const pathRef = useRef(path);
   const checkWelcome = useRef(path === "/" && !sessionStorage.getItem(welcomeSeenKey));
   const sealed = useRef<string>(null);
@@ -94,6 +107,14 @@ function App() {
     setPath(destination);
     window.scrollTo(0, 0);
   }, []);
+
+  const recordTutorialChapter = useCallback((id: string) => {
+    setTutorialProgress((current) => current.includes(id) ? current : [...current, id]);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(tutorialProgressKey, JSON.stringify(tutorialProgress));
+  }, [tutorialProgress]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -622,8 +643,6 @@ function App() {
   );
 
   function renderScreen() {
-    if (path === tutorialPath || path.startsWith(`${tutorialPath}/`)) return <TutorialScreen key={path}
-      section={routeId(path, `${tutorialPath}/`)} navigate={navigate} playSound={playSound} />;
     const tableMatch = routeId(path, "/bilans/");
     const match = tableMatch ?? routeId(path, "/parties/");
     const profile = routeId(path, "/joueurs/");
@@ -711,6 +730,18 @@ function App() {
               onDecision={(requestId, accept) => socket.emit("hub:admission-decision", { hubId: currentHub.id, requestId, accept })} />
           ) : (
             <div className="home-entry-layout">
+              {!tutorialHidden && tutorialProgress.length < tutorialChapters.length && <div className="home-tutorial">
+                <button type="button" className="home-tutorial-open" onClick={() => navigate(tutorialPath)}>
+                  <BookOpen size={16} aria-hidden="true" /> Didacticiel
+                  <span aria-label={`${tutorialProgress.length} chapitres terminés sur ${tutorialChapters.length}`}>
+                    {tutorialProgress.length}/{tutorialChapters.length}
+                  </span>
+                </button>
+                <button type="button" className="home-tutorial-hide" aria-label="Masquer le didacticiel sur l’accueil" onClick={() => {
+                  localStorage.setItem(tutorialHiddenKey, "1");
+                  setTutorialHidden(true);
+                }}><X size={17} aria-hidden="true" /></button>
+              </div>}
               <div className="home-panel home-entry">
                 {previewHub && <HubPreview key={previewHub.id} hub={previewHub} canJoin={canJoinHub(previewHub)}
                   onClose={() => setPreviewHubId(null)} onJoin={() => joinHub(previewHub.id)} />}
@@ -782,7 +813,9 @@ function App() {
 
   return (
     <>
-      {renderScreen()}
+      <div className="screen-content" hidden={showTutorial}>{renderScreen()}</div>
+      {showTutorial && <TutorialScreen key={path} section={routeId(path, `${tutorialPath}/`)} navigate={navigate}
+        playSound={playSound} completed={tutorialProgress} onChapterComplete={recordTutorialChapter} />}
       <dialog ref={welcomeDialog} className="hub-management welcome-dialog" aria-labelledby="welcome-title"
         aria-describedby="welcome-description" onClose={(event) => {
           sessionStorage.setItem(welcomeSeenKey, "1");
@@ -800,7 +833,7 @@ function App() {
         </form>
       </dialog>
       <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
-        onTutorial={!session ? () => navigate(tutorialPath) : undefined}
+        onTutorial={() => navigate(tutorialPath)}
         onLeave={currentHub?.gameStarted && networkReady ? leaveHub : undefined}
         onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined}
         onSignOut={account ? async () => {
