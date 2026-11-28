@@ -51,7 +51,7 @@ if (process.env.SERVE_CLIENT === "1") {
       if (path.extname(file) === ".html") response.setHeader("Cache-Control", "no-store");
     },
   }));
-  app.get(["/parties/:id", "/bilans/:id", "/joueurs/:id", "/joueurs", "/mes-parties", "/mes-stats", "/compte", "/compte/inscription", "/bots"], (_request, response) =>
+  app.get(["/parties/:id", "/bilans/:id", "/joueurs/:id", "/joueurs", "/mes-parties", "/mes-stats", "/compte", "/compte/inscription", "/bots", "/didacticiel", "/didacticiel/:section"], (_request, response) =>
     response.set("Cache-Control", "no-store").sendFile(path.join(clientFiles, "index.html")));
 }
 

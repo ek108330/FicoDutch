@@ -20,6 +20,7 @@ type PlayingCardProps = {
   reaction?: CardReaction;
   powerReveal?: boolean;
   lookRemaining?: number;
+  guided?: boolean;
 };
 
 export function CardFaceMark({ face }: { face: CardFace }) {
@@ -38,7 +39,7 @@ export function CardBackMark({ backRef }: { backRef?: RefObject<HTMLSpanElement 
 }
 
 export default function PlayingCard({ index, slot, face, onToggle, disabled, actionLabel, selected, exchangeSelected, dealOrder, reaction,
-  powerReveal = false, lookRemaining }: PlayingCardProps) {
+  powerReveal = false, lookRemaining, guided }: PlayingCardProps) {
   const card = useRef<HTMLButtonElement>(null);
   const back = useRef<HTMLSpanElement>(null);
   const previouslyRevealed = useRef(false);
@@ -60,6 +61,7 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
     "data-deal-order": dealOrder,
     "data-power-reveal": powerReveal || undefined,
     "data-look-card": lookRemaining !== undefined || undefined,
+    "data-tutorial-target": guided || undefined,
     style: {
       gridColumn: slot === undefined ? undefined : Math.floor(slot / 2) + 1,
       gridRow: slot === undefined ? undefined : slot % 2 + 1,
@@ -84,13 +86,13 @@ export default function PlayingCard({ index, slot, face, onToggle, disabled, act
         onClick={(event) => {
           if (event.detail === 0) {
             if (onToggle) onToggle();
-            else gestures.playReaction(event.currentTarget);
+            else gestures.playReaction(event.currentTarget, "keyboard");
           }
         }}
         onKeyDown={(event) => {
           if (event.key.toLowerCase() !== "r" || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
           event.preventDefault();
-          gestures.playReaction(event.currentTarget);
+          gestures.playReaction(event.currentTarget, "keyboard");
         }}>
         {content}
         {clock}

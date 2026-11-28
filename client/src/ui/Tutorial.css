@@ -1,0 +1,163 @@
+.tutorial-menu {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.tutorial-menu h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-menu > p { margin-block: 8px 16px; }
+
+.tutorial-chapters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tutorial-menu button,
+.tutorial-coach button,
+.tutorial-exit {
+  color: #fff;
+  background: #193f31;
+  border: 1px solid #82a990;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tutorial-menu button:focus-visible,
+.tutorial-coach button:focus-visible,
+.tutorial-exit:focus-visible {
+  outline: 2px solid #f3de9a;
+  outline-offset: 2px;
+}
+
+.tutorial-menu button {
+  min-height: 42px;
+  padding: 8px 12px;
+}
+
+.tutorial-menu .tutorial-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #332616;
+  font-weight: 750;
+  border-color: #f3de9a;
+  background: #f3de9a;
+}
+
+.tutorial-chapters button {
+  display: grid;
+  gap: 3px;
+  text-align: start;
+}
+
+.tutorial-chapters strong { color: #f3de9a; }
+.tutorial-chapters span { font-size: 0.88rem; line-height: 1.3; }
+
+.tutorial-end-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.tutorial-score ul { padding-inline-start: 22px; }
+
+.game-screen.table-screen.tutorial-game {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+}
+
+.tutorial-coach {
+  position: relative;
+  width: min(100%, 1400px);
+  box-sizing: border-box;
+  align-self: start;
+  border: 1px solid #a9925a;
+  border-radius: 10px;
+  background: #14382b;
+  padding: 5px 9px 7px;
+  text-align: start;
+  line-height: 1.2;
+}
+
+.tutorial-coach header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
+}
+
+.tutorial-coach h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.15;
+  color: #fff8e7;
+  letter-spacing: -0.015em;
+}
+
+.tutorial-coach h1 small { font-weight: 600; white-space: nowrap; }
+.tutorial-coach strong { color: #f3de9a; font-size: 0.84rem; }
+.tutorial-coach p { margin: 2px 0 0; font-size: 0.84rem; }
+.tutorial-notice { display: block; margin-top: 3px; color: #ffcf98; }
+.tutorial-coach button {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 32px;
+  padding: 0;
+}
+.tutorial-coach button:disabled { opacity: 0.5; cursor: default; }
+.tutorial-coach button[aria-pressed="true"] { color: #332616; background: #f3de9a; }
+.tutorial-exit { min-height: 28px; padding: 3px 8px; background: #21573d; font-size: 0.78rem; }
+.table-options .tutorial-exit { grid-column: 2; }
+
+.tutorial-game :is([data-tutorial-target], .dutch-icon:focus-visible),
+.tutorial-game[data-hint="draw"] .deck-slot,
+.tutorial-game[data-hint="drawn"] .position-bottom .drawn-card,
+.tutorial-game[data-hint="discard-drag"] :is(.position-bottom .drawn-card, .discard-slot),
+.tutorial-game[data-hint="discard"] .discard-slot,
+.tutorial-game[data-hint="gift"] .deck-slot,
+.tutorial-game[data-hint="dutch"] .position-bottom .dutch-icon,
+.tutorial-game[data-hint="pass"] .turn-cancel,
+.tutorial-game[data-hint="swap"] .turn-swap {
+  outline: 3px solid #f3d27d;
+  outline-offset: 2px;
+  box-shadow: 0 0 12px #ffe29c99;
+}
+
+.tutorial-game:not([data-timed]) :is(.perimeter-clock, .power-card-turn + .perimeter-clock) {
+  visibility: hidden;
+}
+
+@media (orientation: portrait) and (max-height: 650px) {
+  .game-screen.table-screen.tutorial-game > .game-table[data-player-count="3"] {
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+    row-gap: 5px;
+    padding-block: 12px 9px;
+  }
+
+  .tutorial-game .game-table[data-player-count="3"] .position-bottom .player-cards {
+    --card-height: clamp(38px, 8.4dvh, 52px);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .game-screen.table-screen.tutorial-game {
+    grid-template: minmax(0, 1fr) / minmax(145px, 24%) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .tutorial-coach { align-self: center; }
+  .tutorial-coach header { flex-wrap: wrap; }
+  .tutorial-coach h1 { flex: 1 0 65%; }
+}

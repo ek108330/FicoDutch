@@ -4,11 +4,12 @@ import type { PlayGameSound } from "./useCardFeedback";
 
 type Point = { x: number; y: number };
 type Drag = { pointerId: number; origin: Point; target: Point; distance: number; moved: boolean };
+export type ReactionGesture = "triple-tap" | "drag" | "keyboard";
 
 export type CardReaction = {
   scope: string;
   center: RefObject<HTMLDivElement | null>;
-  play: () => void;
+  play: (gesture: ReactionGesture) => void;
   playSound: PlayGameSound;
 };
 
@@ -48,12 +49,12 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
     };
   }, [card, reaction?.scope, actionLabel]);
 
-  function playReaction(element: HTMLButtonElement) {
+  function playReaction(element: HTMLButtonElement, gesture: ReactionGesture) {
     if (!reaction) return;
     const target = reaction.center.current?.querySelector(".discard-slot");
     if (target) flyToDiscard(element.getBoundingClientRect(), target, "reaction");
     reaction.playSound("reaction");
-    reaction.play();
+    reaction.play(gesture);
   }
 
   function pointerDown(event: PointerEvent<HTMLButtonElement>) {
@@ -96,7 +97,7 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
       const releaseTowardCenter = progress >= Math.min(52, current.distance * 0.55) && progress >= movement * 0.7;
       if (releaseTowardCenter) {
         element.style.translate = translate(offset);
-        playReaction(element);
+        playReaction(element, "drag");
       }
       resetDrag(element, !releaseTowardCenter);
       resetTaps();
@@ -108,7 +109,7 @@ export function useCardGestures(card: RefObject<HTMLButtonElement | null>, react
     const count = now - taps.current.last <= tapWindow ? taps.current.count + 1 : 1;
     resetTaps();
     if (count === 3) {
-      playReaction(element);
+      playReaction(element, "triple-tap");
       return;
     }
     reaction.playSound("tap");

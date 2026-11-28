@@ -1,5 +1,5 @@
 import { useId, useState, type RefObject } from "react";
-import { BookOpen, LogOut, UserRound, Users, Volume2, VolumeX, X } from "lucide-react";
+import { BookOpen, GraduationCap, LogOut, UserRound, Users, Volume2, VolumeX, X } from "lucide-react";
 import HubManagement, { type HubManagementOptions } from "./HubManagement";
 import Rules from "./Rules";
 
@@ -9,11 +9,12 @@ type Props = {
   toggleSound: () => void;
   management?: HubManagementOptions;
   onAccount?: () => void;
+  onTutorial?: () => void;
   onSignOut?: () => Promise<void>;
   onLeave?: () => void;
 };
 
-export default function GameSettings({ dialog, sound, toggleSound, management, onAccount, onSignOut, onLeave }: Props) {
+export default function GameSettings({ dialog, sound, toggleSound, management, onAccount, onTutorial, onSignOut, onLeave }: Props) {
   const title = useId();
   const [panel, setPanel] = useState<"settings" | "rules" | "table">("settings");
   const showRules = panel === "rules";
@@ -55,6 +56,9 @@ export default function GameSettings({ dialog, sound, toggleSound, management, o
             <button type="button" onClick={() => setPanel("rules")}>
               <BookOpen size={19} aria-hidden="true" /> Règles du jeu
             </button>
+            {onTutorial && <button type="button" onClick={() => { dialog.current?.close(); onTutorial(); }}>
+              <GraduationCap size={19} aria-hidden="true" /> Apprendre à jouer
+            </button>}
             {onAccount && <button type="button" onClick={() => { dialog.current?.close(); onAccount(); }}>
               <UserRound size={19} aria-hidden="true" /> Mon compte
             </button>}

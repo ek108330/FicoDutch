@@ -21,6 +21,7 @@ import RoundScreen from "./ui/RoundScreen";
 import { useGameAudio } from "./ui/useCardFeedback";
 import AccountScreen from "./ui/AccountScreen";
 import FriendsPanel from "./ui/FriendsPanel";
+import TutorialScreen, { tutorialPath } from "./ui/TutorialScreen";
 import { DemoBots, MatchArchive, PlayersDirectory, PublicProfile, RatingPodium, RecentMatches } from "./ui/MatchArchive";
 import { guestMatchToken, matchPath, readAccount, readMatch, rememberGuestMatch, signOut, tableSummaryPath, type AccountSession } from "./network/accountApi";
 import { completedRoundsAfter, logDeal, logMatch } from "./game/matchJournal";
@@ -621,6 +622,8 @@ function App() {
   );
 
   function renderScreen() {
+    if (path === tutorialPath || path.startsWith(`${tutorialPath}/`)) return <TutorialScreen key={path}
+      section={routeId(path, `${tutorialPath}/`)} navigate={navigate} playSound={playSound} />;
     const tableMatch = routeId(path, "/bilans/");
     const match = tableMatch ?? routeId(path, "/parties/");
     const profile = routeId(path, "/joueurs/");
@@ -785,6 +788,7 @@ function App() {
           sessionStorage.setItem(welcomeSeenKey, "1");
           if (event.currentTarget.returnValue === "signin") navigate("/compte");
           if (event.currentTarget.returnValue === "register") navigate(registrationPath);
+          if (event.currentTarget.returnValue === "tutorial") navigate(tutorialPath);
         }}>
         <h2 id="welcome-title">Bienvenue sur FicoDutch</h2>
         <p id="welcome-description">Connecte-toi ou crée un compte pour conserver tes statistiques.</p>
@@ -792,9 +796,11 @@ function App() {
           <button type="submit" value="signin">Se connecter</button>
           <button type="submit" value="register">Créer un compte</button>
           <button type="submit" value="guest">Jouer en tant qu’invité</button>
+          <button type="submit" value="tutorial">Apprendre à jouer</button>
         </form>
       </dialog>
       <GameSettings dialog={settingsDialog} sound={sound} toggleSound={toggleSound} management={management}
+        onTutorial={!session ? () => navigate(tutorialPath) : undefined}
         onLeave={currentHub?.gameStarted && networkReady ? leaveHub : undefined}
         onAccount={accountSession?.enabled ? () => navigate("/compte") : undefined}
         onSignOut={account ? async () => {

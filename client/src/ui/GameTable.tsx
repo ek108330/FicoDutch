@@ -16,6 +16,7 @@ import type { TableEmoji } from "../network/useTableEmojis";
 import type { PlayGameSound } from "./useCardFeedback";
 import { describeCardFace } from "./cardLabels";
 import { useTapAction } from "./useTapAction";
+import type { ReactionGesture } from "./useCardGestures";
 import PerimeterClock from "./PerimeterClock";
 import PlayerAvatar from "./PlayerAvatar";
 import RatingBadge from "./RatingBadge";
@@ -40,11 +41,12 @@ type GameTableProps = {
   leaderIds?: readonly string[];
   protectedPlayerId?: string;
   tableEmojis?: ReadonlyMap<string, TableEmoji>;
-  onReplace?: (position: number) => void;
+  onReplace?: (position: number, gesture: "tap" | "drag") => void;
   onDiscardDrawn?: () => void;
   dutchControl?: { armed: boolean; toggle: () => void };
   look?: { target: CardTarget; remaining: number };
-  reaction?: { scope: string; play: (position: number) => void };
+  reaction?: { scope: string; play: (position: number, gesture: ReactionGesture) => void };
+  guideTarget?: CardTarget;
   drawnCard?: CardFace;
   botDrawingId?: string;
   cardMotion?: TurnView["cardMotion"];
@@ -100,6 +102,7 @@ export default function GameTable({
   dutchControl,
   look,
   reaction,
+  guideTarget,
   drawnCard,
   botDrawingId,
   cardMotion,
@@ -160,11 +163,11 @@ export default function GameTable({
     playSound(publicMove.move.kind === "bot-discard" ? "discard" : publicMove.move.kind);
   }, [publicMove, playSound]);
 
-  function replaceCard(position: number) {
+  function replaceCard(position: number, gesture: "tap" | "drag") {
     const target = center.current?.querySelector(".discard-slot");
     const source = table.current?.querySelector(`.position-bottom [data-card-position="${position}"]`);
     if (source && target) flyToDiscard(source.getBoundingClientRect(), target, "discard");
-    onReplace?.(position);
+    onReplace?.(position, gesture);
   }
   const localIndex = players.findIndex((player) => player.id === localPlayerId);
   const opponents = localIndex < 0 ? players : [...players.slice(localIndex + 1), ...players.slice(0, localIndex)];
@@ -258,7 +261,7 @@ export default function GameTable({
                   const cardAction = viewed && powerFace && power ? power.hideCard
                     : canChoose ? () => power.chooseCard(target)
                     : ownSelection ? () => ownSelection.toggle(index)
-                    : replace && (() => replaceCard(index));
+                    : replace && (() => replaceCard(index, "tap"));
                   const actionLabel = viewed && powerFace ? `Retourner la carte ${index + 1} de ${player.pseudo}, ${describeCardFace(powerFace)}`
                     : canChoose ? `Choisir la carte ${index + 1} de ${player.pseudo}`
                     : replace ? `Remplacer la carte ${index + 1}` : undefined;
@@ -271,7 +274,8 @@ export default function GameTable({
                       face={revealed}
                       powerReveal={!!powerFace}
                       onToggle={cardAction}
-                      reaction={react && !viewed ? { scope: react.scope, center, play: () => react.play(index), playSound } : undefined}
+                      reaction={react && !viewed ? { scope: react.scope, center, play: (gesture) => react.play(index, gesture), playSound } : undefined}
+                      guided={guideTarget && sameTarget(guideTarget, target)}
                       actionLabel={actionLabel}
                       selected={selected || !!(ownSelection && revealed)}
                       exchangeSelected={exchangeSelected}
@@ -290,7 +294,7 @@ export default function GameTable({
               </div>
               {position === "bottom" && drawnCard && (
                 <DrawnCard face={drawnCard} center={center} onSlide={() => playSound("slide")}
-                  onDrop={onDiscardDrawn && ((target) => target === null ? onDiscardDrawn() : replaceCard(target))} />
+                  onDrop={onDiscardDrawn && ((target) => target === null ? onDiscardDrawn() : replaceCard(target, "drag"))} />
               )}
               {botDrawingId === player.id && <DrawnCard center={center} botName={player.pseudo} />}
               {played && slot === undefined && (
